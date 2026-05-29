@@ -8,6 +8,10 @@
 Runico turns anything you're learning into flashcards and helps you practice them —
 recall the answer, reveal it, then Continue or Pause, with no grading scales to fuss over.
 
+### ▶ [Launch the live prototype](https://nordic-ocean.github.io/runico/app/)
+
+Runs entirely in your browser · mock data persists in your session
+
 </div>
 
 ---
@@ -74,6 +78,18 @@ Each section links to a full step-by-step walkthrough.
 **[Full walkthrough →](tutorial/07-make-it-yours.md)**
 
 ---
+
+## Try the prototype
+
+A fully interactive, mock-data build of the app — browse the library, study cards
+(including image-occlusion), generate and review AI draft cards, rename/add/delete
+cards and folders, and switch themes and language. **Everything you change is saved to
+your browser's session storage**, so it survives reloads within the tab and resets when
+you close it.
+
+**▶ [Open the live prototype](https://nordic-ocean.github.io/runico/app/)**
+
+Prefer to run it locally? See [`app/`](app/) — `python3 -m http.server --directory app`, then open the printed URL.
 
 ## At a glance
 
