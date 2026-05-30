@@ -1,6 +1,6 @@
 [← Back to the tour](README.md)
 
-# 4 · Add cards from anything
+# 5 · Add cards from anything
 
 > Drop in material, let Runico draft cards, then keep the ones worth studying.
 
@@ -38,6 +38,6 @@ keep only the ones worth studying.
 
 <div align="center">
 
-[← Browse & practice](03-browse-and-practice.md)  ·  [↑ Tour index](README.md)  ·  Next: [Mask an image →](05-mask-an-image.md)
+[← Track your progress](04-track-your-progress.md)  ·  [↑ Tour index](README.md)  ·  Next: [Mask an image →](06-mask-an-image.md)
 
 </div>

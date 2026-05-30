@@ -1,6 +1,6 @@
 [← Back to the tour](README.md)
 
-# 7 · Make it yours
+# 8 · Make it yours
 
 > Choose a canvas theme and the language for your cards and interface.
 
@@ -39,7 +39,7 @@ language your cards and interface render in.
 
 <div align="center">
 
-[← See the source](06-see-the-source.md)  ·  [↑ Tour index](README.md)
+[← See the source](07-see-the-source.md)  ·  [↑ Tour index](README.md)
 
 That's the tour. ✨
 

@@ -1,6 +1,6 @@
 [← Back to the tour](README.md)
 
-# 6 · See the source
+# 7 · See the source
 
 > Open the original material as a book page, with the studied term highlighted in context.
 
@@ -31,6 +31,6 @@ highlighted in place. It's context, not just a flashcard.
 
 <div align="center">
 
-[← Mask an image](05-mask-an-image.md)  ·  [↑ Tour index](README.md)  ·  Next: [Make it yours →](07-make-it-yours.md)
+[← Mask an image](06-mask-an-image.md)  ·  [↑ Tour index](README.md)  ·  Next: [Make it yours →](08-make-it-yours.md)
 
 </div>

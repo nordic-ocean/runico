@@ -1,6 +1,6 @@
 [← Back to the tour](README.md)
 
-# 5 · Mask an image
+# 6 · Mask an image
 
 > Draw, drag, and resize boxes over a figure to build image-occlusion cards.
 
@@ -32,6 +32,6 @@ for you to recall — perfect for diagrams, anatomy, maps, and any labelled imag
 
 <div align="center">
 
-[← Add cards from anything](04-add-cards-from-anything.md)  ·  [↑ Tour index](README.md)  ·  Next: [See the source →](06-see-the-source.md)
+[← Add cards from anything](05-add-cards-from-anything.md)  ·  [↑ Tour index](README.md)  ·  Next: [See the source →](07-see-the-source.md)
 
 </div>

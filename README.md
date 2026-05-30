@@ -18,7 +18,7 @@ Runs entirely in your browser · mock data persists in your session
 
 ## A quick tour of Runico
 
-Seven short, looping demos — one per feature. Everything plays automatically.
+Eight short, looping demos — one per feature. Everything plays automatically.
 Each section links to a full step-by-step walkthrough.
 
 ### 1 · Study a card
@@ -45,37 +45,45 @@ Each section links to a full step-by-step walkthrough.
 
 **[Full walkthrough →](tutorial/03-browse-and-practice.md)**
 
-### 4 · Add cards from anything
+### 4 · Track your progress
+
+> See whether a topic is trending up — per-session accuracy over time, with a drill-down to any single card.
+
+<p align="center"><img src="tutorial/assets/progress.gif" alt="Track your progress — looping demo" width="700"></p>
+
+**[Full walkthrough →](tutorial/04-track-your-progress.md)**
+
+### 5 · Add cards from anything
 
 > Drop in material, let Runico draft cards, then keep the ones worth studying.
 
 <p align="center"><img src="tutorial/assets/add.gif" alt="Add cards from anything — looping demo" width="700"></p>
 
-**[Full walkthrough →](tutorial/04-add-cards-from-anything.md)**
+**[Full walkthrough →](tutorial/05-add-cards-from-anything.md)**
 
-### 5 · Mask an image
+### 6 · Mask an image
 
 > Draw, drag, and resize boxes over a figure to build image-occlusion cards.
 
 <p align="center"><img src="tutorial/assets/occlusion.gif" alt="Mask an image — looping demo" width="700"></p>
 
-**[Full walkthrough →](tutorial/05-mask-an-image.md)**
+**[Full walkthrough →](tutorial/06-mask-an-image.md)**
 
-### 6 · See the source
+### 7 · See the source
 
 > Open the original material as a book page, with the studied term highlighted in context.
 
 <p align="center"><img src="tutorial/assets/source.gif" alt="See the source — looping demo" width="700"></p>
 
-**[Full walkthrough →](tutorial/06-see-the-source.md)**
+**[Full walkthrough →](tutorial/07-see-the-source.md)**
 
-### 7 · Make it yours
+### 8 · Make it yours
 
 > Choose a canvas theme and the language for your cards and interface.
 
 <p align="center"><img src="tutorial/assets/settings.gif" alt="Make it yours — looping demo" width="700"></p>
 
-**[Full walkthrough →](tutorial/07-make-it-yours.md)**
+**[Full walkthrough →](tutorial/08-make-it-yours.md)**
 
 ---
 
@@ -96,6 +104,7 @@ Prefer to run it locally? See [`app/`](app/) — `python3 -m http.server --direc
 - **Study without grading scales.** Reveal the answer, then choose **Continue** or **Pause** — that's it.
 - **Always resumable.** Runico remembers the exact card you stopped on.
 - **A library you can navigate.** Subjects → folders → topics, in a column browser.
+- **See your progress.** Per-session accuracy charts show whether a topic is trending up — reporting only, never grading.
 - **Cards from any material.** Drop in a page, screenshot, or notes and Runico drafts cards for you to review.
 - **Image-occlusion cards.** Mask regions of a figure to study diagrams and labels.
 - **Source in context.** Every card links back to the original material, shown like a book page.
