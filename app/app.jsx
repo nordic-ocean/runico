@@ -134,6 +134,101 @@ const KIND_LABEL = {
   occlusion: 'Image',
 };
 
+// ── Review history ───────────────────────────────────────────
+// Per-session accuracy is the one and only metric: cards passed ÷ cards
+// reviewed, as a raw observed pass rate straight from the grades, computed
+// per sitting. History is persisted keyed by session id + timestamp (and,
+// for drill-down, the per-card pass/miss within each session). This module
+// is read-only — it never touches grading or scheduling.
+//
+// In production these rows are appended every time a session ends. For the
+// prototype we seed a deterministic ~3 months of sittings per leaf source so
+// the rolling-30-day window and the page-back-through-earlier-spans behavior
+// have something real to render.
+
+const DAY_MS = 86400000;
+// The app's "today" (matches the dashboard eyebrow, Tuesday · May 27).
+const TODAY = new Date(2026, 4, 27);
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function hashSeed(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+
+// Generate sittings for one leaf source. Accuracy trends from startAcc →
+// endAcc over the span, with per-card difficulty + per-sitting noise so the
+// deck trend and the single-card drill-downs both read honestly.
+function genSourceHistory(srcId, cardIds, startAcc, endAcc, spanDays = 96) {
+  if (!cardIds.length) return { sessions: [], cardHist: {} };
+  const rnd = mulberry32(hashSeed(srcId));
+  const diff = {};
+  cardIds.forEach(id => { diff[id] = (rnd() - 0.5) * 0.34; }); // ±0.17 difficulty
+  const sessions = [];
+  const cardHist = {};
+  cardIds.forEach(id => { cardHist[id] = []; });
+
+  let dayOff = spanDays;
+  let sid = 0;
+  while (dayOff >= 0) {
+    const ts = new Date(TODAY);
+    ts.setDate(ts.getDate() - dayOff);
+    ts.setHours(8 + Math.floor(rnd() * 11), Math.floor(rnd() * 60), 0, 0);
+    const progress = 1 - dayOff / spanDays;
+    const target = startAcc + (endAcc - startAcc) * progress;
+
+    const maxR = cardIds.length;
+    const reviewed = Math.max(3, Math.min(maxR, Math.round(maxR * (0.5 + rnd() * 0.5))));
+    const pool = cardIds.slice();
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    const chosen = pool.slice(0, reviewed);
+    let passed = 0;
+    chosen.forEach(cid => {
+      let p = target + diff[cid] + (rnd() - 0.5) * 0.16;
+      p = Math.max(0.05, Math.min(0.98, p));
+      const ok = rnd() < p;
+      if (ok) passed++;
+      cardHist[cid].push({ ts: ts.getTime(), passed: ok, sid });
+    });
+    sessions.push({ id: srcId + '-s' + sid, ts: ts.getTime(), reviewed: chosen.length, passed });
+    sid++;
+    dayOff -= 2 + Math.floor(rnd() * 3); // 2–4 day gaps between sittings
+  }
+  sessions.sort((a, b) => a.ts - b.ts);
+  Object.values(cardHist).forEach(arr => arr.sort((a, b) => a.ts - b.ts));
+  return { sessions, cardHist };
+}
+
+const REVIEW_HISTORY = {
+  'bio-cell-organelles': genSourceHistory(
+    'bio-cell-organelles',
+    (SOURCE_CARDS_SEED['bio-cell-organelles'] || []).map(c => c.id), 0.52, 0.9),
+  'bio-cell-photo': genSourceHistory(
+    'bio-cell-photo',
+    (SOURCE_CARDS_SEED['bio-cell-photo'] || []).map(c => c.id), 0.6, 0.83),
+  'bio-cell-membrane': genSourceHistory(
+    'bio-cell-membrane',
+    (SOURCE_CARDS_SEED['bio-cell-membrane'] || []).map(c => c.id), 0.46, 0.95),
+};
+
+function fmtDay(ts) {
+  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+function acc(passed, reviewed) {
+  return reviewed > 0 ? Math.round((passed / reviewed) * 100) : 0;
+}
+
 // ── Tiny icons (only ones we use, hand-built) ────────────────
 function Glyph({ name, size = 16 }) {
   const paths = {
@@ -155,6 +250,9 @@ function Glyph({ name, size = 16 }) {
     book:   <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></>,
     play:   <path d="M6 4l14 8-14 8z" />,
     restart:<><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></>,
+    chart:  <><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></>,
+    trend:  <><path d="M3 17l6-6 4 4 7-7" /><path d="M17 8h4v4" /></>,
+    clock:  <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -326,7 +424,7 @@ function FolderView({
   onEnterChild, onBack, onBegin,
   onCreateFolder, onAddSource,
   onRenameFolder, onDeleteFolder,
-  onOpenSource,
+  onOpenSource, onViewProgress,
 }) {
   // ── Finder-style column view ─────────────────────────────────
   // The Single-folder view above was replaced by a multi-column
@@ -563,12 +661,14 @@ function FolderView({
           <ActionCard
             scope={selectedScope}
             cards={sourceCards[selectedScope.id] || []}
+            history={REVIEW_HISTORY[selectedScope.id]}
             onBegin={() => onBegin(selectedScope.id)}
             onOpen={() => onOpenSource(selectedScope.id)}
             onEdit={() => startRename(selectedScope)}
             onDelete={() => onDeleteFolder(selectedScope.id)}
             onAddFromFile={() => onAddSource(selectedScope.id)}
             onReviewDrafts={() => onReviewDrafts(selectedScope.id)}
+            onViewProgress={() => onViewProgress(selectedScope.id)}
             isPendingDelete={pendingDeleteId === selectedScope.id}
             onConfirmDelete={() => { onDeleteFolder(selectedScope.id); setPendingDeleteId(null); setPath(path.slice(0, -1)); }}
             onCancelDelete={() => setPendingDeleteId(null)}
@@ -584,14 +684,52 @@ function FolderView({
   );
 }
 
+// Full-width accuracy trend banner for the leaf's Action Card — the recent
+// per-session accuracy shape at a glance. Falls back to the spark mark when
+// there isn't enough history to draw a line.
+function ActionTrend({ history }) {
+  const sessions = (history && history.sessions) || [];
+  const pts = sessions.slice(-14).map(s => acc(s.passed, s.reviewed));
+  const W = 240, H = 34, padL = 20, padR = 3, padT = 4, padB = 4;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const xs = (i) => padL + (i / (pts.length - 1)) * plotW;
+  const ys = (v) => padT + (1 - v / 100) * plotH; // fixed 0–100 scale
+  const line = pts.map((v, i) => `${i ? 'L' : 'M'}${xs(i).toFixed(1)},${ys(v).toFixed(1)}`).join(' ');
+  const area = `M${xs(0).toFixed(1)},${ys(0).toFixed(1)} `
+    + pts.map((v, i) => `L${xs(i).toFixed(1)},${ys(v).toFixed(1)}`).join(' ')
+    + ` L${xs(pts.length - 1).toFixed(1)},${ys(0).toFixed(1)} Z`;
+  const ticks = [100, 50, 0];
+  return (
+    <div className="action-card-trend">
+      <svg className="action-trend-svg" viewBox={`0 0 ${W} ${H}`} fill="none">
+        {ticks.map(t => (
+          <g key={t}>
+            <line className="action-trend-grid" x1={padL} y1={ys(t)} x2={W - padR} y2={ys(t)} />
+            <text className="action-trend-axis" x={padL - 4} y={ys(t) + 2.6} textAnchor="end">{t}</text>
+          </g>
+        ))}
+        <path className="action-trend-area" d={area} />
+        <path className="action-trend-line" d={line} />
+        <circle className="action-trend-dot" cx={xs(pts.length - 1)} cy={ys(pts[pts.length - 1])} r="2.6" />
+      </svg>
+      <div className="action-trend-foot">
+        <span className="action-trend-cap">Accuracy trend</span>
+      </div>
+    </div>
+  );
+}
+
 function ActionCard({
-  scope, cards = [], onBegin, onOpen, onEdit, onDelete, onAddFromFile, onReviewDrafts,
+  scope, cards = [], history, onBegin, onOpen, onEdit, onDelete, onAddFromFile, onReviewDrafts, onViewProgress,
   isPendingDelete, onConfirmDelete, onCancelDelete, askDelete,
   renaming, editName, setEditName, finishRename,
 }) {
+  const hasTrend = history && history.sessions && history.sessions.length >= 2;
   return (
     <div className="action-card">
-      <div className="action-card-glyph"><Glyph name="spark" size={18} /></div>
+      {hasTrend
+        ? <ActionTrend history={history} />
+        : <div className="action-card-glyph"><Glyph name="spark" size={18} /></div>}
       {renaming ? (
         <input
           className="action-card-name-input"
@@ -636,6 +774,9 @@ function ActionCard({
         )}
         <button className="action-card-btn" onClick={onOpen}>
           <Glyph name="folders" size={13} /> Open cards
+        </button>
+        <button className="action-card-btn" onClick={onViewProgress}>
+          <Glyph name="trend" size={13} /> View progress
         </button>
         <button className="action-card-btn" onClick={onEdit}>
           <Glyph name="pencil" size={13} /> Rename
@@ -952,7 +1093,7 @@ function CreateFolderRow({ depth = 1, name, setName, onSubmit, onCancel }) {
     </div>
   );
 }
-function SourceDetailScreen({ scope, scopes, cards, onChangeName, onSaveCard, onDeleteCard, onAddManual, onAddFromFile, onBegin, onBack, draftCount, onReviewDrafts }) {
+function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSaveCard, onDeleteCard, onAddManual, onAddFromFile, onBegin, onBack, draftCount, onReviewDrafts, onViewProgress }) {
   const [name, setName] = useState(scope.label);
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -1040,12 +1181,22 @@ function SourceDetailScreen({ scope, scopes, cards, onChangeName, onSaveCard, on
         {dueCount > 0
           ? <button className="primary lg" onClick={onBegin}>Begin <Glyph name="arrow" size={18} /></button>
           : null}
+        <button className="quiet" onClick={onViewProgress}>
+          <Glyph name="trend" size={15} /> View progress
+        </button>
         {draftCount > 0 && (
           <button className="quiet" onClick={onReviewDrafts}>
             <Glyph name="spark" /> {draftCount} new cards ready
           </button>
         )}
       </div>
+
+      {history && history.sessions && history.sessions.length >= 2 && (
+        <button className="src-trend" onClick={onViewProgress} title="View full performance">
+          <ActionTrend history={history} />
+          <span className="src-trend-hint">View full performance <Glyph name="arrow" size={12} /></span>
+        </button>
+      )}
 
       <div className="folder-section-head">
         <span className="folder-section-label">Cards</span>
@@ -1159,6 +1310,295 @@ function CardEditor({ draft, setDraft }) {
         onChange={e => setDraft(d => ({ ...d, a: e.target.value }))}
         rows={2}
       />
+    </div>
+  );
+}
+
+// ── Performance over time ────────────────────────────────────
+function cardLabel(c) {
+  if (!c) return '';
+  if (c.kind === 'cloze') return c.q.replace(/\{\{(.+?)\}\}/g, '____');
+  return c.q;
+}
+
+// Tiny inline sparkline for the per-card list (binary pass/miss).
+function MiniSpark({ points }) {
+  const W = 72, H = 22, pad = 3;
+  if (!points.length) {
+    return <svg className="mini-spark" width={W} height={H} viewBox={`0 0 ${W} ${H}`} />;
+  }
+  if (points.length === 1) {
+    const p = points[0];
+    const cy = pad + (1 - p.value / 100) * (H - pad * 2);
+    return (
+      <svg className="mini-spark" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+        <circle cx={W / 2} cy={cy} r="2.6" fill={p.passed ? 'var(--success-500)' : 'var(--error-500)'} />
+      </svg>
+    );
+  }
+  const xs = (i) => pad + (i / (points.length - 1)) * (W - pad * 2);
+  const ys = (v) => pad + (1 - v / 100) * (H - pad * 2);
+  const d = points.map((p, i) => `${i ? 'L' : 'M'}${xs(i).toFixed(1)},${ys(p.value).toFixed(1)}`).join(' ');
+  return (
+    <svg className="mini-spark" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+      <path d={d} fill="none" stroke="var(--primary-300)" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" />
+      {points.map((p, i) => (
+        <circle key={i} cx={xs(i)} cy={ys(p.value)} r="2"
+                fill={p.passed ? 'var(--success-500)' : 'var(--error-500)'} />
+      ))}
+    </svg>
+  );
+}
+
+// The line chart. Time on x across the visible 30-day span; per-session
+// accuracy (%) on y. `mode` is 'deck' (continuous %) or 'card' (binary).
+function PerfChart({ points, windowStart, windowEnd, mode }) {
+  const [hover, setHover] = useState(null);
+  const W = 880, H = 320, padL = 48, padR = 22, padT = 22, padB = 36;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const span = windowEnd - windowStart || 1;
+  const xOf = (ts) => padL + ((ts - windowStart) / span) * plotW;
+  const yOf = (v) => padT + (1 - v / 100) * plotH;
+
+  const inWin = points
+    .filter(p => p.ts >= windowStart && p.ts <= windowEnd)
+    .sort((a, b) => a.ts - b.ts);
+
+  const yTicks = [0, 25, 50, 75, 100];
+  const xTicks = Array.from({ length: 6 }, (_, i) => windowStart + (span * i) / 5);
+
+  const linePts = inWin.map(p => `${xOf(p.ts).toFixed(1)},${yOf(p.value).toFixed(1)}`).join(' ');
+  const areaD = inWin.length
+    ? `M${xOf(inWin[0].ts).toFixed(1)},${yOf(0).toFixed(1)} `
+      + inWin.map(p => `L${xOf(p.ts).toFixed(1)},${yOf(p.value).toFixed(1)}`).join(' ')
+      + ` L${xOf(inWin[inWin.length - 1].ts).toFixed(1)},${yOf(0).toFixed(1)} Z`
+    : '';
+
+  return (
+    <div className="chart-wrap">
+      <svg className="chart-svg" viewBox={`0 0 ${W} ${H}`}
+           onMouseLeave={() => setHover(null)}>
+        {/* horizontal gridlines + y labels */}
+        {yTicks.map(t => (
+          <g key={t}>
+            <line className="chart-grid-line" x1={padL} y1={yOf(t)} x2={W - padR} y2={yOf(t)} />
+            <text className="chart-axis-text" x={padL - 10} y={yOf(t) + 4} textAnchor="end">{t}%</text>
+          </g>
+        ))}
+        {/* x date labels */}
+        {xTicks.map((t, i) => (
+          <text key={i} className="chart-axis-text" x={xOf(t)} y={H - 12}
+                textAnchor={i === 0 ? 'start' : i === xTicks.length - 1 ? 'end' : 'middle'}>
+            {fmtDay(t)}
+          </text>
+        ))}
+
+        {mode === 'deck' && areaD && <path className="chart-area" d={areaD} />}
+
+        {inWin.length > 1 && (
+          <polyline className={`chart-line ${mode === 'card' ? 'is-card' : ''}`} points={linePts} />
+        )}
+
+        {inWin.map((p, i) => (
+          <g key={i}>
+            <circle
+              className={`chart-dot ${mode === 'card' ? (p.passed ? 'pass' : 'miss') : ''}`}
+              cx={xOf(p.ts)} cy={yOf(p.value)} r={hover === i ? 6 : 4.5} />
+            <circle cx={xOf(p.ts)} cy={yOf(p.value)} r="14" fill="transparent"
+                    onMouseEnter={() => setHover(i)} style={{ cursor: 'pointer' }} />
+          </g>
+        ))}
+      </svg>
+
+      {inWin.length === 0 && (
+        <div className="chart-empty">No sittings in this window.</div>
+      )}
+
+      {hover != null && inWin[hover] && (() => {
+        const p = inWin[hover];
+        const left = (xOf(p.ts) / W) * 100;
+        const top = (yOf(p.value) / H) * 100;
+        return (
+          <div className="chart-tooltip" style={{ left: `${left}%`, top: `${top}%` }}>
+            {mode === 'card' ? (
+              <>
+                <div>{p.passed ? 'Passed' : 'Missed'}</div>
+                <div className="chart-tooltip-sub">{fmtDay(p.ts)}</div>
+              </>
+            ) : (
+              <>
+                <div>{p.value}% accuracy</div>
+                <div className="chart-tooltip-sub">{p.passed}/{p.reviewed} passed · {fmtDay(p.ts)}</div>
+              </>
+            )}
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+function PerformanceScreen({ scope, scopes, cards, history, onJumpFolder, onOpenSource }) {
+  const [offset, setOffset] = useState(0);   // 0 = trailing 30 days from today
+  const [cardId, setCardId] = useState(null); // null = deck overview
+
+  const hist = history || { sessions: [], cardHist: {} };
+  const todayEnd = useMemo(() => {
+    const d = new Date(TODAY); d.setHours(23, 59, 59, 999); return d.getTime();
+  }, []);
+  const windowEnd = todayEnd - offset * 30 * DAY_MS;
+  const windowStart = windowEnd - 30 * DAY_MS;
+
+  const oldestTs = hist.sessions.length ? hist.sessions[0].ts : null;
+  const canEarlier = oldestTs != null && windowStart > oldestTs;
+  const canLater = offset > 0;
+
+  // Deck points: one per sitting.
+  const deckPoints = useMemo(() => hist.sessions.map(s => ({
+    ts: s.ts, value: acc(s.passed, s.reviewed), passed: s.passed, reviewed: s.reviewed,
+  })), [hist]);
+
+  // Card points: binary pass/miss per sitting that included the card.
+  const cardPoints = useMemo(() => {
+    if (!cardId || !hist.cardHist[cardId]) return [];
+    return hist.cardHist[cardId].map(h => ({
+      ts: h.ts, value: h.passed ? 100 : 0, passed: h.passed, reviewed: 1,
+    }));
+  }, [cardId, hist]);
+
+  const mode = cardId ? 'card' : 'deck';
+  const points = mode === 'card' ? cardPoints : deckPoints;
+  const winPts = points.filter(p => p.ts >= windowStart && p.ts <= windowEnd);
+
+  // Window stats.
+  const latest = winPts.length ? winPts[winPts.length - 1].value : null;
+  const prev = winPts.length > 1 ? winPts[winPts.length - 2].value : null;
+  const delta = latest != null && prev != null ? latest - prev : null;
+  const winAvg = winPts.length
+    ? Math.round(winPts.reduce((s, p) => s + p.value, 0) / winPts.length)
+    : null;
+  const reviewedTotal = winPts.reduce((s, p) => s + (mode === 'card' ? 1 : p.reviewed), 0);
+
+  // Breadcrumb path.
+  const crumbs = [];
+  let cur = scope;
+  while (cur && cur.id !== 'all') { crumbs.unshift(cur); cur = scopes.find(s => s.id === cur.parent); }
+
+  const selectedCard = cards.find(c => c.id === cardId);
+
+  return (
+    <div className="stage-inner">
+      <div className="add-path" style={{ marginTop: 0, marginBottom: 28 }}>
+        {crumbs.map((c, i) => {
+          const isLast = i === crumbs.length - 1;
+          return (
+            <React.Fragment key={c.id}>
+              {i > 0 && <span className="add-path-sep">›</span>}
+              {isLast
+                ? <button className="add-path-crumb add-path-link" onClick={onOpenSource}>{c.label}</button>
+                : <button className="add-path-crumb add-path-link" onClick={() => onJumpFolder(c.id)}>{c.label}</button>}
+            </React.Fragment>
+          );
+        })}
+        <span className="add-path-sep">›</span>
+        <span className="add-path-crumb is-last">Performance</span>
+      </div>
+
+      <div className="perf-head">
+        <div className="perf-eyebrow">Performance over time</div>
+        <div className="perf-title">{mode === 'card' ? cardLabel(selectedCard) : scope.label}</div>
+        <div className="perf-sub">
+          {mode === 'card'
+            ? 'Pass or miss on this card, each sitting'
+            : 'Per-session accuracy — cards passed ÷ cards reviewed'}
+        </div>
+      </div>
+
+      {mode === 'card' && (
+        <div className="perf-mode">
+          <span className="perf-mode-label">
+            <Glyph name="spark" size={13} /> Viewing a single card
+          </span>
+          <button className="perf-mode-back" onClick={() => setCardId(null)}>
+            <Glyph name="back" size={13} /> Deck overview
+          </button>
+        </div>
+      )}
+
+      <div className="perf-stats">
+        <div className="perf-stat">
+          <div className="perf-stat-value accent">{latest != null ? `${latest}%` : '—'}</div>
+          <div className="perf-stat-label">Latest sitting</div>
+          {delta != null && delta !== 0 && (
+            <div className={`perf-stat-delta ${delta > 0 ? 'up' : 'down'}`}>
+              {delta > 0 ? '▲' : '▼'} {Math.abs(delta)} pts vs prior
+            </div>
+          )}
+          {delta === 0 && <div className="perf-stat-delta flat">No change vs prior</div>}
+        </div>
+        <div className="perf-stat">
+          <div className="perf-stat-value">{winAvg != null ? `${winAvg}%` : '—'}</div>
+          <div className="perf-stat-label">Window average</div>
+        </div>
+        <div className="perf-stat">
+          <div className="perf-stat-value">{winPts.length}</div>
+          <div className="perf-stat-label">
+            {winPts.length === 1 ? 'Sitting' : 'Sittings'}
+            {reviewedTotal > 0 && mode === 'deck' ? ` · ${reviewedTotal} cards` : ''}
+          </div>
+        </div>
+      </div>
+
+      <div className="perf-chart-card">
+        <PerfChart points={points} windowStart={windowStart} windowEnd={windowEnd} mode={mode} />
+      </div>
+
+      <div className="perf-paging">
+        <button className="perf-page-btn" disabled={!canEarlier}
+                onClick={() => canEarlier && setOffset(o => o + 1)}>
+          <Glyph name="back" size={13} /> Earlier 30 days
+        </button>
+        <span className="perf-range">
+          {fmtDay(windowStart + DAY_MS)} – {fmtDay(windowEnd)}
+          <span className="perf-range-tag">{offset === 0 ? 'Last 30 days' : `${offset * 30} days back`}</span>
+        </span>
+        <button className="perf-page-btn" disabled={!canLater}
+                onClick={() => canLater && setOffset(o => Math.max(0, o - 1))}>
+          Later 30 days <Glyph name="arrow" size={13} />
+        </button>
+      </div>
+
+      <div className="folder-section-head" style={{ marginTop: 40 }}>
+        <span className="folder-section-label">Drill into a card</span>
+        <span className="folder-section-count">{cards.length}</span>
+      </div>
+
+      <div className="perf-card-list">
+        {cards.map(c => {
+          const h = (hist.cardHist[c.id] || []);
+          const win = h.filter(x => x.ts >= windowStart && x.ts <= windowEnd);
+          const rate = win.length ? Math.round((win.filter(x => x.passed).length / win.length) * 100) : null;
+          const spark = win.map(x => ({ value: x.passed ? 100 : 0, passed: x.passed }));
+          const active = cardId === c.id;
+          return (
+            <button key={c.id} className={`perf-card-row ${active ? 'is-active' : ''}`}
+                    onClick={() => setCardId(active ? null : c.id)}>
+              <span className="perf-card-kind">{KIND_LABEL[c.kind]}</span>
+              <span className="perf-card-q">{cardLabel(c)}</span>
+              <MiniSpark points={spark} />
+              <span className={`perf-card-rate ${rate == null ? 'dim' : ''}`}>
+                {rate == null ? '—' : `${rate}%`}
+              </span>
+              <Glyph name="caret" size={12} style={{ transform: 'rotate(-90deg)', color: '#BCC5D0' }} />
+            </button>
+          );
+        })}
+        {cards.length === 0 && (
+          <div style={{ padding: '32px 0', textAlign: 'center', color: '#9BA5B3', fontSize: 13 }}>
+            No cards in this source.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1849,6 +2289,7 @@ function App() {
   const [keptCount, setKeptCount] = useState(0);
   const [processingPhase, setProcessingPhase] = useState(0);
   const [overlayRegion, setOverlayRegion] = useState(undefined);
+  const [perfReturn, setPerfReturn] = useState('folder');
   const [tweaks, setTweaks] = usePersistentState('settings', TWEAK_DEFAULTS);
 
   // Source card store — keyed by scope id (only leaf sources have cards)
@@ -2105,6 +2546,7 @@ function App() {
               if (scopeId === id) setScopeId(scope.parent || 'all');
             }}
             onOpenSource={(id) => { setScopeId(id); setCardIdx(0); setScreen('source'); }}
+            onViewProgress={(id) => { setScopeId(id); setPerfReturn('folder'); setScreen('performance'); }}
           />
         )}
         {screen === 'source' && isLeafSource && (
@@ -2112,6 +2554,7 @@ function App() {
             scope={scopeForView}
             scopes={scopes}
             cards={sourceCards[scope.id] || []}
+            history={REVIEW_HISTORY[scope.id]}
             draftCount={draftCount}
             onReviewDrafts={reviewDrafts}
             onChangeName={(name) => setScopeLabelOverrides(o => ({ ...o, [scope.id]: name }))}
@@ -2128,6 +2571,7 @@ function App() {
               [scope.id]: [card, ...(s[scope.id] || [])],
             }))}
             onAddFromFile={() => { setAddTargetScope(scope.id); setScreen('add'); }}
+            onViewProgress={() => { setPerfReturn('source'); setScreen('performance'); }}
             onBegin={() => {
               const total = Math.min(QUEUE.length, scope.due);
               setCardIdx(0);
@@ -2141,6 +2585,16 @@ function App() {
               }
               setScreen('folder');
             }}
+          />
+        )}
+        {screen === 'performance' && (
+          <PerformanceScreen
+            scope={scopeForView}
+            scopes={scopes}
+            cards={sourceCards[scope.id] || []}
+            history={REVIEW_HISTORY[scope.id]}
+            onJumpFolder={(id) => { setScopeId(id); setCardIdx(0); setScreen('folder'); }}
+            onOpenSource={() => { setCardIdx(0); setScreen('source'); }}
           />
         )}
         {screen === 'study' && currentCard && (
