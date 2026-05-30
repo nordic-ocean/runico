@@ -437,6 +437,7 @@ function FolderView({
   const [creatingIn, setCreatingIn] = useState(null);   // parent id
   const [creatingName, setCreatingName] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const columnsRef = useRef(null);
 
   const selectedId = path[path.length - 1];
   const selectedScope = scopes.find(s => s.id === selectedId) || scopes[0];
@@ -471,6 +472,16 @@ function FolderView({
     return { due, total };
   }
 
+  // Opening a folder appends a column to the right of the track; on narrow
+  // screens (phones) that new column lands off-screen. Scroll the track fully
+  // right on every path change so the newest column — or the selected leaf's
+  // action card — is in view. (Smooth/instant honors prefers-reduced-motion
+  // via the track's CSS scroll-behavior.)
+  useEffect(() => {
+    const el = columnsRef.current;
+    if (el) el.scrollTo({ left: el.scrollWidth });
+  }, [path]);
+
   return (
     <div className="stage-inner stage-columns">
       <div className="columns-header">
@@ -485,7 +496,7 @@ function FolderView({
         )}
       </div>
 
-      <div className="columns">
+      <div className="columns" ref={columnsRef}>
         {Array.from({ length: columnsToRender }).map((_, i) => {
           const parentId = path[i];
           const parent = scopes.find(s => s.id === parentId);

@@ -734,6 +734,7 @@
   .columns::-webkit-scrollbar { height: 6px; }
   .columns::-webkit-scrollbar-thumb { background: #D6DCE3; border-radius: 3px; }
   .columns::-webkit-scrollbar-track { background: transparent; }
+  @media (prefers-reduced-motion: reduce) { .columns { scroll-behavior: auto; } }
 
   .column {
     flex: none;
