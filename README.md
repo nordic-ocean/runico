@@ -8,7 +8,7 @@
 Runico turns anything you're learning into flashcards and helps you practice them —
 recall the answer, reveal it, then Continue or Pause, with no grading scales to fuss over.
 
-### ▶ [Launch the live prototype](https://nordic-ocean.github.io/runico/app/)
+### ▶ [Launch the live prototype](https://nordic-ocean.github.io/runico/prototype/)
 
 Runs entirely in your browser · mock data persists in your session
 
@@ -95,9 +95,9 @@ cards and folders, and switch themes and language. **Everything you change is sa
 your browser's session storage**, so it survives reloads within the tab and resets when
 you close it.
 
-**▶ [Open the live prototype](https://nordic-ocean.github.io/runico/app/)**
+**▶ [Open the live prototype](https://nordic-ocean.github.io/runico/prototype/)**
 
-Prefer to run it locally? See [`app/`](app/) — `python3 -m http.server --directory app`, then open the printed URL.
+Prefer to run it locally? See [`prototype/`](prototype/) — `python3 -m http.server --directory prototype`, then open the printed URL.
 
 ## At a glance
 

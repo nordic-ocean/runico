@@ -12,14 +12,14 @@ It uses in-browser Babel (no build step), so it must be served over HTTP (openin
 via `file://` won't work — the browser blocks loading `app.jsx`). From the repo root:
 
 ```bash
-python3 -m http.server 8000 --directory app
+python3 -m http.server 8000 --directory prototype
 # then open http://localhost:8000/
 ```
 
 or with Node:
 
 ```bash
-npx serve app
+npx serve prototype
 ```
 
 First load needs network access: it pulls React 18, ReactDOM, and Babel from a CDN and
