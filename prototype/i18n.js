@@ -207,7 +207,9 @@ const RUNICO_STRINGS = {
     "settings.langItalian": "Italian",
     "settings.langChinese": "Chinese",
     "settings.doneButton": "Done",
-    "browse.untitledFolder": "Untitled"
+    "browse.untitledFolder": "Untitled",
+    "add.fileReady": "Ready to read",
+    "add.fileRemoveTitle": "Remove file"
   },
   "pt-BR": {
     "common.nav.settings": "Configurações",
@@ -412,7 +414,9 @@ const RUNICO_STRINGS = {
     "settings.langItalian": "Italiano",
     "settings.langChinese": "Chinês",
     "settings.doneButton": "Concluído",
-    "browse.untitledFolder": "Sem título"
+    "browse.untitledFolder": "Sem título",
+    "add.fileReady": "Pronto para ler",
+    "add.fileRemoveTitle": "Remover arquivo"
   },
   "pt-PT": {
     "common.nav.settings": "Definições",
@@ -617,7 +621,9 @@ const RUNICO_STRINGS = {
     "settings.langItalian": "Italiano",
     "settings.langChinese": "Chinês",
     "settings.doneButton": "Concluído",
-    "browse.untitledFolder": "Sem título"
+    "browse.untitledFolder": "Sem título",
+    "add.fileReady": "Pronto a ler",
+    "add.fileRemoveTitle": "Remover ficheiro"
   },
   "es": {
     "common.nav.settings": "Ajustes",
@@ -822,7 +828,9 @@ const RUNICO_STRINGS = {
     "settings.langItalian": "Italiano",
     "settings.langChinese": "Chino",
     "settings.doneButton": "Listo",
-    "browse.untitledFolder": "Sin título"
+    "browse.untitledFolder": "Sin título",
+    "add.fileReady": "Listo para leer",
+    "add.fileRemoveTitle": "Quitar archivo"
   },
   "ru": {
     "common.nav.settings": "Настройки",
@@ -1027,7 +1035,9 @@ const RUNICO_STRINGS = {
     "settings.langItalian": "Итальянский",
     "settings.langChinese": "Китайский",
     "settings.doneButton": "Готово",
-    "browse.untitledFolder": "Без названия"
+    "browse.untitledFolder": "Без названия",
+    "add.fileReady": "Готово к чтению",
+    "add.fileRemoveTitle": "Удалить файл"
   },
   "it": {
     "common.nav.settings": "Impostazioni",
@@ -1232,7 +1242,9 @@ const RUNICO_STRINGS = {
     "settings.langItalian": "Italiano",
     "settings.langChinese": "Cinese",
     "settings.doneButton": "Fatto",
-    "browse.untitledFolder": "Senza titolo"
+    "browse.untitledFolder": "Senza titolo",
+    "add.fileReady": "Pronto da leggere",
+    "add.fileRemoveTitle": "Rimuovi file"
   },
   "zh": {
     "common.nav.settings": "设置",
@@ -1437,7 +1449,9 @@ const RUNICO_STRINGS = {
     "settings.langItalian": "意大利语",
     "settings.langChinese": "中文",
     "settings.doneButton": "完成",
-    "browse.untitledFolder": "未命名"
+    "browse.untitledFolder": "未命名",
+    "add.fileReady": "准备就绪",
+    "add.fileRemoveTitle": "移除文件"
   }
 };
 

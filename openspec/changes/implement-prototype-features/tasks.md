@@ -63,13 +63,13 @@
 
 ## 6. Card authoring
 
-- [ ] 6.1 Implement the add flow: destination breadcrumb, topic name, and a drop/paste/browse zone with thumbnail/size/ready indicator
+- [x] 6.1 Implement the add flow: destination breadcrumb, topic name, and a drop/paste/browse zone with thumbnail/size/ready indicator
 - [x] 6.2 Implement the processing screen cycling through reading → understanding → drafting → choosing
 - [x] 6.3 Implement draft review (one at a time) with Keep / Remove / Edit, adding only kept cards
 - [x] 6.4 Implement the completion confirmation ("N cards added", view cards / back home)
 - [ ] 6.5 Implement pending-draft indicators and the review path (and practice guard where applicable)
 - [x] 6.6 Implement manual card create / edit / delete with kind selection
-- [ ] 6.7 Verify the add flow, draft review, and manual CRUD
+- [x] 6.7 Verify the add flow, draft review, and manual CRUD
 - [ ] 6.8 NOTE: real generation engine is delivered by `add-ai-card-generation`; here the flow may use the prototype's mock drafting
 
 ## 7. Image occlusion

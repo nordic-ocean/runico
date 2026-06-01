@@ -1828,10 +1828,40 @@ function DoneScreen({ onHome, draftCount, onReviewDrafts }) {
 
 const PRIORITY_KEY = { definitions:'add.priorityDefinitions', labeledDiagrams:'add.priorityLabeledDiagrams', examples:'add.priorityExamples', bodyProse:'add.priorityBodyProse' };
 
+function fmtFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
 function AddScreen({ targetPath, isExistingSource, onCancel, onBegin }) {
   const [name, setName] = useState('');
   const [priorities, setPriorities] = useState(['definitions','labeledDiagrams','examples','bodyProse']);
   const [dragIdx, setDragIdx] = useState(null);
+  const [file, setFile] = useState(null);        // { name, size, isImage, url }
+  const [dropActive, setDropActive] = useState(false);
+  const fileInputRef = useRef(null);
+
+  function acceptFile(f) {
+    if (!f) return;
+    const isImage = (f.type || '').indexOf('image/') === 0;
+    setFile({ name: f.name, size: f.size, isImage, url: isImage ? URL.createObjectURL(f) : null });
+  }
+  function onPickFile(e) { acceptFile(e.target.files && e.target.files[0]); }
+  function onDropFile(e) {
+    e.preventDefault();
+    setDropActive(false);
+    acceptFile(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+  }
+  // Paste an image/file from the clipboard ("Drop, paste, or browse").
+  useEffect(() => {
+    function onPaste(e) {
+      const files = e.clipboardData && e.clipboardData.files;
+      if (files && files.length) acceptFile(files[0]);
+    }
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, []);
 
   function onDrop(targetIdx) {
     if (dragIdx == null || dragIdx === targetIdx) return;
@@ -1843,6 +1873,8 @@ function AddScreen({ targetPath, isExistingSource, onCancel, onBegin }) {
     });
     setDragIdx(null);
   }
+
+  const canBegin = (isExistingSource || !!name.trim()) && !!file;
 
   return (
     <div className="stage-inner">
@@ -1874,10 +1906,34 @@ function AddScreen({ targetPath, isExistingSource, onCancel, onBegin }) {
         </>
       )}
 
-      <div className="drop">
-        <p className="drop-title">{t('add.dropTitle')}</p>
-        <p className="drop-sub">{t('add.dropSub')}</p>
-      </div>
+      <input ref={fileInputRef} type="file" accept="image/*,.txt,.md,.pdf"
+             style={{ display: 'none' }} onChange={onPickFile} />
+      {file ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px',
+                      border: '1px solid #EBEEF2', borderRadius: 12, textAlign: 'left' }}>
+          {file.isImage
+            ? <img src={file.url} alt="" style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 8, flex: 'none' }} />
+            : <span style={{ display: 'inline-flex', width: 52, height: 52, alignItems: 'center', justifyContent: 'center',
+                             borderRadius: 8, background: '#F2F5F8', flex: 'none', color: '#7A8696' }}><Glyph name="book" size={22} /></span>}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</div>
+            <div style={{ fontSize: 13, color: '#7A8696', marginTop: 2 }}>{fmtFileSize(file.size)} · {t('add.fileReady')}</div>
+          </div>
+          <button className="nav-btn" title={t('add.fileRemoveTitle')}
+                  onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                  style={{ flex: 'none' }}><Glyph name="close" size={14} /></button>
+        </div>
+      ) : (
+        <div className="drop"
+             style={{ cursor: 'pointer', outline: dropActive ? '2px dashed #0076B4' : 'none', outlineOffset: 4 }}
+             onClick={() => fileInputRef.current && fileInputRef.current.click()}
+             onDragOver={(e) => { e.preventDefault(); setDropActive(true); }}
+             onDragLeave={() => setDropActive(false)}
+             onDrop={onDropFile}>
+          <p className="drop-title">{t('add.dropTitle')}</p>
+          <p className="drop-sub">{t('add.dropSub')}</p>
+        </div>
+      )}
 
       <div className="priority-list">
         <p className="priority-list-label">{t('add.priorityListLabel')}</p>
@@ -1896,7 +1952,7 @@ function AddScreen({ targetPath, isExistingSource, onCancel, onBegin }) {
       </div>
 
       <div className="home-actions" style={{ marginTop: 40 }}>
-        <button className="primary lg" onClick={() => onBegin(name.trim())} disabled={!isExistingSource && !name.trim()}>
+        <button className="primary lg" onClick={() => onBegin(name.trim())} disabled={!canBegin}>
           {t('add.begin')} <Glyph name="arrow" size={18} />
         </button>
         <button className="quiet" onClick={onCancel}>{t('add.cancel')}</button>
