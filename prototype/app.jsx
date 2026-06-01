@@ -66,14 +66,31 @@ function collectExportData() {
   }
   return out;
 }
+// Default backup name: runico-export-YYYY-MM-DD-HH-MM-SS.json
+function exportFileName() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `runico-export-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}.json`;
+}
 async function exportSaveFile() {
   const data = collectExportData();
-  if (IS_DESKTOP) { try { await RUNICO.exportData(data); } catch (e) { /* canceled / failed */ } return; }
+  const fname = exportFileName();
+  if (IS_DESKTOP) {
+    // Native save dialog: the user can type the name + choose where, pre-filled
+    // with the timestamped default.
+    try { await RUNICO.exportData(data, fname); } catch (e) { /* canceled / failed */ }
+    return;
+  }
+  // Browser: the download manager usually won't prompt, so ask for the name.
+  let name = window.prompt(t('nav.saveAsPrompt'), fname);
+  if (name === null) return;                          // cancelled
+  name = (name.trim() || fname);
+  if (!/\.json$/i.test(name)) name += '.json';
   try {
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'runico-backup.json';
+    a.href = url; a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   } catch (e) { /* ignore */ }

@@ -77,9 +77,9 @@ async function openRouterGenerate(body) {
 }
 // Export the library to a user-chosen backup file; import reads one back (the
 // renderer confirms + applies, so import only READS here, never overwrites).
-async function exportData(data) {
+async function exportData(data, name) {
   const r = await dialog.showSaveDialog(win || undefined, {
-    title: 'Save Runico backup', defaultPath: 'runico-backup.json',
+    title: 'Save Runico backup', defaultPath: (name || 'runico-export.json'),
     filters: [{ name: 'Runico backup', extensions: ['json'] }],
   });
   if (r.canceled || !r.filePath) return { canceled: true };
@@ -144,7 +144,7 @@ ipcMain.handle('runico:saveKey', (e, key) => writeKey(key));
 ipcMain.handle('runico:clearKey', () => clearKey());
 ipcMain.handle('runico:validate', () => openRouterValidate());
 ipcMain.handle('runico:generate', (e, body) => openRouterGenerate(body));
-ipcMain.handle('runico:export', (e, data) => exportData(data));
+ipcMain.handle('runico:export', (e, payload) => exportData(payload && payload.data, payload && payload.name));
 ipcMain.handle('runico:import', () => importData());
 
 const ICON = path.join(__dirname, '..', 'prototype', 'assets', 'runico-ring.png');

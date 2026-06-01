@@ -25,6 +25,6 @@ contextBridge.exposeInMainWorld('runico', {
   validate: () => ipcRenderer.invoke('runico:validate'),
   generate: (body) => ipcRenderer.invoke('runico:generate', body),
   // Export to / import from a user-chosen backup file (native dialogs in main).
-  exportData: (data) => ipcRenderer.invoke('runico:export', data),
+  exportData: (data, name) => ipcRenderer.invoke('runico:export', { data, name }),
   importData: () => ipcRenderer.invoke('runico:import'),
 });

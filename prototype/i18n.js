@@ -261,7 +261,8 @@ const RUNICO_STRINGS = {
     "nav.loadFile": "Load file",
     "nav.loadConfirm": "Load a save file? This replaces your current library (your API key is kept).",
     "nav.loadError": "That file isn't a valid Runico save.",
-    "occ.useOriginal": "Use original image"
+    "occ.useOriginal": "Use original image",
+    "nav.saveAsPrompt": "Save your backup as:"
   },
   "pt-BR": {
     "common.nav.settings": "Configurações",
@@ -520,7 +521,8 @@ const RUNICO_STRINGS = {
     "nav.loadFile": "Carregar arquivo",
     "nav.loadConfirm": "Carregar um arquivo salvo? Isso substitui sua biblioteca atual (sua chave de API é mantida).",
     "nav.loadError": "Esse arquivo não é um save válido do Runico.",
-    "occ.useOriginal": "Usar imagem original"
+    "occ.useOriginal": "Usar imagem original",
+    "nav.saveAsPrompt": "Salvar o backup como:"
   },
   "pt-PT": {
     "common.nav.settings": "Definições",
@@ -779,7 +781,8 @@ const RUNICO_STRINGS = {
     "nav.loadFile": "Carregar ficheiro",
     "nav.loadConfirm": "Carregar um ficheiro guardado? Isto substitui a sua biblioteca atual (a sua chave de API é mantida).",
     "nav.loadError": "Esse ficheiro não é um save válido do Runico.",
-    "occ.useOriginal": "Usar imagem original"
+    "occ.useOriginal": "Usar imagem original",
+    "nav.saveAsPrompt": "Guardar a cópia como:"
   },
   "es": {
     "common.nav.settings": "Ajustes",
@@ -1038,7 +1041,8 @@ const RUNICO_STRINGS = {
     "nav.loadFile": "Cargar archivo",
     "nav.loadConfirm": "¿Cargar un archivo guardado? Esto reemplaza tu biblioteca actual (se conserva tu clave de API).",
     "nav.loadError": "Ese archivo no es un guardado válido de Runico.",
-    "occ.useOriginal": "Usar imagen original"
+    "occ.useOriginal": "Usar imagen original",
+    "nav.saveAsPrompt": "Guardar la copia como:"
   },
   "ru": {
     "common.nav.settings": "Настройки",
@@ -1297,7 +1301,8 @@ const RUNICO_STRINGS = {
     "nav.loadFile": "Загрузить файл",
     "nav.loadConfirm": "Загрузить файл сохранения? Это заменит вашу текущую библиотеку (ключ API сохранится).",
     "nav.loadError": "Этот файл не является корректным сохранением Runico.",
-    "occ.useOriginal": "Исходное изображение"
+    "occ.useOriginal": "Исходное изображение",
+    "nav.saveAsPrompt": "Сохранить резервную копию как:"
   },
   "it": {
     "common.nav.settings": "Impostazioni",
@@ -1556,7 +1561,8 @@ const RUNICO_STRINGS = {
     "nav.loadFile": "Carica file",
     "nav.loadConfirm": "Caricare un file salvato? Sostituisce la libreria attuale (la chiave API viene mantenuta).",
     "nav.loadError": "Quel file non è un salvataggio valido di Runico.",
-    "occ.useOriginal": "Usa immagine originale"
+    "occ.useOriginal": "Usa immagine originale",
+    "nav.saveAsPrompt": "Salva il backup come:"
   },
   "zh": {
     "common.nav.settings": "设置",
@@ -1815,7 +1821,8 @@ const RUNICO_STRINGS = {
     "nav.loadFile": "加载文件",
     "nav.loadConfirm": "加载存档文件？这将替换当前的卡片库（会保留你的 API 密钥）。",
     "nav.loadError": "该文件不是有效的 Runico 存档。",
-    "occ.useOriginal": "使用原图"
+    "occ.useOriginal": "使用原图",
+    "nav.saveAsPrompt": "将备份另存为："
   }
 };
 
