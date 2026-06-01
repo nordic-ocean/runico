@@ -1958,6 +1958,36 @@ function fmtFileSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
+// Downscale an image data URL: caps the long side and re-encodes as JPEG so even
+// a large screenshot fits localStorage (and the model gets a lighter payload).
+// The same downscaled image is both sent for generation AND saved as the source,
+// so "See the source" can always show it. Resolves to the original on any failure
+// or if shrinking wouldn't help.
+function downscaleImageDataUrl(dataUrl, maxDim, quality) {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const long = Math.max(img.width, img.height) || 1;
+          const scale = Math.min(1, maxDim / long);
+          const w = Math.max(1, Math.round(img.width * scale));
+          const h = Math.max(1, Math.round(img.height * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); // flatten transparency for JPEG
+          ctx.drawImage(img, 0, 0, w, h);
+          const out = canvas.toDataURL('image/jpeg', quality);
+          resolve(out && out.length < dataUrl.length ? out : dataUrl);
+        } catch (e) { resolve(dataUrl); }
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    } catch (e) { resolve(dataUrl); }
+  });
+}
+
 function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCancel, onGenerateCards, onGenerated, onGenerateManual }) {
   const [name, setName] = useState('');
   const [model, setModel] = useState(modelById(defaultModel) ? defaultModel : DEFAULT_GEN_MODEL);
@@ -1981,10 +2011,18 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCa
     setFile({ name: f.name, size: f.size, isImage, url: isImage ? URL.createObjectURL(f) : null, dataUrl: null, text: null, _ready: false });
     if (isImage || isText) {
       const reader = new FileReader();
-      reader.onload = () => setFile(prev => (prev && readToken.current === token)
-        ? { ...prev, [isImage ? 'dataUrl' : 'text']: isImage ? reader.result : String(reader.result || ''), _ready: true }
-        : prev);
-      if (isImage) reader.readAsDataURL(f); else reader.readAsText(f);
+      if (isImage) {
+        // Downscale before marking ready so generation + the saved source use a
+        // storable image (never the raw multi-MB original).
+        reader.onload = () => downscaleImageDataUrl(reader.result, 1600, 0.82).then(small =>
+          setFile(prev => (prev && readToken.current === token)
+            ? { ...prev, dataUrl: small, _ready: true } : prev));
+        reader.readAsDataURL(f);
+      } else {
+        reader.onload = () => setFile(prev => (prev && readToken.current === token)
+          ? { ...prev, text: String(reader.result || ''), _ready: true } : prev);
+        reader.readAsText(f);
+      }
     }
   }
 
