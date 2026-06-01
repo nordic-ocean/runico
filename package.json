@@ -5,7 +5,9 @@
   "license": "SEE LICENSE IN LICENSE",
   "main": "electron/main.js",
   "scripts": {
+    "predev": "node electron/patch-dev-name.js",
     "dev": "electron .",
+    "prestart": "node electron/patch-dev-name.js",
     "start": "electron .",
     "build": "electron-builder"
   },
