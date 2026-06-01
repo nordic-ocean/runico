@@ -101,6 +101,11 @@ const GEN_MODELS = [
 ];
 function modelById(id) { return GEN_MODELS.find(m => m.id === id); }
 function modelPrice(m) { return m ? ('$' + m.in.toFixed(2) + ' / $' + m.out.toFixed(2) + ' per 1M') : ''; }
+// Occlusion (find the figure + its labels in an image) is a hard vision/grounding
+// task, so it always runs on the most capable vision model regardless of which
+// (cheaper) model is chosen for the text cards. Picks the priciest vision model
+// in the list as a capability proxy, so it tracks the curated list automatically.
+const OCCLUSION_MODEL = (GEN_MODELS.filter(m => m.vision).sort((a, b) => b.in - a.in)[0] || {}).id || DEFAULT_GEN_MODEL;
 
 function buildGenPrompt(sourceText) {
   return [
@@ -3264,7 +3269,9 @@ function App() {
     // cards already produced).
     if (imageDataUrl) {
       try {
-        const occ = await generateOcclusionCard({ apiKey, model: model || genModel, imageDataUrl });
+        // Always use the most capable vision model for occlusion (it both detects
+        // whether there's a good figure and bounds it), not the text-card model.
+        const occ = await generateOcclusionCard({ apiKey, model: OCCLUSION_MODEL, imageDataUrl });
         if (occ) cards.push(occ);
       } catch (e) { /* occlusion is optional */ }
     }
