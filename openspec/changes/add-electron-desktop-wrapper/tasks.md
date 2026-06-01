@@ -47,7 +47,7 @@
 - [x] 6.1 Implement the save-document layer in the main process: load/save `data.json` (text) under `app.getPath('userData')`
 - [ ] 6.2 Store images as binary files in a `media/` bundle, referenced by hash; de-duplicate identical images; never base64-embed in `data.json` (DEFERRED — currently embedded base64)
 - [x] 6.3 Auto-save (debounced) using temp-file-then-rename atomic writes
-- [ ] 6.4 Implement export (zip the document) and import (restore full state) (DEFERRED)
+- [x] 6.4 Implement export / import via top-bar Save/Load buttons — desktop uses native save/open dialogs; browser downloads/uploads the document. Restores full library state (API key excluded from the backup). (Plain JSON, not a zip; media-bundle zip deferred with 6.2.)
 - [x] 6.5 Repoint the renderer's `usePersistentState` seam through the save-document layer (IPC in Electron) instead of web storage
 - [x] 6.6 Implement the browser fallback: durable web storage (localStorage) + (manual file copy for now)
 - [x] 6.7 Seed an empty/default library + fresh document on first run when none exists

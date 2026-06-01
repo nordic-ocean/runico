@@ -24,4 +24,7 @@ contextBridge.exposeInMainWorld('runico', {
   // OpenRouter requests run in the main process (no CORS); the key is attached there.
   validate: () => ipcRenderer.invoke('runico:validate'),
   generate: (body) => ipcRenderer.invoke('runico:generate', body),
+  // Export to / import from a user-chosen backup file (native dialogs in main).
+  exportData: (data) => ipcRenderer.invoke('runico:export', data),
+  importData: () => ipcRenderer.invoke('runico:import'),
 });

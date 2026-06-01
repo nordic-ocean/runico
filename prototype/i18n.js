@@ -256,7 +256,11 @@ const RUNICO_STRINGS = {
     "settings.modelEstimate": "≈ {cards} cards per $1 of usage",
     "add.generatingHint": "This can take a few seconds. You can leave this screen — your cards will be waiting.",
     "add.genInterrupted": "A generation was interrupted by a reload — your source is restored. Generate again to continue.",
-    "settings.modelCardsShort": "≈ {cards} cards/$1"
+    "settings.modelCardsShort": "≈ {cards} cards/$1",
+    "nav.saveFile": "Save file",
+    "nav.loadFile": "Load file",
+    "nav.loadConfirm": "Load a save file? This replaces your current library (your API key is kept).",
+    "nav.loadError": "That file isn't a valid Runico save."
   },
   "pt-BR": {
     "common.nav.settings": "Configurações",
@@ -510,7 +514,11 @@ const RUNICO_STRINGS = {
     "settings.modelEstimate": "≈ {cards} cartões por $1 de uso",
     "add.generatingHint": "Isto pode levar alguns segundos. Você pode sair desta tela — seus cartões estarão esperando.",
     "add.genInterrupted": "Uma geração foi interrompida por um recarregamento — sua fonte foi restaurada. Gere novamente para continuar.",
-    "settings.modelCardsShort": "≈ {cards} cartões/$1"
+    "settings.modelCardsShort": "≈ {cards} cartões/$1",
+    "nav.saveFile": "Salvar arquivo",
+    "nav.loadFile": "Carregar arquivo",
+    "nav.loadConfirm": "Carregar um arquivo salvo? Isso substitui sua biblioteca atual (sua chave de API é mantida).",
+    "nav.loadError": "Esse arquivo não é um save válido do Runico."
   },
   "pt-PT": {
     "common.nav.settings": "Definições",
@@ -764,7 +772,11 @@ const RUNICO_STRINGS = {
     "settings.modelEstimate": "≈ {cards} cartões por $1 de utilização",
     "add.generatingHint": "Isto pode demorar alguns segundos. Pode sair deste ecrã — os seus cartões ficarão à espera.",
     "add.genInterrupted": "Uma geração foi interrompida por um recarregamento — a sua fonte foi restaurada. Gere novamente para continuar.",
-    "settings.modelCardsShort": "≈ {cards} cartões/$1"
+    "settings.modelCardsShort": "≈ {cards} cartões/$1",
+    "nav.saveFile": "Guardar ficheiro",
+    "nav.loadFile": "Carregar ficheiro",
+    "nav.loadConfirm": "Carregar um ficheiro guardado? Isto substitui a sua biblioteca atual (a sua chave de API é mantida).",
+    "nav.loadError": "Esse ficheiro não é um save válido do Runico."
   },
   "es": {
     "common.nav.settings": "Ajustes",
@@ -1018,7 +1030,11 @@ const RUNICO_STRINGS = {
     "settings.modelEstimate": "≈ {cards} tarjetas por $1 de uso",
     "add.generatingHint": "Esto puede tardar unos segundos. Puedes salir de esta pantalla: tus tarjetas estarán esperando.",
     "add.genInterrupted": "Una generación se interrumpió por una recarga — tu fuente se restauró. Genera de nuevo para continuar.",
-    "settings.modelCardsShort": "≈ {cards} tarjetas/$1"
+    "settings.modelCardsShort": "≈ {cards} tarjetas/$1",
+    "nav.saveFile": "Guardar archivo",
+    "nav.loadFile": "Cargar archivo",
+    "nav.loadConfirm": "¿Cargar un archivo guardado? Esto reemplaza tu biblioteca actual (se conserva tu clave de API).",
+    "nav.loadError": "Ese archivo no es un guardado válido de Runico."
   },
   "ru": {
     "common.nav.settings": "Настройки",
@@ -1272,7 +1288,11 @@ const RUNICO_STRINGS = {
     "settings.modelEstimate": "≈ {cards} карточек на $1",
     "add.generatingHint": "Это может занять несколько секунд. Можно уйти с этого экрана — карточки будут ждать.",
     "add.genInterrupted": "Генерация прервана перезагрузкой — источник восстановлен. Запустите снова, чтобы продолжить.",
-    "settings.modelCardsShort": "≈ {cards} карт./$1"
+    "settings.modelCardsShort": "≈ {cards} карт./$1",
+    "nav.saveFile": "Сохранить файл",
+    "nav.loadFile": "Загрузить файл",
+    "nav.loadConfirm": "Загрузить файл сохранения? Это заменит вашу текущую библиотеку (ключ API сохранится).",
+    "nav.loadError": "Этот файл не является корректным сохранением Runico."
   },
   "it": {
     "common.nav.settings": "Impostazioni",
@@ -1526,7 +1546,11 @@ const RUNICO_STRINGS = {
     "settings.modelEstimate": "≈ {cards} carte per $1 di utilizzo",
     "add.generatingHint": "Può richiedere qualche secondo. Puoi lasciare questa schermata — le tue carte ti aspetteranno.",
     "add.genInterrupted": "Una generazione è stata interrotta da un ricaricamento — la tua fonte è stata ripristinata. Genera di nuovo per continuare.",
-    "settings.modelCardsShort": "≈ {cards} carte/$1"
+    "settings.modelCardsShort": "≈ {cards} carte/$1",
+    "nav.saveFile": "Salva file",
+    "nav.loadFile": "Carica file",
+    "nav.loadConfirm": "Caricare un file salvato? Sostituisce la libreria attuale (la chiave API viene mantenuta).",
+    "nav.loadError": "Quel file non è un salvataggio valido di Runico."
   },
   "zh": {
     "common.nav.settings": "设置",
@@ -1780,7 +1804,11 @@ const RUNICO_STRINGS = {
     "settings.modelEstimate": "≈ 每 $1 约 {cards} 张卡片",
     "add.generatingHint": "这可能需要几秒钟。你可以离开此页面——卡片会等着你。",
     "add.genInterrupted": "生成因刷新而中断——已恢复你的来源。再次生成以继续。",
-    "settings.modelCardsShort": "≈ 每 $1 {cards} 张"
+    "settings.modelCardsShort": "≈ 每 $1 {cards} 张",
+    "nav.saveFile": "保存文件",
+    "nav.loadFile": "加载文件",
+    "nav.loadConfirm": "加载存档文件？这将替换当前的卡片库（会保留你的 API 密钥）。",
+    "nav.loadError": "该文件不是有效的 Runico 存档。"
   }
 };
 

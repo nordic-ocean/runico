@@ -6,7 +6,7 @@
 //    never crosses IPC to the renderer,
 //  • makes OpenRouter validation + generation requests here (no CORS),
 //  • persists all user data to a single user-owned save file (data.json).
-const { app, BrowserWindow, ipcMain, safeStorage, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, safeStorage, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -71,6 +71,30 @@ async function openRouterGenerate(body) {
     return { ok: true, status: 200, content };
   } catch (e) { return { ok: false, error: 'network' }; }
 }
+// Export the library to a user-chosen backup file; import reads one back (the
+// renderer confirms + applies, so import only READS here, never overwrites).
+async function exportData(data) {
+  const r = await dialog.showSaveDialog(win || undefined, {
+    title: 'Save Runico backup', defaultPath: 'runico-backup.json',
+    filters: [{ name: 'Runico backup', extensions: ['json'] }],
+  });
+  if (r.canceled || !r.filePath) return { canceled: true };
+  try { fs.writeFileSync(r.filePath, JSON.stringify(data || {})); return { ok: true, path: r.filePath }; }
+  catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+}
+async function importData() {
+  const r = await dialog.showOpenDialog(win || undefined, {
+    title: 'Load Runico backup', properties: ['openFile'],
+    filters: [{ name: 'Runico backup', extensions: ['json'] }],
+  });
+  if (r.canceled || !r.filePaths || !r.filePaths[0]) return { canceled: true };
+  try {
+    const data = JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8'));
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return { ok: false, error: 'invalid' };
+    return { ok: true, data };
+  } catch (e) { return { ok: false, error: 'invalid' }; }
+}
+
 async function openRouterValidate() {
   const key = readKey();
   if (!key) return 'invalid';
@@ -116,6 +140,8 @@ ipcMain.handle('runico:saveKey', (e, key) => writeKey(key));
 ipcMain.handle('runico:clearKey', () => clearKey());
 ipcMain.handle('runico:validate', () => openRouterValidate());
 ipcMain.handle('runico:generate', (e, body) => openRouterGenerate(body));
+ipcMain.handle('runico:export', (e, data) => exportData(data));
+ipcMain.handle('runico:import', () => importData());
 
 let win = null;
 async function createWindow() {

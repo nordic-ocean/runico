@@ -44,6 +44,77 @@ if (IS_DESKTOP && typeof window !== 'undefined') {
   window.addEventListener('beforeunload', nativeFlush);
 }
 
+// ── Save-file export / import ────────────────────────────
+// The user-owned backup: the whole library as a { "runico:v3:<key>": value } map.
+// The API key is excluded (it lives in the keychain in desktop, and shouldn't ride
+// along in a plaintext backup in the browser).
+const KEY_STORE_KEY = STORE_PREFIX + 'openrouterKey';
+function collectExportData() {
+  const out = {};
+  if (IS_DESKTOP) {
+    for (const k in NATIVE_STORE) if (k !== KEY_STORE_KEY) out[k] = NATIVE_STORE[k];
+    return out;
+  }
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.indexOf(STORE_PREFIX) === 0 && k !== KEY_STORE_KEY) {
+      try { out[k] = JSON.parse(localStorage.getItem(k)); } catch (e) { /* skip */ }
+    }
+  }
+  return out;
+}
+async function exportSaveFile() {
+  const data = collectExportData();
+  if (IS_DESKTOP) { try { await RUNICO.exportData(data); } catch (e) { /* canceled / failed */ } return; }
+  try {
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'runico-backup.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } catch (e) { /* ignore */ }
+}
+function applyImportedData(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) { try { alert(t('nav.loadError')); } catch (e) {} return; }
+  if (!window.confirm(t('nav.loadConfirm'))) return;
+  if (IS_DESKTOP) {
+    try { (RUNICO.saveDataSync || RUNICO.saveData)(data); } catch (e) { /* best-effort */ }
+  } else {
+    try {
+      const keep = localStorage.getItem(KEY_STORE_KEY);              // preserve the saved key
+      const remove = [];
+      for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.indexOf(STORE_PREFIX) === 0) remove.push(k); }
+      remove.forEach(k => localStorage.removeItem(k));
+      if (keep != null) localStorage.setItem(KEY_STORE_KEY, keep);
+      for (const k in data) { try { localStorage.setItem(k, JSON.stringify(data[k])); } catch (e) {} }
+    } catch (e) { /* ignore */ }
+  }
+  location.reload();   // re-hydrate the whole app from the imported library
+}
+async function importSaveFile() {
+  if (IS_DESKTOP) {
+    let r; try { r = await RUNICO.importData(); } catch (e) { return; }
+    if (!r || r.canceled) return;
+    if (!r.ok) { try { alert(t('nav.loadError')); } catch (e) {} return; }
+    applyImportedData(r.data);
+    return;
+  }
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json,application/json';
+  input.onchange = () => {
+    const f = input.files && input.files[0]; if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let data = null;
+      try { data = JSON.parse(String(reader.result || '')); } catch (e) { try { alert(t('nav.loadError')); } catch (e2) {} return; }
+      applyImportedData(data);
+    };
+    reader.readAsText(f);
+  };
+  input.click();
+}
+
 function usePersistentState(key, initial) {
   const [val, setVal] = useState(() => {
     try {
@@ -586,6 +657,8 @@ function Glyph({ name, size = 16 }) {
     chart:  <><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></>,
     trend:  <><path d="M3 17l6-6 4 4 7-7" /><path d="M17 8h4v4" /></>,
     clock:  <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+    download:<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5" /><path d="M12 15V3" /></>,
+    upload: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m17 8-5-5-5 5" /><path d="M12 3v12" /></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -3534,9 +3607,17 @@ function App() {
         </div>
         <div className="nav-right">
           {(screen === 'folder' || screen === 'source' || screen === 'done') && (
-            <button className="nav-btn" onClick={() => setScreen('settings')} title={t('common.nav.settings')}>
-              <Glyph name="gear" size={14} /> {t('common.nav.settings')}
-            </button>
+            <>
+              <button className="nav-btn" onClick={exportSaveFile} title={t('nav.saveFile')}>
+                <Glyph name="download" size={14} /> {t('nav.saveFile')}
+              </button>
+              <button className="nav-btn" onClick={importSaveFile} title={t('nav.loadFile')}>
+                <Glyph name="upload" size={14} /> {t('nav.loadFile')}
+              </button>
+              <button className="nav-btn" onClick={() => setScreen('settings')} title={t('common.nav.settings')}>
+                <Glyph name="gear" size={14} /> {t('common.nav.settings')}
+              </button>
+            </>
           )}
         </div>
       </div>
