@@ -102,7 +102,7 @@ const GEN_MODELS = [
 function modelById(id) { return GEN_MODELS.find(m => m.id === id); }
 function modelPrice(m) { return m ? ('$' + m.in.toFixed(2) + ' / $' + m.out.toFixed(2) + ' per 1M') : ''; }
 
-function buildGenPrompt(sourceText, hasImage) {
+function buildGenPrompt(sourceText) {
   return [
     'You are an expert tutor creating high-quality study flashcards from the source material below.',
     'Cover the material thoroughly: capture every important fact, name, date, definition, cause-and-effect, and relationship — not just the headline idea. Aim for 8–15 cards (more for richer sources).',
@@ -114,9 +114,6 @@ function buildGenPrompt(sourceText, hasImage) {
     '- "qa": a precise question (q) with a complete answer (a). Use for facts, processes, comparisons, cause/effect.',
     '- "cloze": q is a COMPLETE sentence with exactly ONE key term hidden using double braces, e.g. "The powerhouse of the cell is the {{mitochondrion}}."; a is that hidden term. The {{ }} braces are REQUIRED — never omit them.',
     '- "rev": a term/definition pair for two-way recall — q is the term or concept name (a few words), a is its definition. Use for vocabulary, names, and key concepts.',
-    hasImage
-      ? '- "occlusion" (ONLY because an image is attached): ONE card that masks labeled parts of the image. Shape {"kind":"occlusion","q":"Identify each labeled part","regions":[{"label":"...","x":0.12,"y":0.30,"w":0.18,"h":0.10}, ...]}. x,y,w,h are NORMALIZED fractions of the image (0..1): x,y = top-left corner of the box over the labeled part, w,h = its width/height. Include one region per visible label (3–8 regions). Place boxes as accurately as you can.'
-      : null,
     '',
     'Example (note the mix and the REQUIRED {{ }} in cloze):',
     '[',
@@ -127,7 +124,7 @@ function buildGenPrompt(sourceText, hasImage) {
     '',
     'SOURCE MATERIAL:',
     sourceText && sourceText.trim() ? sourceText.trim() : '(see the attached image)',
-  ].filter(l => l !== null).join('\n');
+  ].join('\n');
 }
 
 // Monotonic id counter so generated cards are unique regardless of timing.
@@ -154,30 +151,16 @@ function parseGenCards(responseText) {
     try { const s = JSON.parse(text.slice(start, end + 1)); if (Array.isArray(s)) arr = s; } catch (e) { return []; }
   }
   if (!Array.isArray(arr)) return [];
-  const KINDS = { qa: 1, cloze: 1, rev: 1, occlusion: 1 };
+  const KINDS = { qa: 1, cloze: 1, rev: 1 };
   const prim = v => (typeof v === 'string' || typeof v === 'number') ? String(v).trim() : '';
-  // Coerce a model-supplied normalized [0..1] region into a percent box, tolerant
-  // of 0..100 inputs; returns null if it isn't a usable rectangle.
-  const toBox = (r, i) => {
-    if (!r || typeof r !== 'object') return null;
-    let x = +r.x, y = +r.y, w = +r.w, h = +r.h;
-    if (![x, y, w, h].every(n => Number.isFinite(n)) || w <= 0 || h <= 0) return null;
-    const pct = v => (v <= 1 ? v * 100 : v);              // accept 0..1 OR already-percent
-    x = pct(x); y = pct(y); w = pct(w); h = pct(h);
-    x = Math.max(0, Math.min(100, x)); y = Math.max(0, Math.min(100, y));
-    w = Math.max(2, Math.min(100 - x, w)); h = Math.max(2, Math.min(100 - y, h));
-    return { id: 'b' + i, x, y, w, h, label: prim(r.label) || ('Region ' + (i + 1)) };
-  };
   const out = [];
   arr.forEach(c => {
     if (!c || typeof c !== 'object') return;
+    // Occlusion is never AI-generated: a model can read labels but can't place
+    // masks, and a page dump is the wrong thing to occlude anyway. Occlusion is a
+    // manual, draw-your-own-masks card kind.
+    if (c.kind === 'occlusion') return;
     let kind = KINDS[c.kind] ? c.kind : 'qa';
-    if (kind === 'occlusion') {
-      const boxes = (Array.isArray(c.regions) ? c.regions : []).map(toBox).filter(Boolean);
-      if (!boxes.length) return;                          // no usable regions → drop
-      out.push({ id: genId('g'), kind, q: prim(c.q) || 'Identify each labeled part.', a: null, boxes });
-      return;
-    }
     const q = prim(c.q), a = prim(c.a);
     if (!q) return;
     if (kind === 'cloze' && !/\{\{.+?\}\}/.test(q)) kind = 'qa';
@@ -191,8 +174,8 @@ function parseGenCards(responseText) {
 // model text (to be run through parseGenCards). Throws a short code on failure.
 async function callOpenRouter({ apiKey, model, sourceText, imageDataUrl }) {
   const content = imageDataUrl
-    ? [{ type: 'text', text: buildGenPrompt(sourceText, true) }, { type: 'image_url', image_url: { url: imageDataUrl } }]
-    : buildGenPrompt(sourceText, false);
+    ? [{ type: 'text', text: buildGenPrompt(sourceText) }, { type: 'image_url', image_url: { url: imageDataUrl } }]
+    : buildGenPrompt(sourceText);
   let res;
   try {
     res = await fetch(OPENROUTER_URL, {
@@ -2271,7 +2254,7 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCa
 }
 
 function ManualGenScreen({ source, onApply, onCancel }) {
-  const prompt = buildGenPrompt(source ? source.sourceText : '', !!(source && source.imageDataUrl));
+  const prompt = buildGenPrompt(source ? source.sourceText : '');
   const [pasteText, setPasteText] = useState('');
   const [copied, setCopied] = useState(false);
   const [err, setErr] = useState(false);
