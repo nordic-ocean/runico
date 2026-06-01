@@ -209,7 +209,9 @@ const RUNICO_STRINGS = {
     "settings.doneButton": "Done",
     "browse.untitledFolder": "Untitled",
     "add.fileReady": "Ready to read",
-    "add.fileRemoveTitle": "Remove file"
+    "add.fileRemoveTitle": "Remove file",
+    "source.fromThisSource": "From this source",
+    "source.highlighted": "Highlighted: {label}."
   },
   "pt-BR": {
     "common.nav.settings": "Configurações",
@@ -416,7 +418,9 @@ const RUNICO_STRINGS = {
     "settings.doneButton": "Concluído",
     "browse.untitledFolder": "Sem título",
     "add.fileReady": "Pronto para ler",
-    "add.fileRemoveTitle": "Remover arquivo"
+    "add.fileRemoveTitle": "Remover arquivo",
+    "source.fromThisSource": "Desta fonte",
+    "source.highlighted": "Destacado: {label}."
   },
   "pt-PT": {
     "common.nav.settings": "Definições",
@@ -623,7 +627,9 @@ const RUNICO_STRINGS = {
     "settings.doneButton": "Concluído",
     "browse.untitledFolder": "Sem título",
     "add.fileReady": "Pronto a ler",
-    "add.fileRemoveTitle": "Remover ficheiro"
+    "add.fileRemoveTitle": "Remover ficheiro",
+    "source.fromThisSource": "Desta fonte",
+    "source.highlighted": "Destacado: {label}."
   },
   "es": {
     "common.nav.settings": "Ajustes",
@@ -830,7 +836,9 @@ const RUNICO_STRINGS = {
     "settings.doneButton": "Listo",
     "browse.untitledFolder": "Sin título",
     "add.fileReady": "Listo para leer",
-    "add.fileRemoveTitle": "Quitar archivo"
+    "add.fileRemoveTitle": "Quitar archivo",
+    "source.fromThisSource": "De esta fuente",
+    "source.highlighted": "Destacado: {label}."
   },
   "ru": {
     "common.nav.settings": "Настройки",
@@ -1037,7 +1045,9 @@ const RUNICO_STRINGS = {
     "settings.doneButton": "Готово",
     "browse.untitledFolder": "Без названия",
     "add.fileReady": "Готово к чтению",
-    "add.fileRemoveTitle": "Удалить файл"
+    "add.fileRemoveTitle": "Удалить файл",
+    "source.fromThisSource": "Из этого источника",
+    "source.highlighted": "Выделено: {label}."
   },
   "it": {
     "common.nav.settings": "Impostazioni",
@@ -1244,7 +1254,9 @@ const RUNICO_STRINGS = {
     "settings.doneButton": "Fatto",
     "browse.untitledFolder": "Senza titolo",
     "add.fileReady": "Pronto da leggere",
-    "add.fileRemoveTitle": "Rimuovi file"
+    "add.fileRemoveTitle": "Rimuovi file",
+    "source.fromThisSource": "Da questa fonte",
+    "source.highlighted": "Evidenziato: {label}."
   },
   "zh": {
     "common.nav.settings": "设置",
@@ -1451,7 +1463,9 @@ const RUNICO_STRINGS = {
     "settings.doneButton": "完成",
     "browse.untitledFolder": "未命名",
     "add.fileReady": "准备就绪",
-    "add.fileRemoveTitle": "移除文件"
+    "add.fileRemoveTitle": "移除文件",
+    "source.fromThisSource": "来自此来源",
+    "source.highlighted": "高亮：{label}。"
   }
 };
 

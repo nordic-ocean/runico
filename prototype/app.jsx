@@ -2179,7 +2179,7 @@ function ReviewDraftsScreen({ onApprove, onCancel, onShowSource }) {
         {(revealed || editing) && (
           <div className="card-foot-row">
             <div className="card-meta">
-              <button onClick={onShowSource}><Glyph name="book" size={13} /> {t('add.reviewSource')}</button>
+              <button onClick={() => onShowSource(card.region)}><Glyph name="book" size={13} /> {t('add.reviewSource')}</button>
             </div>
             {editing ? (
               <div className="row-tight">
@@ -2299,7 +2299,7 @@ function SourceOverlay({ region, onClose }) {
       <div className="overlay-card source-page" onClick={e => e.stopPropagation()}>
         <div className="source-page-head">
           <div>
-            <div className="eyebrow" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Glyph name="book" size={13} /> From this source</div>
+            <div className="eyebrow" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Glyph name="book" size={13} /> {t('source.fromThisSource')}</div>
             <div className="source-page-title">Eukaryotic cell · Ch. 4</div>
           </div>
           <button className="overlay-close" onClick={onClose}><Glyph name="close" /></button>
@@ -2328,8 +2328,8 @@ function SourceOverlay({ region, onClose }) {
             <figcaption>
               <b>Figure 4.3</b> — A generalized eukaryotic cell, showing the principal
               membrane-bound organelles and their spatial relationships.
-              {region && (
-                <> Highlighted: <b style={{ color: '#0076B4' }}>{REGIONS[region]?.label}</b>.</>
+              {region && REGIONS[region] && (
+                <> {t('source.highlighted', { label: REGIONS[region].label })}</>
               )}
             </figcaption>
           </figure>
@@ -2787,7 +2787,7 @@ function App() {
           <ReviewDraftsScreen
             onApprove={approveDrafts}
             onCancel={() => setScreen('folder')}
-            onShowSource={() => setOverlayRegion(null)}
+            onShowSource={(r) => setOverlayRegion(r || null)}
           />
         )}
         {screen === 'approved' && (
