@@ -1,0 +1,2 @@
+# Claude Code / OpenSpec local tooling (regenerable via `openspec init --tools claude`)
+.claude/
