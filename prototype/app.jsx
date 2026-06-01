@@ -13,6 +13,10 @@ const { useState, useEffect, useMemo, useRef } = React;
 // add-electron-desktop-wrapper change).
 const STORE_PREFIX = 'runico:v3:';
 
+// App version shown in the bottom-left build badge. Keep in sync with
+// package.json "version" — electron-builder names the installers from that.
+const APP_VERSION = '1.0.0-alpha.1';
+
 // ── Native (desktop) backend ─────────────────────────────
 // In the Electron build, window.runico (preload.js) exposes the OS keychain, the
 // local save file, and main-process OpenRouter requests. In a plain browser it's
@@ -2988,7 +2992,7 @@ function ApprovedScreen({ keptCount, onHome, onViewCards, topicLabel }) {
   );
 }
 
-function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiKey, onApiKeyChange, genModel, onGenModelChange, onDone }) {
+function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiKey, onApiKeyChange, genModel, onGenModelChange, onOpenAbout, onDone }) {
   // In desktop, apiKey is just a presence sentinel ('saved'); the raw key lives in
   // the keychain and never reaches the renderer, so the input starts empty there.
   const [keyInput, setKeyInput] = useState(IS_DESKTOP ? '' : (apiKey || ''));
@@ -3113,8 +3117,75 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiK
         })()}
       </div>
 
+      <div className="settings-section">
+        <div className="settings-section-label">{t('about.title')}</div>
+        <button className="lang-row" onClick={onOpenAbout}>
+          <span className="lang-row-label">{t('about.settingsRow')}</span>
+          <span className="lang-row-native" style={{ fontSize: 12, color: '#7A8696' }}>v{APP_VERSION}</span>
+          <span className="lang-row-check"><Glyph name="arrow" size={14} /></span>
+        </button>
+      </div>
+
       <div className="home-actions" style={{ marginTop: 32 }}>
         <button className="primary" onClick={onDone}>{t('settings.doneButton')}</button>
+      </div>
+    </div>
+  );
+}
+
+// Category metadata for changelog entries. The labels are short interface words,
+// so they go through i18n (falling back to English); the entry text itself is
+// authored content from changelog.js and is shown as written.
+const CHANGELOG_CATEGORIES = {
+  feature:     { key: 'about.catFeature',     fallback: 'Feature',     cls: 'cl-feature' },
+  enhancement: { key: 'about.catEnhancement', fallback: 'Enhancement', cls: 'cl-enhancement' },
+  fix:         { key: 'about.catFix',         fallback: 'Fix',         cls: 'cl-fix' },
+  security:    { key: 'about.catSecurity',    fallback: 'Security',    cls: 'cl-security' },
+};
+
+// About / changelog page. Describes the app and lists every release. Reached from
+// the version badge (bottom-left) and from Settings → About. Reads its content from
+// the globals defined in changelog.js, guarding against the file failing to load.
+function AboutScreen() {
+  const about = (typeof window !== 'undefined' && window.RUNICO_ABOUT) || {};
+  const releases = (typeof window !== 'undefined' && window.RUNICO_CHANGELOG) || [];
+  return (
+    <div className="stage-inner">
+      <div className="eyebrow">{t('about.title')}</div>
+
+      <div className="about-hero">
+        <img className="about-mark" src="assets/runico-ring.png" alt="" />
+        <div className="about-name">Runico</div>
+        <div className="about-version">v{APP_VERSION}</div>
+        {about.tagline && <div className="about-tagline">{about.tagline}</div>}
+      </div>
+
+      {(about.description || []).map((para, i) => (
+        <p key={i} className="about-desc">{para}</p>
+      ))}
+
+      <div className="settings-section-label" style={{ marginTop: 28 }}>{t('about.changelogTitle')}</div>
+      <div className="changelog">
+        {releases.map((rel, ri) => (
+          <div key={`${rel.version}-${ri}`} className="cl-release">
+            <div className="cl-release-head">
+              <span className="cl-version">v{rel.version}</span>
+              {rel.date && <span className="cl-date">{rel.date}</span>}
+            </div>
+            {rel.summary && <div className="cl-summary">{rel.summary}</div>}
+            <ul className="cl-entries">
+              {(rel.entries || []).map((e, ei) => {
+                const cat = CHANGELOG_CATEGORIES[e.type] || CHANGELOG_CATEGORIES.feature;
+                return (
+                  <li key={ei} className="cl-entry">
+                    <span className={`cl-tag ${cat.cls}`}>{t(cat.key) === cat.key ? cat.fallback : t(cat.key)}</span>
+                    <span className="cl-text">{e.text}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -3264,6 +3335,8 @@ function App() {
       .map(c => ({ ...c, sourceId: srcId, ...(c.kind === 'occlusion' ? { image: c.image || imageDataUrl } : {}) }));
   }
   const [perfReturn, setPerfReturn] = useState('folder');
+  // Where the About page returns to (home from the version badge, Settings from there).
+  const [aboutReturn, setAboutReturn] = useState('folder');
   const [tweaks, setTweaks] = usePersistentState('settings', TWEAK_DEFAULTS);
   // Sync the interface language before children render (switching is live).
   setRunicoLocale(tweaks.language || 'en');
@@ -3727,11 +3800,12 @@ function App() {
         </div>
       </div>
 
-      {(screen === 'add' || screen === 'processing' || screen === 'processedNotice' || screen === 'manualGen' || screen === 'reviewDrafts' || screen === 'settings' || screen === 'study' || screen === 'performance') && (
+      {(screen === 'add' || screen === 'processing' || screen === 'processedNotice' || screen === 'manualGen' || screen === 'reviewDrafts' || screen === 'settings' || screen === 'study' || screen === 'performance' || screen === 'about') && (
         <div className="back-bar">
           <button className="nav-btn" onClick={() => {
             // Performance returns to where it was opened from; study pauses (saving
             // the spot so it's resumable); everything else goes home.
+            if (screen === 'about') { setScreen(aboutReturn || 'folder'); return; }
             if (screen === 'performance') { setScreen(perfReturn || 'folder'); return; }
             if (screen === 'study') { pauseSession(); return; }
             setGenDraftBackup(null); setRestoreDraft(null); setScreen('folder');
@@ -3934,15 +4008,24 @@ function App() {
             onApiKeyChange={changeApiKey}
             genModel={genModel}
             onGenModelChange={setGenModel}
+            onOpenAbout={() => { setAboutReturn('settings'); setScreen('about'); }}
             onDone={() => setScreen('folder')}
           />
         )}
+        {screen === 'about' && <AboutScreen />}
       </div>
 
       {overlay && (
         <SourceOverlay region={overlay.region} source={overlay.source} onClose={() => setOverlay(null)} />
       )}
 
+      <button
+        className="version-badge"
+        title={t('about.title')}
+        onClick={() => { setAboutReturn('folder'); setScreen('about'); }}
+      >
+        v{APP_VERSION}
+      </button>
     </div>
   );
 }

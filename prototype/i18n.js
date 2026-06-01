@@ -7,6 +7,13 @@ const RUNICO_STRINGS = {
   "en": {
     "common.nav.settings": "Settings",
     "common.nav.back": "Back",
+    "about.title": "About",
+    "about.changelogTitle": "What's new",
+    "about.settingsRow": "About Runico & what's new",
+    "about.catFeature": "Feature",
+    "about.catEnhancement": "Enhancement",
+    "about.catFix": "Fix",
+    "about.catSecurity": "Security",
     "common.processedNotice.title": "{n} new cards drafted.",
     "common.processedNotice.title_one": "{n} new card drafted.",
     "common.processedNotice.sub": "Take a look when you have a minute.",

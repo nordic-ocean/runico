@@ -35,6 +35,49 @@
   .app.theme-warm { background: #FBFAF7; }
   .app.theme-warm body { color: #1F1B17; }
 
+  /* Build version — faint, fixed in the bottom-left; opens the About page.
+     Colors inherit the theme base and dim via opacity, so it stays legible
+     on light, warm, and dark without per-theme overrides. */
+  .version-badge {
+    position: fixed; bottom: 14px; left: 16px;
+    font-family: inherit; font-size: 11px; line-height: 1; letter-spacing: 0.02em;
+    color: inherit; opacity: 0.45;
+    background: none; border: none; padding: 4px; margin: 0;
+    cursor: pointer; user-select: none;
+    z-index: 80;
+    transition: opacity 150ms;
+  }
+  .version-badge:hover { opacity: 0.9; text-decoration: underline; }
+
+  /* About + changelog page */
+  .about-hero { text-align: center; margin: 4px 0 20px; }
+  .about-mark { width: 56px; height: 56px; }
+  .about-name { font-size: 22px; font-weight: 600; margin-top: 10px; letter-spacing: -0.01em; }
+  .about-version { font-size: 13px; margin-top: 3px; opacity: 0.55; }
+  .about-tagline { font-size: 15px; margin-top: 8px; opacity: 0.8; font-style: italic; }
+  .about-desc { line-height: 1.65; margin: 12px 0; opacity: 0.92; }
+  .changelog { margin-top: 14px; display: flex; flex-direction: column; gap: 26px; }
+  .cl-release-head { display: flex; align-items: baseline; gap: 10px; }
+  .cl-version { font-size: 16px; font-weight: 600; }
+  .cl-date { font-size: 12px; opacity: 0.55; }
+  .cl-summary { margin-top: 5px; opacity: 0.7; line-height: 1.5; }
+  .cl-entries { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 9px; }
+  .cl-entry { display: flex; align-items: flex-start; gap: 10px; }
+  .cl-text { line-height: 1.5; opacity: 0.92; }
+  .cl-tag {
+    flex: none; margin-top: 2px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  }
+  .cl-feature     { background: rgba(34,197,94,0.15);  color: #15803d; }
+  .cl-enhancement { background: rgba(59,130,246,0.15); color: #1d4ed8; }
+  .cl-fix         { background: rgba(245,158,11,0.18); color: #b45309; }
+  .cl-security    { background: rgba(239,68,68,0.15);  color: #b91c1c; }
+  .app.theme-dark .cl-feature     { color: #4ade80; }
+  .app.theme-dark .cl-enhancement { color: #7aa7ff; }
+  .app.theme-dark .cl-fix         { color: #fbbf24; }
+  .app.theme-dark .cl-security    { color: #f87171; }
+
   /* Wordmark + tiny top bar */
   .nav {
     display: flex; align-items: center; justify-content: space-between;
@@ -2553,6 +2596,8 @@
 
 <!-- Interface translations + tiny i18n engine (plain JS, runs before app.jsx) -->
 <script src="i18n.js"></script>
+<!-- Static changelog + app description (plain JS, runs before app.jsx) -->
+<script src="changelog.js"></script>
 <script type="text/babel" src="app.jsx"></script>
 
 </body>
