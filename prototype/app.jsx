@@ -2383,7 +2383,7 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, init
                 value={model} onChange={e => setModel(e.target.value)}>
           {GEN_MODELS.map(m => (
             <option key={m.id} value={m.id} disabled={!m.vision && !!(file && file.isImage)}>
-              {m.label} — {modelPrice(m)}{m.vision ? '' : ' · text only'}
+              {m.label} — {modelPrice(m)} · {t('settings.modelCardsShort', { cards: modelCardEstimate(m).cardsPer1M.toLocaleString() })}{m.vision ? '' : ' · text only'}
             </option>
           ))}
         </select>
@@ -2903,7 +2903,7 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiK
                     className={`lang-row ${genModel === m.id ? 'is-selected' : ''}`}
                     onClick={() => onGenModelChange(m.id)}>
               <span className="lang-row-label">{m.label}{m.vision ? '' : ' · text only'}</span>
-              <span className="lang-row-native" style={{ fontSize: 12, color: '#7A8696' }}>{modelPrice(m)}</span>
+              <span className="lang-row-native" style={{ fontSize: 12, color: '#7A8696' }}>{modelPrice(m)} · {t('settings.modelCardsShort', { cards: modelCardEstimate(m).cardsPer1M.toLocaleString() })}</span>
               <span className="lang-row-check">{genModel === m.id && <Glyph name="check" size={14} />}</span>
             </button>
           ))}
@@ -3348,7 +3348,10 @@ function App() {
     // Back up the input so a generation interrupted by a page reload can be
     // restored (the network request itself cannot survive a reload). Cleared on
     // success (storeDraftsAndReview) or when the user cancels the Add screen.
-    setGenDraftBackup({ name: name || '', sourceText: sourceText || '', imageDataUrl: imageDataUrl || null, model: model || genModel, targetScope: addTargetScope });
+    // Match the source-store cap: don't persist an oversized image into the backup
+    // (it would silently blow the localStorage quota); text is restored regardless.
+    const backupImage = (imageDataUrl && imageDataUrl.length > 2000000) ? null : (imageDataUrl || null);
+    setGenDraftBackup({ name: name || '', sourceText: sourceText || '', imageDataUrl: backupImage, model: model || genModel, targetScope: addTargetScope });
     try {
       let text;
       try { text = await callOpenRouter({ apiKey, model: model || genModel, sourceText, imageDataUrl }); }
@@ -3442,7 +3445,7 @@ function App() {
     <div className={`app theme-${tweaks.theme}`} style={{ ['--size-mul']: sizeMul }}>
       <div className="nav">
         <div className="nav-left">
-          <button className="nav-mark" onClick={() => { setScopeId('all'); setScreen('folder'); }}>
+          <button className="nav-mark" onClick={() => { setGenDraftBackup(null); setRestoreDraft(null); setScopeId('all'); setScreen('folder'); }}>
             <img className="mark-logo" src="assets/runico-ring.png" alt="" />
             <img className="mark-wordmark" src="assets/runico-wordmark.png" alt="Runico" />
           </button>
@@ -3458,7 +3461,7 @@ function App() {
 
       {(screen === 'add' || screen === 'processing' || screen === 'processedNotice' || screen === 'manualGen' || screen === 'reviewDrafts' || screen === 'settings') && (
         <div className="back-bar">
-          <button className="nav-btn" onClick={() => setScreen('folder')}>
+          <button className="nav-btn" onClick={() => { setGenDraftBackup(null); setRestoreDraft(null); setScreen('folder'); }}>
             <Glyph name="back" size={14} /> {t('common.nav.back')}
           </button>
         </div>
