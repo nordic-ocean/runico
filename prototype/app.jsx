@@ -102,22 +102,32 @@ const GEN_MODELS = [
 function modelById(id) { return GEN_MODELS.find(m => m.id === id); }
 function modelPrice(m) { return m ? ('$' + m.in.toFixed(2) + ' / $' + m.out.toFixed(2) + ' per 1M') : ''; }
 
-function buildGenPrompt(sourceText) {
+function buildGenPrompt(sourceText, hasImage) {
   return [
     'You are an expert tutor creating high-quality study flashcards from the source material below.',
     'Cover the material thoroughly: capture every important fact, name, date, definition, cause-and-effect, and relationship — not just the headline idea. Aim for 8–15 cards (more for richer sources).',
     'Write specific, self-contained questions that test real understanding and recall. Each card must stand on its own (never "according to the text"). Avoid trivial, yes/no, or vague questions, and do not duplicate cards.',
     'Match the language of the source material.',
-    'Return ONLY a JSON array (no prose, no markdown, no code fences). Each card is an object {"kind","q","a"} where kind is one of:',
-    '- "qa": a precise question (q) with a complete answer (a).',
-    '- "cloze": q is a full sentence with the single key term hidden as {{term}}; a is that term.',
-    '- "rev": q is a key term, a is its definition (for reversible study).',
-    'Pick the kind that best fits each fact, and use a mix.',
-    'Example: [{"kind":"qa","q":"Which European powers seized Caribbean islands from Spain in the 17th century?","a":"The English, Dutch, and French."},{"kind":"cloze","q":"The English captured the island of {{Jamaica}} from Spain.","a":"Jamaica"}]',
+    '',
+    'Use a DELIBERATE MIX of the card kinds below — do NOT return only "qa". For ~10 cards, aim for roughly 4 "qa", 3 "cloze", and 3 "rev" (adjust to the material, but always include several of each kind where it fits).',
+    'Return ONLY a JSON array (no prose, no markdown, no code fences). Each card is an object {"kind","q","a"}:',
+    '- "qa": a precise question (q) with a complete answer (a). Use for facts, processes, comparisons, cause/effect.',
+    '- "cloze": q is a COMPLETE sentence with exactly ONE key term hidden using double braces, e.g. "The powerhouse of the cell is the {{mitochondrion}}."; a is that hidden term. The {{ }} braces are REQUIRED — never omit them.',
+    '- "rev": a term/definition pair for two-way recall — q is the term or concept name (a few words), a is its definition. Use for vocabulary, names, and key concepts.',
+    hasImage
+      ? '- "occlusion" (ONLY because an image is attached): ONE card that masks labeled parts of the image. Shape {"kind":"occlusion","q":"Identify each labeled part","regions":[{"label":"...","x":0.12,"y":0.30,"w":0.18,"h":0.10}, ...]}. x,y,w,h are NORMALIZED fractions of the image (0..1): x,y = top-left corner of the box over the labeled part, w,h = its width/height. Include one region per visible label (3–8 regions). Place boxes as accurately as you can.'
+      : null,
+    '',
+    'Example (note the mix and the REQUIRED {{ }} in cloze):',
+    '[',
+    '  {"kind":"qa","q":"Which European powers seized Caribbean islands from Spain in the 17th century?","a":"The English, Dutch, and French."},',
+    '  {"kind":"cloze","q":"In 1655 the English captured the island of {{Jamaica}} from Spain.","a":"Jamaica"},',
+    '  {"kind":"rev","q":"Privateer","a":"A private sailor licensed by a government to attack enemy ships during wartime."}',
+    ']',
     '',
     'SOURCE MATERIAL:',
     sourceText && sourceText.trim() ? sourceText.trim() : '(see the attached image)',
-  ].join('\n');
+  ].filter(l => l !== null).join('\n');
 }
 
 // Monotonic id counter so generated cards are unique regardless of timing.
@@ -144,12 +154,30 @@ function parseGenCards(responseText) {
     try { const s = JSON.parse(text.slice(start, end + 1)); if (Array.isArray(s)) arr = s; } catch (e) { return []; }
   }
   if (!Array.isArray(arr)) return [];
-  const KINDS = { qa: 1, cloze: 1, rev: 1 };
+  const KINDS = { qa: 1, cloze: 1, rev: 1, occlusion: 1 };
   const prim = v => (typeof v === 'string' || typeof v === 'number') ? String(v).trim() : '';
+  // Coerce a model-supplied normalized [0..1] region into a percent box, tolerant
+  // of 0..100 inputs; returns null if it isn't a usable rectangle.
+  const toBox = (r, i) => {
+    if (!r || typeof r !== 'object') return null;
+    let x = +r.x, y = +r.y, w = +r.w, h = +r.h;
+    if (![x, y, w, h].every(n => Number.isFinite(n)) || w <= 0 || h <= 0) return null;
+    const pct = v => (v <= 1 ? v * 100 : v);              // accept 0..1 OR already-percent
+    x = pct(x); y = pct(y); w = pct(w); h = pct(h);
+    x = Math.max(0, Math.min(100, x)); y = Math.max(0, Math.min(100, y));
+    w = Math.max(2, Math.min(100 - x, w)); h = Math.max(2, Math.min(100 - y, h));
+    return { id: 'b' + i, x, y, w, h, label: prim(r.label) || ('Region ' + (i + 1)) };
+  };
   const out = [];
   arr.forEach(c => {
     if (!c || typeof c !== 'object') return;
     let kind = KINDS[c.kind] ? c.kind : 'qa';
+    if (kind === 'occlusion') {
+      const boxes = (Array.isArray(c.regions) ? c.regions : []).map(toBox).filter(Boolean);
+      if (!boxes.length) return;                          // no usable regions → drop
+      out.push({ id: genId('g'), kind, q: prim(c.q) || 'Identify each labeled part.', a: null, boxes });
+      return;
+    }
     const q = prim(c.q), a = prim(c.a);
     if (!q) return;
     if (kind === 'cloze' && !/\{\{.+?\}\}/.test(q)) kind = 'qa';
@@ -163,8 +191,8 @@ function parseGenCards(responseText) {
 // model text (to be run through parseGenCards). Throws a short code on failure.
 async function callOpenRouter({ apiKey, model, sourceText, imageDataUrl }) {
   const content = imageDataUrl
-    ? [{ type: 'text', text: buildGenPrompt(sourceText) }, { type: 'image_url', image_url: { url: imageDataUrl } }]
-    : buildGenPrompt(sourceText);
+    ? [{ type: 'text', text: buildGenPrompt(sourceText, true) }, { type: 'image_url', image_url: { url: imageDataUrl } }]
+    : buildGenPrompt(sourceText, false);
   let res;
   try {
     res = await fetch(OPENROUTER_URL, {
@@ -1788,8 +1816,10 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
           })}
         </div>
 
-        <div className="figure-wrap" style={{ aspectRatio: '600 / 400' }}>
-          <CellFigure />
+        <div className="figure-wrap" style={card.image ? undefined : { aspectRatio: '600 / 400' }}>
+          {card.image
+            ? <img src={card.image} alt="" style={{ width: '100%', height: 'auto', display: 'block' }} />
+            : <CellFigure />}
           {items.map((it, i) => {
             const isCurrent = i === step && !done;
             const past = i < step;
@@ -2221,7 +2251,7 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCa
 }
 
 function ManualGenScreen({ source, onApply, onCancel }) {
-  const prompt = buildGenPrompt(source ? source.sourceText : '');
+  const prompt = buildGenPrompt(source ? source.sourceText : '', !!(source && source.imageDataUrl));
   const [pasteText, setPasteText] = useState('');
   const [copied, setCopied] = useState(false);
   const [err, setErr] = useState(false);
@@ -2294,15 +2324,19 @@ function ProcessingScreen({ phase, onDone }) {
 function OcclusionEditor({ card, onBoxesChange }) {
   const wrapRef = useRef(null);
   const [boxes, setBoxes] = useState(() =>
-    (card.regions || []).map((rid, i) => {
-      const r = REGIONS[rid];
-      return {
-        id: 'b' + i + '-' + rid,
-        x: (r.x / 600) * 100, y: (r.y / 400) * 100,
-        w: (r.w / 600) * 100, h: (r.h / 400) * 100,
-        label: r.label,
-      };
-    })
+    // Generated/edited occlusion carries percent boxes directly; the seeded demo
+    // carries region keys resolved through REGIONS (px → percent).
+    (card.boxes && card.boxes.length)
+      ? card.boxes.map((b, i) => ({ id: b.id || ('b' + i), x: b.x, y: b.y, w: b.w, h: b.h, label: b.label || ('Region ' + (i + 1)) }))
+      : (card.regions || []).map((rid, i) => {
+          const r = REGIONS[rid];
+          return {
+            id: 'b' + i + '-' + rid,
+            x: (r.x / 600) * 100, y: (r.y / 400) * 100,
+            w: (r.w / 600) * 100, h: (r.h / 400) * 100,
+            label: r.label,
+          };
+        })
   );
   const [selId, setSelId] = useState(null);
   const drag = useRef(null);
@@ -2376,8 +2410,10 @@ function OcclusionEditor({ card, onBoxesChange }) {
 
   return (
     <>
-      <div className="figure-wrap occ-editor" ref={wrapRef} style={{ aspectRatio: '600 / 400', marginBottom: 12 }}>
-        <CellFigure />
+      <div className="figure-wrap occ-editor" ref={wrapRef} style={card.image ? { marginBottom: 12 } : { aspectRatio: '600 / 400', marginBottom: 12 }}>
+        {card.image
+          ? <img src={card.image} alt="" style={{ width: '100%', height: 'auto', display: 'block' }} />
+          : <CellFigure />}
         <div className="occ-edit-surface" onPointerDown={startCreate} />
         {boxes.map(b => (
           <div key={b.id}
@@ -2778,7 +2814,9 @@ function App() {
       if (keys.length > SOURCES_CAP) for (const k of keys.slice(0, keys.length - SOURCES_CAP)) delete next[k];
       return next;
     });
-    return cards.map(c => ({ ...c, sourceId: srcId }));
+    // Occlusion cards render over an image, so embed it on the card itself (the
+    // study/edit surface is self-contained and survives source eviction).
+    return cards.map(c => ({ ...c, sourceId: srcId, ...(c.kind === 'occlusion' && imageDataUrl ? { image: imageDataUrl } : {}) }));
   }
   const [perfReturn, setPerfReturn] = useState('folder');
   const [tweaks, setTweaks] = usePersistentState('settings', TWEAK_DEFAULTS);
@@ -3079,7 +3117,10 @@ function App() {
           ...(c.region ? { region: c.region } : {}),
           ...(c.sourceId ? { sourceId: c.sourceId } : {}),
           ...(c.kind === 'occlusion'
-            ? (e.boxes && e.boxes.length ? { boxes: e.boxes } : (c.regions ? { regions: c.regions } : {}))
+            ? {
+                ...(e.boxes && e.boxes.length ? { boxes: e.boxes } : (c.boxes && c.boxes.length ? { boxes: c.boxes } : (c.regions ? { regions: c.regions } : {}))),
+                ...(c.image ? { image: c.image } : {}),
+              }
             : {}),
         };
       });
