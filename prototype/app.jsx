@@ -2493,7 +2493,7 @@ function ReviewDraftsScreen({ drafts, onApprove, onCancel, onShowSource }) {
 
   return (
     <div className="stage-inner">
-      <div className="eyebrow">{t('add.reviewCardCounter', { idx: idx + 1, total: drafts.length })}<span className="dot" />{t('add.reviewDraftedFromSource')}</div>
+      <div className="eyebrow">{t('add.reviewCardCounter', { idx: idx + 1, total: drafts.length })}<span className="dot" />{kindLabel(card.kind)}<span className="dot" />{t('add.reviewDraftedFromSource')}</div>
 
       {editing ? (
         <>
