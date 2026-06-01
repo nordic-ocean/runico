@@ -246,7 +246,9 @@ const RUNICO_STRINGS = {
     "source.highlighted": "Highlighted: {label}.",
     "source.unavailable": "The source for this card isn’t available.",
     "study.flipTerm": "Term",
-    "study.flipDefinition": "Definition"
+    "study.flipDefinition": "Definition",
+    "study.flipQuestion": "Question",
+    "study.flipAnswer": "Answer"
   },
   "pt-BR": {
     "common.nav.settings": "Configurações",
@@ -490,7 +492,9 @@ const RUNICO_STRINGS = {
     "source.highlighted": "Destacado: {label}.",
     "source.unavailable": "A fonte deste cartão não está disponível.",
     "study.flipTerm": "Termo",
-    "study.flipDefinition": "Definição"
+    "study.flipDefinition": "Definição",
+    "study.flipQuestion": "Pergunta",
+    "study.flipAnswer": "Resposta"
   },
   "pt-PT": {
     "common.nav.settings": "Definições",
@@ -734,7 +738,9 @@ const RUNICO_STRINGS = {
     "source.highlighted": "Destacado: {label}.",
     "source.unavailable": "A fonte deste cartão não está disponível.",
     "study.flipTerm": "Termo",
-    "study.flipDefinition": "Definição"
+    "study.flipDefinition": "Definição",
+    "study.flipQuestion": "Pergunta",
+    "study.flipAnswer": "Resposta"
   },
   "es": {
     "common.nav.settings": "Ajustes",
@@ -978,7 +984,9 @@ const RUNICO_STRINGS = {
     "source.highlighted": "Destacado: {label}.",
     "source.unavailable": "La fuente de esta tarjeta no está disponible.",
     "study.flipTerm": "Término",
-    "study.flipDefinition": "Definición"
+    "study.flipDefinition": "Definición",
+    "study.flipQuestion": "Pregunta",
+    "study.flipAnswer": "Respuesta"
   },
   "ru": {
     "common.nav.settings": "Настройки",
@@ -1222,7 +1230,9 @@ const RUNICO_STRINGS = {
     "source.highlighted": "Выделено: {label}.",
     "source.unavailable": "Источник для этой карточки недоступен.",
     "study.flipTerm": "Термин",
-    "study.flipDefinition": "Определение"
+    "study.flipDefinition": "Определение",
+    "study.flipQuestion": "Вопрос",
+    "study.flipAnswer": "Ответ"
   },
   "it": {
     "common.nav.settings": "Impostazioni",
@@ -1466,7 +1476,9 @@ const RUNICO_STRINGS = {
     "source.highlighted": "Evidenziato: {label}.",
     "source.unavailable": "La fonte di questa carta non è disponibile.",
     "study.flipTerm": "Termine",
-    "study.flipDefinition": "Definizione"
+    "study.flipDefinition": "Definizione",
+    "study.flipQuestion": "Domanda",
+    "study.flipAnswer": "Risposta"
   },
   "zh": {
     "common.nav.settings": "设置",
@@ -1710,7 +1722,9 @@ const RUNICO_STRINGS = {
     "source.highlighted": "高亮：{label}。",
     "source.unavailable": "此卡片的来源不可用。",
     "study.flipTerm": "术语",
-    "study.flipDefinition": "定义"
+    "study.flipDefinition": "定义",
+    "study.flipQuestion": "问题",
+    "study.flipAnswer": "答案"
   }
 };
 

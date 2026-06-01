@@ -1805,6 +1805,7 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
     const done = step >= items.length;
     return (
       <div className="stage-inner wide">
+        <div className="eyebrow subtle">{t('study.cardMarker', { idx: idx + 1, total })}<span className="dot" />{kindLabel(card.kind)}</div>
         <div className="progress-dots">
           {items.map((_, i) => {
             const mark = occState?.marks[i];
@@ -1887,16 +1888,17 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
     <div className="stage-inner">
       <div className="eyebrow subtle">{t('study.cardMarker', { idx: idx + 1, total })}<span className="dot" />{kindLabel(card.kind)}</div>
 
-      {card.kind === 'rev' ? (
-        // Reversible: the term flips on its axis to reveal the definition.
+      {(card.kind === 'rev' || card.kind === 'qa') ? (
+        // Two-sided cards flip over: Q&A shows question→answer, reversible shows
+        // term→definition. (Cloze can't flip — its answer fills in place.)
         <div className="flip-card">
           <div className={`flip-inner ${revealed ? 'is-flipped' : ''}`}>
             <div className="flip-face flip-front">
-              <span className="flip-edge"><Glyph name="restart" size={12} /> {t('study.flipTerm')}</span>
+              <span className="flip-edge"><Glyph name="restart" size={12} /> {t(card.kind === 'rev' ? 'study.flipTerm' : 'study.flipQuestion')}</span>
               <div className="card-question">{card.q}</div>
             </div>
             <div className="flip-face flip-back">
-              <span className="flip-edge"><Glyph name="restart" size={12} /> {t('study.flipDefinition')}</span>
+              <span className="flip-edge"><Glyph name="restart" size={12} /> {t(card.kind === 'rev' ? 'study.flipDefinition' : 'study.flipAnswer')}</span>
               <div className="card-answer">{card.a}</div>
             </div>
           </div>
