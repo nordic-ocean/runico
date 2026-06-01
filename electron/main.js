@@ -110,6 +110,7 @@ function startServer() {
 // ── IPC surface (mirrors preload.js) ──
 ipcMain.on('runico:load', (e) => { e.returnValue = loadDataSync(); });           // sync: read at first render
 ipcMain.on('runico:keyStatus', (e) => { e.returnValue = hasKey() && keyAvailable(); });
+ipcMain.on('runico:saveSync', (e, obj) => { e.returnValue = saveData(obj); });   // sync: flush-on-close before teardown
 ipcMain.handle('runico:save', (e, obj) => saveData(obj));
 ipcMain.handle('runico:saveKey', (e, key) => writeKey(key));
 ipcMain.handle('runico:clearKey', () => clearKey());

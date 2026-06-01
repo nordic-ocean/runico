@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld('runico', {
   keyStatusSync: () => { try { return !!ipcRenderer.sendSync('runico:keyStatus'); } catch (e) { return false; } },
   // Persist the save document (debounced by the renderer).
   saveData: (obj) => ipcRenderer.invoke('runico:save', obj),
+  // Synchronous save used on window close/quit to flush the pending write before
+  // the renderer is torn down (an async save would race teardown and be lost).
+  saveDataSync: (obj) => { try { return ipcRenderer.sendSync('runico:saveSync', obj); } catch (e) { return { ok: false }; } },
   // Key management — the raw key goes IN to the keychain and never comes back.
   saveKey: (key) => ipcRenderer.invoke('runico:saveKey', key),
   clearKey: () => ipcRenderer.invoke('runico:clearKey'),

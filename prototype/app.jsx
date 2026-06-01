@@ -32,6 +32,17 @@ function nativeSaveSoon() {
     try { RUNICO.saveData(NATIVE_STORE); } catch (e) { /* best-effort */ }
   }, 400);
 }
+// Flush any pending debounced write before the window is torn down (close / quit),
+// using the SYNCHRONOUS save so it completes before the renderer dies — otherwise
+// a change made within the debounce window would be lost.
+if (IS_DESKTOP && typeof window !== 'undefined') {
+  const nativeFlush = () => {
+    if (NATIVE_SAVE_TIMER) { clearTimeout(NATIVE_SAVE_TIMER); NATIVE_SAVE_TIMER = null; }
+    try { (RUNICO.saveDataSync || RUNICO.saveData)(NATIVE_STORE); } catch (e) { /* best-effort */ }
+  };
+  window.addEventListener('pagehide', nativeFlush);
+  window.addEventListener('beforeunload', nativeFlush);
+}
 
 function usePersistentState(key, initial) {
   const [val, setVal] = useState(() => {
@@ -2933,9 +2944,11 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiK
           />
         </div>
         <div className="row-tight" style={{ marginTop: 10, alignItems: 'center', gap: 10 }}>
-          <button className="primary" onClick={() => { onApiKeyChange(keyInput.trim()); setKeyStatus(''); }}>{t('settings.apiKeySave')}</button>
+          <button className="primary" onClick={() => { onApiKeyChange(keyInput.trim()); if (IS_DESKTOP) setKeyInput(''); setKeyStatus(''); }}>{t('settings.apiKeySave')}</button>
           <button className="quiet" onClick={() => { setKeyInput(''); onApiKeyChange(''); setKeyStatus(''); }}>{t('settings.apiKeyClear')}</button>
-          <button className="quiet" onClick={testKey} disabled={!(keyInput.trim() || apiKey)}>{t('settings.apiKeyTest')}</button>
+          {/* Desktop validates the SAVED keychain key (the renderer never holds the raw key),
+              so Test only makes sense once a key is saved and the input is empty. */}
+          <button className="quiet" onClick={testKey} disabled={IS_DESKTOP ? (!apiKey || !!keyInput.trim()) : !(keyInput.trim() || apiKey)}>{t('settings.apiKeyTest')}</button>
           <span className="small" style={{ color: keyStatus === 'valid' ? 'var(--success-500)' : keyStatus === 'invalid' ? 'var(--error-500)' : '#7A8696' }}>
             {keyStatus === 'testing' && t('settings.apiKeyTesting')}
             {keyStatus === 'valid' && t('settings.apiKeyValid')}
