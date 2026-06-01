@@ -107,7 +107,7 @@ function buildGenPrompt(sourceText, hasImage) {
     'You are an expert tutor creating high-quality study flashcards from the source material below.',
     'Cover the material thoroughly: capture every important fact, name, date, definition, cause-and-effect, and relationship — not just the headline idea. Aim for 8–15 cards (more for richer sources).',
     'Write specific, self-contained questions that test real understanding and recall. Each card must stand on its own (never "according to the text"). Avoid trivial, yes/no, or vague questions, and do not duplicate cards.',
-    'Match the language of the source material.',
+    'CRITICAL: Write the ENTIRE output — every question and every answer — in ONE single language: the exact same language as the source material. Never mix languages, never switch alphabets/scripts, and never insert a word from another language (for example, if the source is Portuguese do NOT drop in an Arabic, Cyrillic, Chinese, or English word — write the Portuguese word instead). Proper names keep their original spelling.',
     '',
     'Use a DELIBERATE MIX of the card kinds below — do NOT return only "qa". For ~10 cards, aim for roughly 4 "qa", 3 "cloze", and 3 "rev" (adjust to the material, but always include several of each kind where it fits).',
     'Return ONLY a JSON array (no prose, no markdown, no code fences). Each card is an object {"kind","q","a"}:',
