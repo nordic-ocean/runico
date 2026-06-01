@@ -4,21 +4,26 @@
 // ============================================================
 const { useState, useEffect, useMemo, useRef } = React;
 
-// ── Session-storage persistence ──────────────────────────
+// ── Durable local persistence ────────────────────────────
 // Mock data seeds state once; every mutation is mirrored to
-// sessionStorage, so the prototype survives reloads within a tab
-// (and resets cleanly when the tab/session closes).
-const STORE_PREFIX = 'runico:v1:';
+// localStorage, so user data (the library, cards, settings, and
+// your last session) survives a full restart — not just a reload.
+// In the desktop build this same seam is backed by the OS keychain /
+// local save file (see the add-electron-desktop-wrapper change).
+// NOTE: recording real study sittings into persisted history is
+// future work (it needs a "miss" signal for standard cards); today
+// the trend reads from seeded demo history.
+const STORE_PREFIX = 'runico:v2:';
 function usePersistentState(key, initial) {
   const [val, setVal] = useState(() => {
     try {
-      const raw = sessionStorage.getItem(STORE_PREFIX + key);
+      const raw = localStorage.getItem(STORE_PREFIX + key);
       if (raw != null) return JSON.parse(raw);
     } catch (e) { /* ignore parse / storage errors */ }
     return typeof initial === 'function' ? initial() : initial;
   });
   useEffect(() => {
-    try { sessionStorage.setItem(STORE_PREFIX + key, JSON.stringify(val)); }
+    try { localStorage.setItem(STORE_PREFIX + key, JSON.stringify(val)); }
     catch (e) { /* ignore quota / serialization errors */ }
   }, [key, val]);
   return [val, setVal];
@@ -460,16 +465,17 @@ function FolderView({
   }
 
   // Folder counts roll up from their descendant leaf sources, so adding or
-  // creating cards anywhere keeps ancestor totals current.
+  // creating cards anywhere keeps ancestor totals current. Counts are
+  // factual totals — there is no spaced-repetition "due" schedule in v1.
   function descendantStats(id) {
-    let due = 0, total = 0;
+    let total = 0;
     const stack = scopes.filter(s => s.parent === id);
     while (stack.length) {
       const s = stack.pop();
-      if (s.isLeaf) { due += s.due || 0; total += s.total || 0; }
+      if (s.isLeaf) { total += s.total || 0; }
       else stack.push(...scopes.filter(c => c.parent === s.id));
     }
-    return { due, total };
+    return { total };
   }
 
   // Opening a folder appends a column to the right of the track; on narrow
@@ -511,13 +517,11 @@ function FolderView({
                     const st = descendantStats(parent.id);
                     return (
                       <div className="column-head-meta">
-                        {st.due > 0 ? `${st.due} due` : 'No cards due'}
-                        {' · '}
                         {st.total} {st.total === 1 ? 'card' : 'cards'}
                       </div>
                     );
                   })()}
-                  {descendantStats(parent.id).due > 0 && (
+                  {descendantStats(parent.id).total > 0 && (
                     <button className="column-head-begin"
                             onClick={() => onBegin(parent.id)}>
                       Practice all <Glyph name="arrow" size={12} />
@@ -527,16 +531,16 @@ function FolderView({
               )}
               {parent && parent.id === 'all' && (
                 <div className="column-head">
-                  <div className="column-head-title">Today</div>
+                  <div className="column-head-title">Everything</div>
                   {(() => {
                     const st = descendantStats('all');
                     return (
                       <div className="column-head-meta">
-                        {st.due > 0 ? `${st.due} cards due today` : 'Nothing due'}
+                        {st.total} {st.total === 1 ? 'card' : 'cards'}
                       </div>
                     );
                   })()}
-                  {descendantStats('all').due > 0 && (
+                  {descendantStats('all').total > 0 && (
                     <button className="column-head-begin"
                             onClick={() => onBegin('all')}>
                       Practice all <Glyph name="arrow" size={12} />
@@ -583,8 +587,8 @@ function FolderView({
                               <Glyph name="spark" size={10} /> {c.pendingDrafts}
                             </span>
                           )}
-                          {(isLeaf ? c.due : descendantStats(c.id).due) > 0 && (
-                            <span className="column-item-due">{isLeaf ? c.due : descendantStats(c.id).due}</span>
+                          {(isLeaf ? c.total : descendantStats(c.id).total) > 0 && (
+                            <span className="column-item-due">{isLeaf ? c.total : descendantStats(c.id).total}</span>
                           )}
                           {!isLeaf && (
                             <Glyph name="caret"
@@ -755,14 +759,13 @@ function ActionCard({
       )}
       <div className="action-card-meta">
         {scope.total} {scope.total === 1 ? 'card' : 'cards'}
-        {` · ${scope.due} due`}
-        {scope.last !== 'never' && ` · last ${scope.last}`}
+        {scope.last !== 'never' && ` · last studied ${scope.last}`}
       </div>
 
       {scope.paused && (
         <div className="action-card-resume">
           <Glyph name="pause" size={12} />
-          Paused at card {scope.paused.at} · {scope.paused.remaining} of {scope.due} remaining
+          Paused at card {scope.paused.at} · {scope.paused.remaining} {scope.paused.remaining === 1 ? 'card' : 'cards'} remaining
         </div>
       )}
 
@@ -775,7 +778,7 @@ function ActionCard({
         )}
         <button className="primary action-card-primary"
                 onClick={onBegin}
-                disabled={scope.due === 0 || scope.pendingDrafts > 0}>
+                disabled={scope.total === 0 || scope.pendingDrafts > 0}>
           <Glyph name="arrow" size={14} /> {scope.paused ? 'Continue practice' : 'Begin practice'}
         </button>
         {scope.pendingDrafts > 0 && (
@@ -885,10 +888,9 @@ function ScopeScreen({ currentScopeId, scopes, onPick, onEdit, onCreate, onCance
                 <div className="scope-item-body">
                   <div className={`scope-item-label ${s.depth <= 1 ? 'is-section' : ''}`}>{s.label}</div>
                   <div className="scope-item-meta">
-                    {s.total} cards · last reviewed {s.last}
+                    {s.total} cards · last studied {s.last}
                   </div>
                 </div>
-                <div className={`scope-due ${s.due === 0 ? 'zero' : ''}`}>{s.due}</div>
                 <div className="scope-check">
                   {isSelected && <Glyph name="check" size={16} />}
                 </div>
@@ -1134,7 +1136,7 @@ function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSav
     setAddingNew(false);
   }
 
-  const dueCount = scope.due;
+  const cardCount = scope.total;
 
   // Build the full path: ancestors → this source
   const crumbs = [];
@@ -1163,9 +1165,9 @@ function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSav
         })}
       </div>
 
-      <div className={`home-count ${dueCount === 0 ? 'dim' : ''}`}>{dueCount}</div>
+      <div className={`home-count ${cardCount === 0 ? 'dim' : ''}`}>{cardCount}</div>
       <p className="home-label">
-        {dueCount === 0 ? 'No cards due in ' : (dueCount === 1 ? 'card due in ' : 'cards due in ')}
+        {cardCount === 0 ? 'No cards in ' : (cardCount === 1 ? 'card in ' : 'cards in ')}
         {editingTitle ? (
           <input
             className="folder-pill-input"
@@ -1189,7 +1191,7 @@ function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSav
       </p>
 
       <div className="home-actions">
-        {dueCount > 0
+        {cardCount > 0
           ? <button className="primary lg" onClick={onBegin}>Begin <Glyph name="arrow" size={18} /></button>
           : null}
         <button className="quiet" onClick={onViewProgress}>
@@ -1788,8 +1790,8 @@ function DoneScreen({ onHome, draftCount, onReviewDrafts }) {
       <div className="done-mark">
         <Glyph name="check" size={28} />
       </div>
-      <div className="lede center">Done for today.</div>
-      <p className="copy center">Come back tomorrow.</p>
+      <div className="lede center">Deck complete.</div>
+      <p className="copy center">Practice again whenever you like.</p>
 
       <div className="home-actions">
         {draftCount > 0 && (
@@ -2028,6 +2030,7 @@ function OcclusionEditor({ card }) {
 function ReviewDraftsScreen({ onApprove, onCancel, onShowSource }) {
   const [idx, setIdx] = useState(0);
   const [decisions, setDecisions] = useState({}); // id -> 'keep' | 'skip'
+  const [edits, setEdits] = useState({}); // id -> { q, a } for edited drafts
   const [revealed, setRevealed] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editQ, setEditQ] = useState('');
@@ -2037,11 +2040,13 @@ function ReviewDraftsScreen({ onApprove, onCancel, onShowSource }) {
 
   useEffect(() => { setRevealed(false); setEditing(false); }, [idx]);
 
-  function decide(d) {
-    setDecisions(s => ({ ...s, [card.id]: d }));
+  function decide(d, edit) {
+    const nextDecisions = { ...decisions, [card.id]: d };
+    const nextEdits = edit ? { ...edits, [card.id]: edit } : edits;
+    setDecisions(nextDecisions);
+    if (edit) setEdits(nextEdits);
     if (idx === DRAFT_QUEUE.length - 1) {
-      // Show summary after small delay
-      onApprove({ ...decisions, [card.id]: d });
+      onApprove(nextDecisions, nextEdits);
     } else {
       setIdx(idx + 1);
     }
@@ -2105,12 +2110,12 @@ function ReviewDraftsScreen({ onApprove, onCancel, onShowSource }) {
             {editing ? (
               <div className="row-tight">
                 <button className="quiet" onClick={() => setEditing(false)}>Cancel</button>
-                <button className="primary" onClick={() => { setEditing(false); decide('keep'); }}>Save & keep <Glyph name="check" size={14} /></button>
+                <button className="primary" onClick={() => { setEditing(false); decide('keep', { q: editQ, a: editA }); }}>Save & keep <Glyph name="check" size={14} /></button>
               </div>
             ) : (
               <div className="row-tight">
                 <button className="quiet" onClick={() => decide('skip')}>Remove</button>
-                <button className="quiet" onClick={() => { setEditQ(card.q.replace(/\{\{|\}\}/g, '')); setEditA(card.a); setEditing(true); }}>Edit</button>
+                <button className="quiet" onClick={() => { setEditQ(card.q); setEditA(card.a); setEditing(true); }}>Edit</button>
                 <button className="primary" onClick={() => decide('keep')}>Keep <Glyph name="check" size={14} /></button>
               </div>
             )}
@@ -2140,19 +2145,17 @@ function ApprovedScreen({ keptCount, onHome, onViewCards, topicLabel }) {
 }
 
 function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, onDone }) {
-  // Top 10 most-spoken languages by total speakers (native + L2),
-  // shown in the locale's own script.
+  // The interface renders in the chosen language; card content is
+  // never translated (see appearance-settings spec). Shown in each
+  // locale's own script.
   const LANGUAGES = [
-    { code: 'en',   label: 'English',           native: 'English' },
-    { code: 'zh',   label: 'Mandarin Chinese',  native: '中文' },
-    { code: 'hi',   label: 'Hindi',             native: 'हिन्दी' },
-    { code: 'es',   label: 'Spanish',           native: 'Español' },
-    { code: 'fr',   label: 'French',            native: 'Français' },
-    { code: 'ar',   label: 'Arabic',            native: 'العربية',  rtl: true },
-    { code: 'bn',   label: 'Bengali',           native: 'বাংলা' },
-    { code: 'pt',   label: 'Portuguese',        native: 'Português' },
-    { code: 'ru',   label: 'Russian',           native: 'Русский' },
-    { code: 'ur',   label: 'Urdu',              native: 'اردو',     rtl: true },
+    { code: 'en',    label: 'English',              native: 'English' },
+    { code: 'pt-BR', label: 'Portuguese (Brazil)',  native: 'Português (Brasil)' },
+    { code: 'pt-PT', label: 'Portuguese (Portugal)', native: 'Português (Portugal)' },
+    { code: 'es',    label: 'Spanish',              native: 'Español' },
+    { code: 'ru',    label: 'Russian',              native: 'Русский' },
+    { code: 'it',    label: 'Italian',              native: 'Italiano' },
+    { code: 'zh',    label: 'Chinese',              native: '中文' },
   ];
   return (
     <div className="stage-inner">
@@ -2189,7 +2192,7 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, onDo
 
       <div className="settings-section">
         <div className="settings-section-label">Language</div>
-        <div className="settings-section-help">Cards and interface render in this language.</div>
+        <div className="settings-section-help">The interface renders in this language. Your cards stay in the language you wrote them.</div>
         <div className="lang-list">
           {LANGUAGES.map(L => (
             <button key={L.code}
@@ -2364,21 +2367,18 @@ function App() {
     });
   }
 
-  // The home count reflects scope.due (real-feeling), while the demo queue
-  // (4 cards) is what actually drives the session. When the user has played
-  // every card in the demo queue, we route to "done" regardless of scope size.
-  const totalDue = Math.max(0, scope.due - cardIdx);
-
+  // The demo deck (the fixed QUEUE) drives the session. v1 has no
+  // spaced-repetition schedule, so the user practices the deck in their
+  // own time; session size is simply the deck length.
   function setTweak(k, v) {
     setTweaks(prev => ({ ...prev, [k]: v }));
   }
 
   function onGrade(g) {
     const next = cardIdx + 1;
-    const total = Math.min(QUEUE.length, scope.due);
-    // End session when either: the demo queue runs out, OR the user has
-    // graded a card per their scope's due count (whichever is smaller).
-    if (next >= QUEUE.length || next >= scope.due) {
+    const total = QUEUE.length;
+    // End the session when the deck runs out. Continue counts as a pass.
+    if (next >= QUEUE.length) {
       setLastSession({ scopeId: scope.id, status: 'finished', position: total, total });
       setCardIdx(0);
       setScreen('done');
@@ -2390,7 +2390,7 @@ function App() {
 
   // Leaving study mid-session = pause. Remembers where we stopped.
   function pauseSession() {
-    const total = Math.min(QUEUE.length, scope.due);
+    const total = QUEUE.length;
     setLastSession({
       scopeId: scope.id,
       status: cardIdx > 0 ? 'paused' : 'open',
@@ -2407,7 +2407,7 @@ function App() {
     if (!target) return;
     setScopeId(lastSession.scopeId);
     if (lastSession.status === 'finished') {
-      const total = Math.min(QUEUE.length, target.due);
+      const total = QUEUE.length;
       setCardIdx(0);
       setLastSession({ scopeId: target.id, status: 'open', position: 0, total });
     } else {
@@ -2443,14 +2443,24 @@ function App() {
     setScreen('reviewDrafts');
   }
 
-  function approveDrafts(decisions) {
+  function approveDrafts(decisions, edits = {}) {
     const keptCards = DRAFT_QUEUE
       .filter(c => decisions[c.id] === 'keep')
-      .map(c => ({
-        id: 'n-' + c.id + '-' + Math.random().toString(36).slice(2, 5),
-        kind: c.kind, q: c.q, a: c.a,
-        ...(c.regions ? { regions: c.regions } : {}),
-      }));
+      .map(c => {
+        const e = edits[c.id] || {};
+        const q = e.q != null ? e.q : c.q;
+        const a = e.a != null ? e.a : c.a;
+        // A cloze whose blank ({{ }}) was edited away is no longer a cloze;
+        // store it as a plain Q&A so it still has something to recall.
+        const kind = (c.kind === 'cloze' && !/\{\{.+?\}\}/.test(q)) ? 'qa' : c.kind;
+        return {
+          id: 'n-' + c.id + '-' + Math.random().toString(36).slice(2, 5),
+          kind,
+          q,
+          a,
+          ...(c.regions ? { regions: c.regions } : {}),
+        };
+      });
     const kept = keptCards.length;
 
     if (pendingNewSource) {
@@ -2538,7 +2548,7 @@ function App() {
             onBegin={(targetId) => {
               const target = scopes.find(s => s.id === targetId);
               const startIdx = target && target.paused ? target.paused.at - 1 : 0;
-              const total = Math.min(QUEUE.length, target ? target.due : 0);
+              const total = QUEUE.length;
               setScopeId(targetId);
               setCardIdx(startIdx);
               setLastSession({
@@ -2584,7 +2594,7 @@ function App() {
             onAddFromFile={() => { setAddTargetScope(scope.id); setScreen('add'); }}
             onViewProgress={() => { setPerfReturn('source'); setScreen('performance'); }}
             onBegin={() => {
-              const total = Math.min(QUEUE.length, scope.due);
+              const total = QUEUE.length;
               setCardIdx(0);
               setLastSession({ scopeId: scope.id, status: 'open', position: 0, total });
               setScreen('study');
@@ -2612,7 +2622,7 @@ function App() {
           <StudyScreen
             card={currentCard}
             idx={cardIdx}
-            total={Math.min(QUEUE.length, scope.due)}
+            total={QUEUE.length}
             onGrade={onGrade}
             onExit={pauseSession}
             onShowSource={() => setOverlayRegion(currentCard.region || null)}
