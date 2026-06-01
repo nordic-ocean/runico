@@ -252,7 +252,10 @@ const RUNICO_STRINGS = {
     "add.occlusionCardPrompt": "Identify each labeled part.",
     "occ.crop": "Crop the figure",
     "occ.cropApply": "Apply crop",
-    "occ.cropHint": "Drag a box around just the figure to keep, then apply."
+    "occ.cropHint": "Drag a box around just the figure to keep, then apply.",
+    "settings.modelEstimate": "≈ {cards} cards per 1M tokens · about {cost} per 100 cards",
+    "add.generatingHint": "This can take a few seconds. You can leave this screen — your cards will be waiting.",
+    "add.genInterrupted": "A generation was interrupted by a reload — your source is restored. Generate again to continue."
   },
   "pt-BR": {
     "common.nav.settings": "Configurações",
@@ -502,7 +505,10 @@ const RUNICO_STRINGS = {
     "add.occlusionCardPrompt": "Identifique cada parte rotulada.",
     "occ.crop": "Recortar a figura",
     "occ.cropApply": "Aplicar recorte",
-    "occ.cropHint": "Arraste uma caixa em volta apenas da figura a manter e aplique."
+    "occ.cropHint": "Arraste uma caixa em volta apenas da figura a manter e aplique.",
+    "settings.modelEstimate": "≈ {cards} cartões por 1M de tokens · cerca de {cost} por 100 cartões",
+    "add.generatingHint": "Isto pode levar alguns segundos. Você pode sair desta tela — seus cartões estarão esperando.",
+    "add.genInterrupted": "Uma geração foi interrompida por um recarregamento — sua fonte foi restaurada. Gere novamente para continuar."
   },
   "pt-PT": {
     "common.nav.settings": "Definições",
@@ -752,7 +758,10 @@ const RUNICO_STRINGS = {
     "add.occlusionCardPrompt": "Identifique cada parte rotulada.",
     "occ.crop": "Recortar a figura",
     "occ.cropApply": "Aplicar recorte",
-    "occ.cropHint": "Arraste uma caixa à volta apenas da figura a manter e aplique."
+    "occ.cropHint": "Arraste uma caixa à volta apenas da figura a manter e aplique.",
+    "settings.modelEstimate": "≈ {cards} cartões por 1M de tokens · cerca de {cost} por 100 cartões",
+    "add.generatingHint": "Isto pode demorar alguns segundos. Pode sair deste ecrã — os seus cartões ficarão à espera.",
+    "add.genInterrupted": "Uma geração foi interrompida por um recarregamento — a sua fonte foi restaurada. Gere novamente para continuar."
   },
   "es": {
     "common.nav.settings": "Ajustes",
@@ -1002,7 +1011,10 @@ const RUNICO_STRINGS = {
     "add.occlusionCardPrompt": "Identifica cada parte etiquetada.",
     "occ.crop": "Recortar la figura",
     "occ.cropApply": "Aplicar recorte",
-    "occ.cropHint": "Arrastra un recuadro alrededor solo de la figura que quieres conservar y aplica."
+    "occ.cropHint": "Arrastra un recuadro alrededor solo de la figura que quieres conservar y aplica.",
+    "settings.modelEstimate": "≈ {cards} tarjetas por 1M de tokens · unos {cost} por 100 tarjetas",
+    "add.generatingHint": "Esto puede tardar unos segundos. Puedes salir de esta pantalla: tus tarjetas estarán esperando.",
+    "add.genInterrupted": "Una generación se interrumpió por una recarga — tu fuente se restauró. Genera de nuevo para continuar."
   },
   "ru": {
     "common.nav.settings": "Настройки",
@@ -1252,7 +1264,10 @@ const RUNICO_STRINGS = {
     "add.occlusionCardPrompt": "Определите каждую подписанную часть.",
     "occ.crop": "Обрезать рисунок",
     "occ.cropApply": "Применить обрезку",
-    "occ.cropHint": "Обведите рамкой только нужный рисунок и примените."
+    "occ.cropHint": "Обведите рамкой только нужный рисунок и примените.",
+    "settings.modelEstimate": "≈ {cards} карточек на 1М токенов · около {cost} за 100 карточек",
+    "add.generatingHint": "Это может занять несколько секунд. Можно уйти с этого экрана — карточки будут ждать.",
+    "add.genInterrupted": "Генерация прервана перезагрузкой — источник восстановлен. Запустите снова, чтобы продолжить."
   },
   "it": {
     "common.nav.settings": "Impostazioni",
@@ -1502,7 +1517,10 @@ const RUNICO_STRINGS = {
     "add.occlusionCardPrompt": "Identifica ogni parte etichettata.",
     "occ.crop": "Ritaglia la figura",
     "occ.cropApply": "Applica ritaglio",
-    "occ.cropHint": "Trascina un riquadro attorno alla sola figura da tenere e applica."
+    "occ.cropHint": "Trascina un riquadro attorno alla sola figura da tenere e applica.",
+    "settings.modelEstimate": "≈ {cards} carte per 1M di token · circa {cost} per 100 carte",
+    "add.generatingHint": "Può richiedere qualche secondo. Puoi lasciare questa schermata — le tue carte ti aspetteranno.",
+    "add.genInterrupted": "Una generazione è stata interrotta da un ricaricamento — la tua fonte è stata ripristinata. Genera di nuovo per continuare."
   },
   "zh": {
     "common.nav.settings": "设置",
@@ -1752,7 +1770,10 @@ const RUNICO_STRINGS = {
     "add.occlusionCardPrompt": "识别每个标注的部分。",
     "occ.crop": "裁剪图形",
     "occ.cropApply": "应用裁剪",
-    "occ.cropHint": "仅在要保留的图形周围拖出方框，然后应用。"
+    "occ.cropHint": "仅在要保留的图形周围拖出方框，然后应用。",
+    "settings.modelEstimate": "≈ 每 100 万 tokens 约 {cards} 张卡片 · 每 100 张约 {cost}",
+    "add.generatingHint": "这可能需要几秒钟。你可以离开此页面——卡片会等着你。",
+    "add.genInterrupted": "生成因刷新而中断——已恢复你的来源。再次生成以继续。"
   }
 };
 

@@ -1544,6 +1544,15 @@
   }
   .flip-face.flip-back { transform: rotateY(180deg); }
   .flip-back .card-answer { margin-top: 0; animation: none; }  /* flip drives the motion */
+
+  /* Generation spinner */
+  .gen-spinner {
+    display: inline-block; width: 15px; height: 15px;
+    border: 2px solid rgba(255,255,255,0.35); border-top-color: #FFFFFF;
+    border-radius: 50%; vertical-align: -2px; margin-right: 9px;
+    animation: gen-spin 0.7s linear infinite;
+  }
+  @keyframes gen-spin { to { transform: rotate(360deg); } }
   .flip-edge {
     display: inline-flex; align-items: center; gap: 6px;
     margin-bottom: 14px;

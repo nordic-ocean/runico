@@ -101,6 +101,16 @@ const GEN_MODELS = [
 ];
 function modelById(id) { return GEN_MODELS.find(m => m.id === id); }
 function modelPrice(m) { return m ? ('$' + m.in.toFixed(2) + ' / $' + m.out.toFixed(2) + ' per 1M') : ''; }
+// Rough cost intuition: a generation averages ~2500 input tokens (prompt + source)
+// producing ~12 cards at ~60 output tokens each → amortized ~210 in + 60 out per
+// card. cardsPer1M is model-independent (token-based); costPer100 reflects price.
+function modelCardEstimate(m) {
+  if (!m) return null;
+  const inPer = 210, outPer = 60;
+  const cardsPer1M = Math.round(1e6 / (inPer + outPer) / 100) * 100;     // ~3700
+  const costPer100 = (inPer * m.in + outPer * m.out) / 1e6 * 100;        // USD for 100 cards
+  return { cardsPer1M, costPer100 };
+}
 // Occlusion (find the figure + its labels in an image) is a hard vision/grounding
 // task, so it always runs on the most capable vision model regardless of which
 // (cheaper) model is chosen for the text cards. Picks the priciest vision model
@@ -2166,14 +2176,19 @@ function downscaleImageDataUrl(dataUrl, maxDim, quality) {
   });
 }
 
-function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCancel, onGenerateCards, onGenerated, onGenerateManual }) {
-  const [name, setName] = useState('');
-  const [model, setModel] = useState(modelById(defaultModel) ? defaultModel : DEFAULT_GEN_MODEL);
+function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, initialDraft, onConsumeInitial, onCancel, onGenerateCards, onGenerated, onGenerateManual }) {
+  // Seed from a restored (reload-interrupted) generation, if any.
+  const init = initialDraft || {};
+  const [wasRestored] = useState(!!(init.sourceText || init.imageDataUrl));
+  const [name, setName] = useState(init.name || '');
+  const [model, setModel] = useState(modelById(init.model) ? init.model : (modelById(defaultModel) ? defaultModel : DEFAULT_GEN_MODEL));
   const [priorities, setPriorities] = useState(['definitions','labeledDiagrams','examples','bodyProse']);
   const [dragIdx, setDragIdx] = useState(null);
-  const [file, setFile] = useState(null);        // { name, size, isImage, url, dataUrl, text, _ready }
+  const [file, setFile] = useState(init.imageDataUrl
+    ? { name: 'image', size: 0, isImage: true, url: init.imageDataUrl, dataUrl: init.imageDataUrl, text: null, _ready: true }
+    : null);        // { name, size, isImage, url, dataUrl, text, _ready }
   const [dropActive, setDropActive] = useState(false);
-  const [sourceText, setSourceText] = useState('');
+  const [sourceText, setSourceText] = useState(init.sourceText || '');
   const [busy, setBusy] = useState(false);
   const [localErr, setLocalErr] = useState('');
   const fileInputRef = useRef(null);
@@ -2181,6 +2196,7 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCa
   const aliveRef = useRef(true);
   const objectUrlRef = useRef(null); // current preview blob URL, revoked when replaced/cleared
   function clearObjectUrl() { if (objectUrlRef.current) { URL.revokeObjectURL(objectUrlRef.current); objectUrlRef.current = null; } }
+  useEffect(() => { if (initialDraft && onConsumeInitial) onConsumeInitial(); }, []);  // consume the one-shot seed
   useEffect(() => () => { aliveRef.current = false; clearObjectUrl(); }, []);
 
   function acceptFile(f) {
@@ -2209,8 +2225,10 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCa
     }
   }
 
-  // API generation runs inline here (no screen switch), so a failure keeps the
-  // user's typed source and any in-flight result can't yank them off-screen.
+  // Generation runs inline here, but the RESULT is never lost: even if the user
+  // leaves this screen mid-flight, the finished cards are still stored (the parent
+  // routes them to review if the user is waiting, else to the topic's pending
+  // badge). Only the local busy/error UI is skipped once unmounted.
   async function doGenerate() {
     setLocalErr(''); setBusy(true);
     // Snapshot the source ONCE: the cards and the stored source must come from the
@@ -2219,9 +2237,9 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCa
     let cards = null, err = '';
     try { cards = await onGenerateCards(p); }
     catch (e) { err = (e && e.message) || 'http'; }
-    if (!aliveRef.current) return; // user left mid-flight — drop the result
-    setBusy(false);
-    if (err) setLocalErr(err); else onGenerated(cards, p.name, p);
+    if (err) { if (aliveRef.current) { setBusy(false); setLocalErr(err); } return; }
+    if (aliveRef.current) setBusy(false);
+    onGenerated(cards, p.name, p);   // store regardless of whether we're still mounted
   }
   function onPickFile(e) { acceptFile(e.target.files && e.target.files[0]); }
   function onDropFile(e) {
@@ -2275,6 +2293,9 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCa
 
   return (
     <div className="stage-inner">
+      {wasRestored && (
+        <div className="add-name-required" style={{ marginBottom: 16, color: 'var(--accent-600, #0076B4)' }}>{t('add.genInterrupted')}</div>
+      )}
       <div className="eyebrow">
         {isExistingSource ? t('add.eyebrowExisting') : t('add.eyebrowNew')}
       </div>
@@ -2366,6 +2387,14 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCa
             </option>
           ))}
         </select>
+        {(() => {
+          const est = modelCardEstimate(modelById(model));
+          return est ? (
+            <div className="settings-section-help" style={{ marginTop: 6 }}>
+              {t('settings.modelEstimate', { cards: est.cardsPer1M.toLocaleString(), cost: '$' + est.costPer100.toFixed(2) })}
+            </div>
+          ) : null;
+        })()}
       </div>
 
       {errMsg && (
@@ -2379,15 +2408,18 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCa
                 onClick={doGenerate}
                 disabled={!canGenerate || !hasApiKey}
                 title={!hasApiKey ? t('add.genErrorKey') : undefined}>
-          {busy ? t('add.generating') : <>{t('add.generateWithKey')} <Glyph name="arrow" size={18} /></>}
+          {busy ? <><span className="gen-spinner" />{t('add.generating')}</> : <>{t('add.generateWithKey')} <Glyph name="arrow" size={18} /></>}
         </button>
         <button className="quiet"
                 onClick={() => onGenerateManual(payload())}
                 disabled={!canGenerate}>
           <Glyph name="spark" size={15} /> {t('add.useOwnAi')}
         </button>
-        <button className="quiet" onClick={onCancel} disabled={busy}>{t('add.cancel')}</button>
+        <button className="quiet" onClick={onCancel}>{t('add.cancel')}</button>
       </div>
+      {busy && (
+        <div className="settings-section-help" style={{ marginTop: 14, textAlign: 'center' }}>{t('add.generatingHint')}</div>
+      )}
     </div>
   );
 }
@@ -2876,6 +2908,14 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiK
             </button>
           ))}
         </div>
+        {(() => {
+          const est = modelCardEstimate(modelById(genModel));
+          return est ? (
+            <div className="settings-section-help" style={{ marginTop: 8 }}>
+              {t('settings.modelEstimate', { cards: est.cardsPer1M.toLocaleString(), cost: '$' + est.costPer100.toFixed(2) })}
+            </div>
+          ) : null;
+        })()}
       </div>
 
       <div className="home-actions" style={{ marginTop: 32 }}>
@@ -2973,6 +3013,10 @@ const TWEAK_DEFAULTS = {
 
 function App() {
   const [screen, setScreen] = useState('folder');
+  // Mirror of `screen` readable inside async callbacks (to decide, at completion
+  // time, whether the user is still waiting on the Add/manual screen).
+  const screenRef = useRef('folder');
+  useEffect(() => { screenRef.current = screen; }, [screen]);
   const [scopeId, setScopeId] = useState('all');
   const [addTargetScope, setAddTargetScope] = useState('bio-cell');
   // When adding a brand-new source (vs. adding to an existing leaf), holds { parentId, name }
@@ -3052,6 +3096,10 @@ function App() {
   const [pendingDrafts, setPendingDrafts] = usePersistentState('pendingDrafts', () => ({}));
   const [lastDraftScope, setLastDraftScope] = useState(null); // most-recently-generated topic
   const [genSource, setGenSource] = useState(null);           // { sourceText, imageDataUrl, name } for the manual prompt
+  // Backup of the in-flight generation input, persisted so a page reload during
+  // generation can restore the Add screen (the request itself can't be resumed).
+  const [genDraftBackup, setGenDraftBackup] = usePersistentState('genDraftBackup', null);
+  const [restoreDraft, setRestoreDraft] = useState(null);     // one-shot seed for a restored Add screen
   // Stored source documents (the material cards were generated from), keyed by id.
   const [sources, setSources] = usePersistentState('sources', () => ({}));
   const pendingFor = (id) => (pendingDrafts[id] || []);
@@ -3073,6 +3121,17 @@ function App() {
       }
       return prev;
     });
+  }, []);
+
+  // If a generation was interrupted by a page reload, return the user to the Add
+  // screen with their input restored (the network request can't be resumed).
+  useEffect(() => {
+    if (genDraftBackup) {
+      setRestoreDraft(genDraftBackup);
+      if (genDraftBackup.targetScope) setAddTargetScope(genDraftBackup.targetScope);
+      setScreen('add');
+      setGenDraftBackup(null);   // consume — a fresh generation re-creates it
+    }
   }, []);
 
   // Append a finished sitting to the scope's history (session-level accuracy
@@ -3273,32 +3332,46 @@ function App() {
     setPendingDrafts(prev => ({ ...prev, [targetId]: tagged }));
     setLastDraftScope(targetId);
     setKeptCount(0);
-    setScreen('reviewDrafts');
+    setGenDraftBackup(null);   // generation finished — clear the refresh-recovery backup
+    // Only pull the user into review if they're still waiting on the Add/manual
+    // screen; if they navigated away, leave them put and surface the pending badge.
+    if (screenRef.current === 'add' || screenRef.current === 'manualGen' || screenRef.current === 'processing') {
+      setScreen('reviewDrafts');
+    }
   }
 
   // Automatic transport: generate via OpenRouter. Returns the parsed cards or
   // throws a normalized code; runs INLINE in AddScreen (no screen switch) so a
   // failure can't strand the user or lose their typed source.
-  async function generateCards({ sourceText, imageDataUrl, model }) {
+  async function generateCards({ sourceText, imageDataUrl, model, name }) {
     if (!apiKey) throw new Error('key');
-    let text;
-    try { text = await callOpenRouter({ apiKey, model: model || genModel, sourceText, imageDataUrl }); }
-    catch (e) { const c = e && e.message; throw new Error(['key', 'rate', 'network', 'http'].indexOf(c) >= 0 ? c : 'http'); }
-    const cards = parseGenCards(text);
-    if (!cards.length) throw new Error('empty');
-    // When a source image is attached, also try to build ONE image-occlusion card
-    // from the figure in it (best-effort; a failure here never affects the text
-    // cards already produced).
-    if (imageDataUrl) {
-      try {
-        // Always use the most capable vision model for occlusion (it both detects
-        // whether there's a good figure and bounds it), not the text-card model.
-        // Pass the source text as theme context so it masks only subject-relevant labels.
-        const occ = await generateOcclusionCard({ apiKey, model: OCCLUSION_MODEL, imageDataUrl, theme: sourceText });
-        if (occ) cards.push(occ);
-      } catch (e) { /* occlusion is optional */ }
+    // Back up the input so a generation interrupted by a page reload can be
+    // restored (the network request itself cannot survive a reload). Cleared on
+    // success (storeDraftsAndReview) or when the user cancels the Add screen.
+    setGenDraftBackup({ name: name || '', sourceText: sourceText || '', imageDataUrl: imageDataUrl || null, model: model || genModel, targetScope: addTargetScope });
+    try {
+      let text;
+      try { text = await callOpenRouter({ apiKey, model: model || genModel, sourceText, imageDataUrl }); }
+      catch (e) { const c = e && e.message; throw new Error(['key', 'rate', 'network', 'http'].indexOf(c) >= 0 ? c : 'http'); }
+      const cards = parseGenCards(text);
+      if (!cards.length) throw new Error('empty');
+      // When a source image is attached, also try to build ONE image-occlusion card
+      // from the figure in it (best-effort; a failure here never affects the text
+      // cards already produced).
+      if (imageDataUrl) {
+        try {
+          // Always use the most capable vision model for occlusion (it both detects
+          // whether there's a good figure and bounds it), not the text-card model.
+          // Pass the source text as theme context so it masks only subject-relevant labels.
+          const occ = await generateOcclusionCard({ apiKey, model: OCCLUSION_MODEL, imageDataUrl, theme: sourceText });
+          if (occ) cards.push(occ);
+        } catch (e) { /* occlusion is optional */ }
+      }
+      return cards;
+    } catch (e) {
+      setGenDraftBackup(null);   // failed — drop the backup (success clears it in storeDraftsAndReview)
+      throw e;
     }
-    return cards;
   }
   function onGeneratedCards(cards, name, src) { storeDraftsAndReview(cards, src, name); }
 
@@ -3519,7 +3592,9 @@ function App() {
               isExistingSource={isExistingSource}
               hasApiKey={!!apiKey}
               defaultModel={genModel}
-              onCancel={() => setScreen('folder')}
+              initialDraft={restoreDraft}
+              onConsumeInitial={() => setRestoreDraft(null)}
+              onCancel={() => { setGenDraftBackup(null); setRestoreDraft(null); setScreen('folder'); }}
               onGenerateCards={generateCards}
               onGenerated={onGeneratedCards}
               onGenerateManual={startGenerateManual}
