@@ -101,15 +101,16 @@ const GEN_MODELS = [
 ];
 function modelById(id) { return GEN_MODELS.find(m => m.id === id); }
 function modelPrice(m) { return m ? ('$' + m.in.toFixed(2) + ' / $' + m.out.toFixed(2) + ' per 1M') : ''; }
-// Rough cost intuition: a generation averages ~2500 input tokens (prompt + source)
-// producing ~12 cards at ~60 output tokens each → amortized ~210 in + 60 out per
-// card. cardsPer1M is model-independent (token-based); costPer100 reflects price.
+// Rough budget intuition: a card averages ~210 input + ~60 output tokens
+// (amortized prompt + a ~12-card batch). cardsPerDollar = how many cards $1 of
+// this model buys — a model-specific signal that maps directly to the user's
+// OpenRouter balance. Rounded to a clean ~figure.
 function modelCardEstimate(m) {
   if (!m) return null;
   const inPer = 210, outPer = 60;
-  const cardsPer1M = Math.round(1e6 / (inPer + outPer) / 100) * 100;     // ~3700
-  const costPer100 = (inPer * m.in + outPer * m.out) / 1e6 * 100;        // USD for 100 cards
-  return { cardsPer1M, costPer100 };
+  const costPerCard = (inPer * m.in + outPer * m.out) / 1e6;            // USD per card
+  const cardsPerDollar = costPerCard > 0 ? Math.round(1 / costPerCard / 100) * 100 : 0;
+  return { cardsPerDollar };
 }
 // Occlusion (find the figure + its labels in an image) is a hard vision/grounding
 // task, so it always runs on the most capable vision model regardless of which
@@ -2383,7 +2384,7 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, init
                 value={model} onChange={e => setModel(e.target.value)}>
           {GEN_MODELS.map(m => (
             <option key={m.id} value={m.id} disabled={!m.vision && !!(file && file.isImage)}>
-              {m.label} — {modelPrice(m)} · {t('settings.modelCardsShort', { cards: modelCardEstimate(m).cardsPer1M.toLocaleString() })}{m.vision ? '' : ' · text only'}
+              {m.label} — {modelPrice(m)} · {t('settings.modelCardsShort', { cards: modelCardEstimate(m).cardsPerDollar.toLocaleString() })}{m.vision ? '' : ' · text only'}
             </option>
           ))}
         </select>
@@ -2391,7 +2392,7 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, init
           const est = modelCardEstimate(modelById(model));
           return est ? (
             <div className="settings-section-help" style={{ marginTop: 6 }}>
-              {t('settings.modelEstimate', { cards: est.cardsPer1M.toLocaleString(), cost: '$' + est.costPer100.toFixed(2) })}
+              {t('settings.modelEstimate', { cards: est.cardsPerDollar.toLocaleString() })}
             </div>
           ) : null;
         })()}
@@ -2903,7 +2904,7 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiK
                     className={`lang-row ${genModel === m.id ? 'is-selected' : ''}`}
                     onClick={() => onGenModelChange(m.id)}>
               <span className="lang-row-label">{m.label}{m.vision ? '' : ' · text only'}</span>
-              <span className="lang-row-native" style={{ fontSize: 12, color: '#7A8696' }}>{modelPrice(m)} · {t('settings.modelCardsShort', { cards: modelCardEstimate(m).cardsPer1M.toLocaleString() })}</span>
+              <span className="lang-row-native" style={{ fontSize: 12, color: '#7A8696' }}>{modelPrice(m)} · {t('settings.modelCardsShort', { cards: modelCardEstimate(m).cardsPerDollar.toLocaleString() })}</span>
               <span className="lang-row-check">{genModel === m.id && <Glyph name="check" size={14} />}</span>
             </button>
           ))}
@@ -2912,7 +2913,7 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiK
           const est = modelCardEstimate(modelById(genModel));
           return est ? (
             <div className="settings-section-help" style={{ marginTop: 8 }}>
-              {t('settings.modelEstimate', { cards: est.cardsPer1M.toLocaleString(), cost: '$' + est.costPer100.toFixed(2) })}
+              {t('settings.modelEstimate', { cards: est.cardsPerDollar.toLocaleString() })}
             </div>
           ) : null;
         })()}
