@@ -213,16 +213,18 @@ async function callOpenRouter({ apiKey, model, sourceText, imageDataUrl, prompt 
 // image to that figure client-side so only the figure remains (no surrounding
 // prose/answers), and place a mask over each label. The user fine-tunes the masks
 // in draft review on the clean, cropped figure.
-function buildOcclusionPrompt() {
+function buildOcclusionPrompt(theme) {
   return [
     'You are shown an image that may be a textbook/document page containing a diagram, map, or labeled illustration.',
-    'Your job: locate the SINGLE main figure (the diagram/map/illustration itself) and the printed labels on it. Ignore body paragraphs, titles, and captions outside the figure.',
+    'Step 1 — locate the SINGLE main figure (the diagram/map/illustration itself) and READ ITS TITLE to understand its SUBJECT. Ignore body paragraphs and any text outside the figure.',
+    theme && theme.trim() ? ('Study topic context: "' + theme.trim().slice(0, 400) + '". Combine it with the figure\'s own title to judge what matters.') : null,
+    'Step 2 — choose labels to mask. CRITICAL: mask ONLY labels that are the SUBJECT of the figure — the things a student is meant to learn from its title/theme. Do NOT mask generic context or chrome labels that are not the subject. For example, if the figure title is about ISLANDS, mask the island names but NOT oceans, seas, gulfs, bays, the compass rose, the scale bar, latitude/longitude or grid labels, the legend/key, or the title itself. When unsure whether a label is the subject, leave it out.',
     'Return ONLY JSON (no prose, no markdown, no code fences): {"figure":{"x":0.0,"y":0.0,"w":0.0,"h":0.0},"labels":[{"text":"...","x":0.0,"y":0.0,"w":0.0,"h":0.0}, ...]}',
     'ALL coordinates are NORMALIZED fractions of the FULL image, range 0..1: x,y = top-left corner, w,h = width,height.',
     '"figure" = a TIGHT box around just the figure (exclude the body text columns and the source caption).',
-    '"labels" = the words printed ON the figure that a student should be quizzed on (place names, part names, structures…). For each, give its text and a tight box around just that word, in FULL-image coordinates. Provide 3 to 10 labels.',
-    'If there is NO real figure/diagram (the page is only text), return {"figure":null,"labels":[]}.',
-  ].join('\n');
+    'For each subject label give its text and a tight box around just that word, in FULL-image coordinates. Provide 3 to 10 labels.',
+    'If there is NO real figure/diagram (the page is only text), or the figure has no subject labels worth masking, return {"figure":null,"labels":[]}.',
+  ].filter(l => l !== null).join('\n');
 }
 
 // Tolerant parse of the occlusion JSON. Accepts 0..1 or 0..100 coordinates.
@@ -298,10 +300,10 @@ function remapLabelsToCrop(labels, fig) {
 // Build ONE occlusion card from an image: find + crop the figure, mask its labels.
 // Best-effort — returns null (no card) on any failure or when there's no figure,
 // so it can never break or block the text-card generation.
-async function generateOcclusionCard({ apiKey, model, imageDataUrl }) {
+async function generateOcclusionCard({ apiKey, model, imageDataUrl, theme }) {
   if (!imageDataUrl) return null;
   let text;
-  try { text = await callOpenRouter({ apiKey, model, imageDataUrl, prompt: buildOcclusionPrompt() }); }
+  try { text = await callOpenRouter({ apiKey, model, imageDataUrl, prompt: buildOcclusionPrompt(theme) }); }
   catch (e) { return null; }
   const data = parseOcclusionResult(text);
   if (!data || !data.figure || !data.labels.length) return null;
@@ -2563,8 +2565,11 @@ function OcclusionEditor({ card, onBoxesChange, onImageChange }) {
       h: b.h / cropSel.h * 100,
     })).filter(b => b.x + b.w > 1 && b.y + b.h > 1 && b.x < 99 && b.y < 99)
       .map(b => {
+        // Trim the part clipped off the left/top before clamping, so a straddling
+        // mask shrinks to its visible portion instead of staying full-width.
+        const w0 = b.w + Math.min(0, b.x), h0 = b.h + Math.min(0, b.y);
         const x = Math.max(0, Math.min(98, b.x)), y = Math.max(0, Math.min(98, b.y));
-        return { ...b, x, y, w: Math.max(2, Math.min(100 - x, b.w)), h: Math.max(2, Math.min(100 - y, b.h)) };
+        return { ...b, x, y, w: Math.max(2, Math.min(100 - x, w0)), h: Math.max(2, Math.min(100 - y, h0)) };
       });
     setImg(cropped);
     setBoxes(remapped);
@@ -2663,7 +2668,7 @@ function ReviewDraftsScreen({ drafts, onApprove, onCancel, onShowSource }) {
         <div className="card-foot">
           <div className="row">
             <button className="quiet" onClick={() => decide('skip')}>{t('add.reviewRemove')}</button>
-            <button className="primary" onClick={() => decide('keep', { boxes: occBoxes || undefined, image: occImage || undefined })}>{t('add.reviewKeep')} <Glyph name="check" size={14} /></button>
+            <button className="primary" disabled={!(occBoxes && occBoxes.length)} onClick={() => decide('keep', { boxes: occBoxes || undefined, image: occImage || undefined })}>{t('add.reviewKeep')} <Glyph name="check" size={14} /></button>
           </div>
         </div>
       </div>
@@ -3271,7 +3276,8 @@ function App() {
       try {
         // Always use the most capable vision model for occlusion (it both detects
         // whether there's a good figure and bounds it), not the text-card model.
-        const occ = await generateOcclusionCard({ apiKey, model: OCCLUSION_MODEL, imageDataUrl });
+        // Pass the source text as theme context so it masks only subject-relevant labels.
+        const occ = await generateOcclusionCard({ apiKey, model: OCCLUSION_MODEL, imageDataUrl, theme: sourceText });
         if (occ) cards.push(occ);
       } catch (e) { /* occlusion is optional */ }
     }
@@ -3313,7 +3319,11 @@ function App() {
           ...(c.sourceId ? { sourceId: c.sourceId } : {}),
           ...(c.kind === 'occlusion'
             ? {
-                ...(e.boxes && e.boxes.length ? { boxes: e.boxes } : (c.boxes && c.boxes.length ? { boxes: c.boxes } : (c.regions ? { regions: c.regions } : {}))),
+                // If the user cropped (e.image present), ONLY the edited boxes match
+                // the cropped image — never fall back to the original full-image boxes.
+                ...((e.boxes && e.boxes.length) ? { boxes: e.boxes }
+                    : e.image ? {}
+                    : (c.boxes && c.boxes.length ? { boxes: c.boxes } : (c.regions ? { regions: c.regions } : {}))),
                 ...((e.image || c.image) ? { image: e.image || c.image } : {}),  // prefer the cropped image
               }
             : {}),
