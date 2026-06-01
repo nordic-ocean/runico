@@ -297,6 +297,20 @@ function remapLabelsToCrop(labels, fig) {
   return out;
 }
 
+// Hard safety net: even when the model ignores the relevance instruction, drop
+// labels that are bodies of water or map chrome (compass, scale, coordinates,
+// tropics, legend) — these are context, not the study subject. The user can
+// always draw a mask back in the editor if they actually want one.
+function isOffThemeLabel(text) {
+  const s = (text || '').toLowerCase().trim();
+  if (!s) return true;
+  if (/^[nsewlo]$/.test(s)) return true;                                  // compass single letter (N/S/E/W, L/O pt)
+  if (/\d/.test(s) && /(km|mi|°|º|'|")/.test(s)) return true;             // scale bar / coordinates
+  if (/(tróp|trop|equad|equat|meridian|paralel|parallel|latitud|longitud|legenda|legend|escala|\bscale\b|fonte\s*:|source\s*:)/.test(s)) return true;
+  if (/(oceano|ocean|océano|\bmar\b|\bsea\b|golfo|gulf|ba[íi]a|bah[íi]a|\bbay\b|estreito|strait|\bcanal\b|channel|\brio\b|\br[íi]o\b|\briver\b|\blago\b|\blake\b)/.test(s)) return true;
+  return false;
+}
+
 // Build ONE occlusion card from an image: find + crop the figure, mask its labels.
 // Best-effort — returns null (no card) on any failure or when there's no figure,
 // so it can never break or block the text-card generation.
@@ -306,7 +320,10 @@ async function generateOcclusionCard({ apiKey, model, imageDataUrl, theme }) {
   try { text = await callOpenRouter({ apiKey, model, imageDataUrl, prompt: buildOcclusionPrompt(theme) }); }
   catch (e) { return null; }
   const data = parseOcclusionResult(text);
-  if (!data || !data.figure || !data.labels.length) return null;
+  if (!data || !data.figure) return null;
+  // Drop off-theme labels (oceans, seas, map chrome) the model may have included.
+  const labels = (data.labels || []).filter(l => !isOffThemeLabel(l.text));
+  if (!labels.length) return null;
   // One canonical, in-bounds figure used for BOTH the crop and the label re-map,
   // so the masks line up exactly with what was actually cropped.
   const f = data.figure;
@@ -315,7 +332,7 @@ async function generateOcclusionCard({ apiKey, model, imageDataUrl, theme }) {
   cf.h = Math.max(0.02, Math.min(1 - cf.y, f.h));
   const cropped = await cropImageToBox(imageDataUrl, cf);
   if (!cropped) return null;
-  const boxes = remapLabelsToCrop(data.labels, cf);
+  const boxes = remapLabelsToCrop(labels, cf);
   if (!boxes.length) return null;
   const q = (typeof t === 'function' ? t('add.occlusionCardPrompt') : '') || 'Identify each labeled part.';
   return { id: genId('g'), kind: 'occlusion', q, a: null, boxes, image: cropped };
