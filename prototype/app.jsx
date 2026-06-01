@@ -3855,14 +3855,16 @@ function App() {
         </div>
       </div>
 
-      {(screen === 'add' || screen === 'processing' || screen === 'processedNotice' || screen === 'manualGen' || screen === 'reviewDrafts' || screen === 'settings' || screen === 'study' || screen === 'performance' || screen === 'about') && (
+      {(screen === 'add' || screen === 'processing' || screen === 'processedNotice' || screen === 'manualGen' || screen === 'reviewDrafts' || screen === 'settings' || screen === 'study' || screen === 'performance' || screen === 'about' || screen === 'source') && (
         <div className="back-bar">
           <button className="nav-btn" onClick={() => {
             // Performance returns to where it was opened from; study pauses (saving
-            // the spot so it's resumable); everything else goes home.
+            // the spot so it's resumable); a source goes up to its parent folder;
+            // everything else goes home.
             if (screen === 'about') { setScreen(aboutReturn || 'folder'); return; }
             if (screen === 'performance') { setScreen(perfReturn || 'folder'); return; }
             if (screen === 'study') { pauseSession(); return; }
+            if (screen === 'source') { setScopeId(scope.parent || 'all'); setCardIdx(0); setScreen('folder'); return; }
             setGenDraftBackup(null); setRestoreDraft(null); setScreen('folder');
           }}>
             <Glyph name="back" size={14} /> {t('common.nav.back')}
