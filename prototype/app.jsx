@@ -1819,7 +1819,7 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
         <div className="figure-wrap" style={card.image ? undefined : { aspectRatio: '600 / 400' }}>
           {card.image
             ? <img src={card.image} alt="" style={{ width: '100%', height: 'auto', display: 'block' }} />
-            : <CellFigure />}
+            : card.regions ? <CellFigure /> : null}
           {items.map((it, i) => {
             const isCurrent = i === step && !done;
             const past = i < step;
@@ -2413,7 +2413,7 @@ function OcclusionEditor({ card, onBoxesChange }) {
       <div className="figure-wrap occ-editor" ref={wrapRef} style={card.image ? { marginBottom: 12 } : { aspectRatio: '600 / 400', marginBottom: 12 }}>
         {card.image
           ? <img src={card.image} alt="" style={{ width: '100%', height: 'auto', display: 'block' }} />
-          : <CellFigure />}
+          : card.regions ? <CellFigure /> : null}
         <div className="occ-edit-surface" onPointerDown={startCreate} />
         {boxes.map(b => (
           <div key={b.id}
@@ -2814,9 +2814,14 @@ function App() {
       if (keys.length > SOURCES_CAP) for (const k of keys.slice(0, keys.length - SOURCES_CAP)) delete next[k];
       return next;
     });
-    // Occlusion cards render over an image, so embed it on the card itself (the
-    // study/edit surface is self-contained and survives source eviction).
-    return cards.map(c => ({ ...c, sourceId: srcId, ...(c.kind === 'occlusion' && imageDataUrl ? { image: imageDataUrl } : {}) }));
+    // Occlusion needs a real image to mask. Drop any occlusion card that has no
+    // storable image (text-only source, manual paste with no image, or an image
+    // dropped for being over the cap) — otherwise it would render its boxes over
+    // the unrelated seeded cell diagram. Surviving occlusion cards embed the image
+    // on the card itself so the study/edit surface is self-contained.
+    return cards
+      .filter(c => c.kind !== 'occlusion' || imageDataUrl)
+      .map(c => ({ ...c, sourceId: srcId, ...(c.kind === 'occlusion' && imageDataUrl ? { image: imageDataUrl } : {}) }));
   }
   const [perfReturn, setPerfReturn] = useState('folder');
   const [tweaks, setTweaks] = usePersistentState('settings', TWEAK_DEFAULTS);
