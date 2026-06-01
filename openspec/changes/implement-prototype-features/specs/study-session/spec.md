@@ -12,12 +12,17 @@ The system SHALL present one card at a time, initially showing only the prompt (
 - **WHEN** the user activates "Show answer"
 - **THEN** the answer is revealed
 
-### Requirement: Two choices after reveal, no grading scale
-After the answer is revealed the system SHALL offer exactly two choices — Continue and Pause — and SHALL NOT present any difficulty/grading scale to the user.
+### Requirement: Binary self-mark after reveal, no grading scale
+After the answer is revealed the system SHALL offer a single binary self-mark — "Got it" or "Missed" — plus a Pause action to leave, and SHALL NOT present any multi-level difficulty/grading scale (e.g. again/hard/good/easy). For image-occlusion cards the pass/miss is derived from the per-region right/wrong marks rather than a separate prompt.
 
-#### Scenario: Continue advances and counts as passed
-- **WHEN** the user chooses Continue on a revealed card
+#### Scenario: "Got it" advances and counts as passed
+- **WHEN** the user chooses "Got it" on a revealed card
 - **THEN** the card is recorded as passed for the sitting
+- **AND** the next card is shown
+
+#### Scenario: "Missed" advances and counts as not passed
+- **WHEN** the user chooses "Missed" on a revealed card
+- **THEN** the card is recorded as reviewed-but-not-passed for the sitting
 - **AND** the next card is shown
 
 #### Scenario: Pause stops and saves place
@@ -32,11 +37,11 @@ The system SHALL show the user's position within the deck (e.g. "1 of 4") during
 - **THEN** the progress marker reflects the new position
 
 ### Requirement: Keyboard shortcuts for study
-The system SHALL support keyboard control during study: a key to reveal, Enter to continue, and Esc to pause.
+The system SHALL support keyboard control during study: a key to reveal, Enter to mark "Got it" (advance as passed), and Esc to pause.
 
-#### Scenario: Continue via keyboard
+#### Scenario: "Got it" via keyboard
 - **WHEN** the answer is revealed and the user presses Enter
-- **THEN** the session advances as if Continue was chosen
+- **THEN** the card is recorded as passed and the session advances
 
 #### Scenario: Pause via keyboard
 - **WHEN** the user presses Esc during a session

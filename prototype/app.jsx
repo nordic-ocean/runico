@@ -6,13 +6,11 @@ const { useState, useEffect, useMemo, useRef } = React;
 
 // ── Durable local persistence ────────────────────────────
 // Mock data seeds state once; every mutation is mirrored to
-// localStorage, so user data (the library, cards, settings, and
-// your last session) survives a full restart — not just a reload.
-// In the desktop build this same seam is backed by the OS keychain /
-// local save file (see the add-electron-desktop-wrapper change).
-// NOTE: recording real study sittings into persisted history is
-// future work (it needs a "miss" signal for standard cards); today
-// the trend reads from seeded demo history.
+// localStorage, so all user data — the library, cards, study
+// history, settings, and your last session — survives a full
+// restart, not just a reload. In the desktop build this same seam
+// is backed by the OS keychain / local save file (see the
+// add-electron-desktop-wrapper change).
 const STORE_PREFIX = 'runico:v2:';
 function usePersistentState(key, initial) {
   const [val, setVal] = useState(() => {
@@ -152,8 +150,10 @@ const KIND_LABEL = {
 // have something real to render.
 
 const DAY_MS = 86400000;
-// The app's "today" (matches the dashboard eyebrow, Tuesday · May 27).
-const TODAY = new Date(2026, 4, 27);
+// The app's "today" — anchored to the real clock so seeded demo history and
+// real recorded sittings share one timeline (a finished session lands inside
+// the current Performance window). Evaluated once at load.
+const TODAY = new Date();
 
 function mulberry32(a) {
   return function () {
@@ -425,7 +425,7 @@ function QuickResume({ lastSession, scopes, onResume }) {
 function FolderView({
   scope, scopes, isRoot,
   draftCount, onReviewDrafts,
-  lastSession, onResume, sourceCards,
+  lastSession, onResume, sourceCards, history,
   onEnterChild, onBack, onBegin,
   onCreateFolder, onAddSource,
   onRenameFolder, onDeleteFolder,
@@ -491,7 +491,7 @@ function FolderView({
   return (
     <div className="stage-inner stage-columns">
       <div className="columns-header">
-        <div className="eyebrow">Tuesday · May 27</div>
+        <div className="eyebrow">{TODAY.toLocaleDateString('en-US', { weekday: 'long' })} · {TODAY.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
         <div className="columns-header-title">Browse & practice</div>
         <QuickResume lastSession={lastSession} scopes={scopes} onResume={onResume} />
         {draftCount > 0 && (
@@ -676,7 +676,7 @@ function FolderView({
           <ActionCard
             scope={selectedScope}
             cards={sourceCards[selectedScope.id] || []}
-            history={REVIEW_HISTORY[selectedScope.id]}
+            history={(history || {})[selectedScope.id]}
             onBegin={() => onBegin(selectedScope.id)}
             onOpen={() => onOpenSource(selectedScope.id)}
             onEdit={() => startRename(selectedScope)}
@@ -1631,11 +1631,11 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (card.kind === 'occlusion') {
         if (!occState) return;
-        if (e.key === '1') return; // ignore grade keys until done
       }
       if (e.code === 'Space') { e.preventDefault(); setRevealed(r => !r); }
       if (revealed && card.kind !== 'occlusion') {
         if (e.key === 'Enter') { e.preventDefault(); onGrade('good'); }
+        if (e.key === 'x' || e.key === 'X') { e.preventDefault(); onGrade('miss'); }
       }
       if (e.key === 'Escape') onExit();
     };
@@ -1718,8 +1718,9 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
           <div style={{ marginTop: 36 }}>
             <div className="eyebrow">
               {occState.marks.filter(m => m === 'right').length} of {regions.length} correct
+              {' · '}{occState.marks.every(m => m === 'right') ? 'Got it' : 'Missed'}
             </div>
-            <GradeRow onContinue={() => onGrade('good')} onPause={onExit} />
+            <GradeRow continueLabel="Done" onContinue={() => onGrade(occState.marks.every(m => m === 'right') ? 'good' : 'miss')} onPause={onExit} />
           </div>
         )}
       </div>
@@ -1750,7 +1751,7 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
 
       {revealed && (
         <div className="card-foot">
-          <GradeRow onContinue={() => onGrade('good')} onPause={onExit} />
+          <RecallChoice onMissed={() => onGrade('miss')} onGotIt={() => onGrade('good')} onPause={onExit} />
           <div className="card-foot-row">
             <div className="card-meta">
               <button onClick={onShowSource}><Glyph name="book" size={13} /> Source</button>
@@ -1758,9 +1759,11 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
               <span>{card.sourceLabel}</span>
             </div>
             <div className="card-meta">
-              <span>Enter to continue</span>
+              <span>Enter · Got it</span>
               <span className="dot" />
-              <span>Esc to pause</span>
+              <span>X · Missed</span>
+              <span className="dot" />
+              <span>Esc · Pause</span>
             </div>
           </div>
         </div>
@@ -1769,7 +1772,7 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
   );
 }
 
-function GradeRow({ onContinue, onPause }) {
+function GradeRow({ onContinue, onPause, continueLabel = 'Continue' }) {
   return (
     <div className="grade-row two">
       <button className="grade grade-pause" onClick={onPause}>
@@ -1777,8 +1780,30 @@ function GradeRow({ onContinue, onPause }) {
         <span className="grade-name">Pause</span>
       </button>
       <button className="grade grade-continue" onClick={onContinue}>
-        <span className="grade-name">Continue</span>
+        <span className="grade-name">{continueLabel}</span>
         <Glyph name="arrow" size={17} />
+      </button>
+    </div>
+  );
+}
+
+// After revealing a standard card, the user makes a single binary self-mark —
+// "Missed" or "Got it" — which feeds per-session accuracy. This is not a
+// multi-level grading scale; Pause leaves the session.
+function RecallChoice({ onMissed, onGotIt, onPause }) {
+  return (
+    <div className="grade-row three">
+      <button className="grade grade-pause" onClick={onPause}>
+        <Glyph name="pause" size={17} />
+        <span className="grade-name">Pause</span>
+      </button>
+      <button className="grade grade-miss" onClick={onMissed}>
+        <Glyph name="close" size={17} />
+        <span className="grade-name">Missed</span>
+      </button>
+      <button className="grade grade-continue" onClick={onGotIt}>
+        <span className="grade-name">Got it</span>
+        <Glyph name="check" size={17} />
       </button>
     </div>
   );
@@ -2311,6 +2336,26 @@ function App() {
   const [scopeLabelOverrides, setScopeLabelOverrides] = usePersistentState('scopeLabels', () => ({}));
   const [scopes, setScopes] = usePersistentState('scopes', () => [...SCOPES]);
 
+  // Per-scope study history (sittings + per-card pass/miss), seeded once from the
+  // demo data and then durably persisted. Real sessions append a sitting on finish.
+  const [history, setHistory] = usePersistentState('history', () => REVIEW_HISTORY);
+  // Accumulates the current sitting's results; "Got it" = pass, "Missed" = miss.
+  const [sitting, setSitting] = useState({ reviewed: 0, passed: 0 });
+
+  // Append a finished sitting to the scope's history so the per-session
+  // accuracy trend reflects real study. Records session-level reviewed/passed
+  // only; per-card pass/miss (cardHist) stays demo-seeded because study runs
+  // the shared demo deck rather than the scope's own cards — wiring study to
+  // each scope's real cards (and recording per-card) is future work.
+  function recordSitting(scopeId, reviewed, passed) {
+    if (reviewed <= 0) return;
+    setHistory(prev => {
+      const h = prev[scopeId] || { sessions: [], cardHist: {} };
+      const session = { id: scopeId + '-live-' + Date.now(), ts: Date.now(), reviewed, passed };
+      return { ...prev, [scopeId]: { ...h, sessions: [...(h.sessions || []), session] } };
+    });
+  }
+
   const scope = scopes.find(s => s.id === scopeId) || scopes[0];
   const scopeLabel = scopeLabelOverrides[scope.id] || scope.label;
   const scopeForView = { ...scope, label: scopeLabel };
@@ -2377,12 +2422,19 @@ function App() {
   function onGrade(g) {
     const next = cardIdx + 1;
     const total = QUEUE.length;
-    // End the session when the deck runs out. Continue counts as a pass.
+    const reviewed = sitting.reviewed + 1;
+    const passed = sitting.passed + (g === 'good' ? 1 : 0);
+    // End the session when the deck runs out, recording the sitting.
     if (next >= QUEUE.length) {
+      // Only leaf topics keep history/progress; Practice-all on a folder
+      // studies the demo deck but does not record a folder-level sitting.
+      if (scope.isLeaf) recordSitting(scope.id, reviewed, passed);
+      setSitting({ reviewed: 0, passed: 0 });
       setLastSession({ scopeId: scope.id, status: 'finished', position: total, total });
       setCardIdx(0);
       setScreen('done');
     } else {
+      setSitting({ reviewed, passed });
       setLastSession({ scopeId: scope.id, status: 'paused', position: next, total });
       setCardIdx(next);
     }
@@ -2413,6 +2465,7 @@ function App() {
     } else {
       setCardIdx(lastSession.position);
     }
+    setSitting({ reviewed: 0, passed: 0 });
     setScreen('study');
   }
 
@@ -2543,6 +2596,7 @@ function App() {
             lastSession={lastSession}
             onResume={resumeLastSession}
             sourceCards={sourceCards}
+            history={history}
             onEnterChild={(id) => { setScopeId(id); setCardIdx(0); }}
             onBack={(parentId) => { setScopeId(parentId); setCardIdx(0); }}
             onBegin={(targetId) => {
@@ -2557,6 +2611,7 @@ function App() {
                 position: startIdx,
                 total,
               });
+              setSitting({ reviewed: 0, passed: 0 });
               setScreen('study');
             }}
             onCreateFolder={createFolder}
@@ -2575,7 +2630,7 @@ function App() {
             scope={scopeForView}
             scopes={scopes}
             cards={sourceCards[scope.id] || []}
-            history={REVIEW_HISTORY[scope.id]}
+            history={history[scope.id]}
             draftCount={draftCount}
             onReviewDrafts={reviewDrafts}
             onChangeName={(name) => setScopeLabelOverrides(o => ({ ...o, [scope.id]: name }))}
@@ -2597,6 +2652,7 @@ function App() {
               const total = QUEUE.length;
               setCardIdx(0);
               setLastSession({ scopeId: scope.id, status: 'open', position: 0, total });
+              setSitting({ reviewed: 0, passed: 0 });
               setScreen('study');
             }}
             onBack={(id) => {
@@ -2613,7 +2669,7 @@ function App() {
             scope={scopeForView}
             scopes={scopes}
             cards={sourceCards[scope.id] || []}
-            history={REVIEW_HISTORY[scope.id]}
+            history={history[scope.id]}
             onJumpFolder={(id) => { setScopeId(id); setCardIdx(0); setScreen('folder'); }}
             onOpenSource={() => { setCardIdx(0); setScreen('source'); }}
           />

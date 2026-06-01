@@ -1,12 +1,14 @@
 <!-- Batch A (done): durable persistence, factual counts/no-SRS, 7 UI-only languages
-     (picker + copy), edited-draft fix, plus all verify-only items confirmed by an
-     adversarial review workflow + esbuild parse check. Verification was by code
-     inspection + adversarial review (the app is browser-only JSX-via-Babel and can't
-     be headless-run); a full in-browser click-through remains as task 10.1.
-     Deferred to Batch B (unchecked below): real study-session recording (needs a
-     "miss" signal), the i18n translation engine + 6 locale dictionaries, file-drop
-     intake, factual pending-draft counts, occlusion box→card production, and
-     source-view generalization. -->
+     (picker + copy), edited-draft fix.
+     Batch B1 (done): study self-mark "Got it"/"Missed" (binary, no grading scale;
+     occlusion auto-grades from per-region marks) + real per-sitting accuracy
+     recorded into durably-persisted history.
+     Verification is by code inspection + adversarial review workflow + esbuild parse
+     check (the app is browser-only JSX-via-Babel and can't be headless-run); a full
+     in-browser click-through remains as task 10.1.
+     Still deferred to Batch B: the i18n translation engine + 6 locale dictionaries
+     (9.2/9.3), file-drop intake (6.1), factual pending-draft counts (6.5), occlusion
+     box→card production (7.4/7.5), and source-view generalization (8.x). -->
 
 ## 1. Library model
 
@@ -20,11 +22,11 @@
 
 - [x] 2.1 Implement one-card-at-a-time recall with prompt shown and answer hidden (cloze blanks the term)
 - [x] 2.2 Implement Show answer → reveal
-- [ ] 2.3 Implement Continue (record pass, advance) and Pause (stop, save place) — no grading scale
+- [x] 2.3 Implement "Got it"/"Missed" self-mark (record pass/miss, advance) and Pause (stop, save place) — no grading scale
 - [x] 2.4 Implement the "N of M" progress marker
 - [x] 2.5 Implement keyboard shortcuts: reveal key, Enter to continue, Esc to pause
 - [x] 2.6 Implement the Source link in the card footer
-- [ ] 2.7 Verify the full study loop and that Continue counts as passed
+- [x] 2.7 Verify the full study loop and that a completed sitting records real pass/miss accuracy
 
 ## 3. Session resume
 
