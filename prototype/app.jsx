@@ -2594,7 +2594,7 @@ function SourceOverlay({ region, source, onClose }) {
         <div className="source-page-head">
           <div>
             <div className="eyebrow" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Glyph name="book" size={13} /> {t('source.fromThisSource')}</div>
-            <div className="source-page-title">{hasSource ? (source.title || t('source.fromThisSource')) : (region ? 'Eukaryotic cell · Ch. 4' : t('source.fromThisSource'))}</div>
+            <div className="source-page-title">{source ? (source.title || t('source.fromThisSource')) : (region ? 'Eukaryotic cell · Ch. 4' : t('source.fromThisSource'))}</div>
           </div>
           <button className="overlay-close" onClick={onClose}><Glyph name="close" /></button>
         </div>
@@ -2695,10 +2695,12 @@ function App() {
   function tagWithSource(cards, src, name) {
     const text = (src && src.sourceText) || '';
     let imageDataUrl = (src && src.imageDataUrl) || null;
-    // Large base64 images can blow the localStorage quota (silent failure); keep
-    // only reasonably-sized ones so the saved source can't desync from the cards.
-    if (imageDataUrl && imageDataUrl.length > 1500000) imageDataUrl = null;
-    if (!text.trim() && !imageDataUrl) return cards;
+    // Large base64 images can blow the localStorage quota (silent failure); drop
+    // only the oversized ones so the saved source can't desync from the cards.
+    if (imageDataUrl && imageDataUrl.length > 2000000) imageDataUrl = null;
+    // ALWAYS record a source (even title-only) so every generated card keeps a
+    // working "See the source" link; the overlay shows a note if there's nothing
+    // storable to preview.
     const srcId = 'usrc-' + (++GEN_ID);
     setSources(prev => ({ ...prev, [srcId]: { text, imageDataUrl, title: (name || '').trim() } }));
     return cards.map(c => ({ ...c, sourceId: srcId }));
@@ -2728,12 +2730,31 @@ function App() {
   // Unreviewed draft cards, persisted PER TOPIC so they survive navigation and
   // can be reopened later via the topic's "review" badge. Seeded with the demo
   // queue under the organelles topic.
-  const [pendingDrafts, setPendingDrafts] = usePersistentState('pendingDrafts', () => ({ 'bio-cell-organelles': DRAFT_QUEUE }));
+  const [pendingDrafts, setPendingDrafts] = usePersistentState('pendingDrafts', () => ({}));
+  const [lastDraftScope, setLastDraftScope] = useState(null); // most-recently-generated topic
   const [genSource, setGenSource] = useState(null);           // { sourceText, imageDataUrl, name } for the manual prompt
   // Stored source documents (the material cards were generated from), keyed by id.
   const [sources, setSources] = usePersistentState('sources', () => ({}));
   const pendingFor = (id) => (pendingDrafts[id] || []);
-  const draftCount = Object.keys(pendingDrafts).reduce((n, k) => n + (pendingDrafts[k] ? pendingDrafts[k].length : 0), 0);
+  // The topic the global "new cards ready" banner points at: the most recent
+  // generation if it still has pending, else the first topic with any.
+  const reviewTargetScope = (lastDraftScope && pendingFor(lastDraftScope).length)
+    ? lastDraftScope
+    : (Object.keys(pendingDrafts).find(k => pendingDrafts[k] && pendingDrafts[k].length) || null);
+  const draftCount = reviewTargetScope ? pendingFor(reviewTargetScope).length : 0;
+  // One-time cleanup: earlier builds seeded a mock review queue (ids d1–d6) under
+  // the organelles topic. Drop it on load so the "new cards ready" banner only
+  // ever points at the user's own generations. Untouched-mock check keeps any
+  // real cards a user may have added there.
+  useEffect(() => {
+    setPendingDrafts(prev => {
+      const mock = prev['bio-cell-organelles'];
+      if (mock && mock.length && mock.every(c => /^d\d+$/.test(c.id))) {
+        const next = { ...prev }; delete next['bio-cell-organelles']; return next;
+      }
+      return prev;
+    });
+  }, []);
 
   // Append a finished sitting to the scope's history (session-level accuracy
   // and per-card pass/miss) so both the trend and the per-card drill-down
@@ -2904,9 +2925,7 @@ function App() {
   // Open the review screen for a topic's pending drafts. Without an id (the
   // global "new cards ready" banner), pick the first topic that has any.
   function reviewDrafts(id) {
-    const sid = (id && typeof id === 'string')
-      ? id
-      : Object.keys(pendingDrafts).find(k => pendingDrafts[k] && pendingDrafts[k].length);
+    const sid = (id && typeof id === 'string') ? id : reviewTargetScope;
     if (sid) setAddTargetScope(sid);
     setKeptCount(0);
     setScreen('reviewDrafts');
@@ -2933,6 +2952,7 @@ function App() {
     }
     const tagged = tagWithSource(cards, src, (name || (target && target.label) || ''));
     setPendingDrafts(prev => ({ ...prev, [targetId]: tagged }));
+    setLastDraftScope(targetId);
     setKeptCount(0);
     setScreen('reviewDrafts');
   }
