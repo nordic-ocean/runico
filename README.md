@@ -99,6 +99,21 @@ you close it.
 
 Prefer to run it locally? See [`prototype/`](prototype/) — `python3 -m http.server --directory prototype`, then open the printed URL.
 
+## Desktop app
+
+A desktop build wraps the same UI in Electron so your OpenRouter key is stored in
+the **OS keychain** (never in the page), card-generation requests run in the main
+process (**no CORS**), and all your data lives in a single local **save file** you own.
+
+```sh
+npm install
+npm start        # launches the desktop app
+npm run build    # packages an app for your platform (unsigned)
+```
+
+The browser build is unchanged and remains the lightweight default; the desktop
+shell only adds the keychain, request, and save-file backends.
+
 ## At a glance
 
 - **Study without grading scales.** Reveal the answer, then choose **Continue** or **Pause** — that's it.

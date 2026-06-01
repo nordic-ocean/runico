@@ -12,17 +12,44 @@ const { useState, useEffect, useMemo, useRef } = React;
 // is backed by the OS keychain / local save file (see the
 // add-electron-desktop-wrapper change).
 const STORE_PREFIX = 'runico:v3:';
+
+// ── Native (desktop) backend ─────────────────────────────
+// In the Electron build, window.runico (preload.js) exposes the OS keychain, the
+// local save file, and main-process OpenRouter requests. In a plain browser it's
+// absent and everything falls back to localStorage + fetch. This single seam is
+// the only place the two builds diverge.
+const RUNICO = (typeof window !== 'undefined' && window.runico) ? window.runico : null;
+const IS_DESKTOP = !!(RUNICO && RUNICO.isDesktop);
+// Desktop: the save document is a { "runico:v3:<key>": value } map loaded once at
+// startup; mutations update it in place and are written back (debounced, atomic).
+const NATIVE_STORE = IS_DESKTOP ? (RUNICO.initialData || {}) : null;
+let NATIVE_SAVE_TIMER = null;
+function nativeSaveSoon() {
+  if (!IS_DESKTOP) return;
+  if (NATIVE_SAVE_TIMER) clearTimeout(NATIVE_SAVE_TIMER);   // trailing debounce: save after the last write settles
+  NATIVE_SAVE_TIMER = setTimeout(() => {
+    NATIVE_SAVE_TIMER = null;
+    try { RUNICO.saveData(NATIVE_STORE); } catch (e) { /* best-effort */ }
+  }, 400);
+}
+
 function usePersistentState(key, initial) {
   const [val, setVal] = useState(() => {
     try {
-      const raw = localStorage.getItem(STORE_PREFIX + key);
-      if (raw != null) return JSON.parse(raw);
+      if (IS_DESKTOP) {
+        if (Object.prototype.hasOwnProperty.call(NATIVE_STORE, STORE_PREFIX + key)) return NATIVE_STORE[STORE_PREFIX + key];
+      } else {
+        const raw = localStorage.getItem(STORE_PREFIX + key);
+        if (raw != null) return JSON.parse(raw);
+      }
     } catch (e) { /* ignore parse / storage errors */ }
     return typeof initial === 'function' ? initial() : initial;
   });
   useEffect(() => {
-    try { localStorage.setItem(STORE_PREFIX + key, JSON.stringify(val)); }
-    catch (e) { /* ignore quota / serialization errors */ }
+    try {
+      if (IS_DESKTOP) { NATIVE_STORE[STORE_PREFIX + key] = val; nativeSaveSoon(); }
+      else { localStorage.setItem(STORE_PREFIX + key, JSON.stringify(val)); }
+    } catch (e) { /* ignore quota / serialization errors */ }
   }, [key, val]);
   return [val, setVal];
 }
@@ -194,6 +221,20 @@ async function callOpenRouter({ apiKey, model, sourceText, imageDataUrl, prompt 
   const content = imageDataUrl
     ? [{ type: 'text', text: promptText }, { type: 'image_url', image_url: { url: imageDataUrl } }]
     : promptText;
+  const body = { model: model || DEFAULT_GEN_MODEL, messages: [{ role: 'user', content }] };
+  // Desktop: the main process attaches the keychain key and makes the request
+  // (no CORS, key never in the renderer). Browser: direct fetch with the key.
+  if (IS_DESKTOP) {
+    let r;
+    try { r = await RUNICO.generate(body); } catch (e) { throw new Error('network'); }
+    if (!r || r.error === 'network') throw new Error('network');
+    if (!r.ok) {
+      if (r.status === 401 || r.status === 403) throw new Error('key');
+      if (r.status === 429) throw new Error('rate');
+      throw new Error('http');
+    }
+    return r.content || '';
+  }
   let res;
   try {
     res = await fetch(OPENROUTER_URL, {
@@ -204,7 +245,7 @@ async function callOpenRouter({ apiKey, model, sourceText, imageDataUrl, prompt 
         'HTTP-Referer': 'https://nordic-ocean.github.io/runico/',
         'X-Title': 'Runico',
       },
-      body: JSON.stringify({ model: model || DEFAULT_GEN_MODEL, messages: [{ role: 'user', content }] }),
+      body: JSON.stringify(body),
     });
   } catch (e) { throw new Error('network'); }
   if (!res.ok) {
@@ -349,8 +390,12 @@ async function generateOcclusionCard({ apiKey, model, imageDataUrl, theme }) {
   return { id: genId('g'), kind: 'occlusion', q, a: null, boxes, image: cropped };
 }
 
-// Lightweight key check against OpenRouter's key endpoint.
+// Lightweight key check against OpenRouter's key endpoint. Desktop validates via
+// the main process (keychain key); browser checks the passed key directly.
 async function validateOpenRouterKey(apiKey) {
+  if (IS_DESKTOP) {
+    try { return await RUNICO.validate(); } catch (e) { return 'untested'; }
+  }
   try {
     const res = await fetch('https://openrouter.ai/api/v1/key', { headers: { 'Authorization': 'Bearer ' + apiKey } });
     return res.ok ? 'valid' : ((res.status === 401 || res.status === 403) ? 'invalid' : 'untested');
@@ -2799,7 +2844,9 @@ function ApprovedScreen({ keptCount, onHome, onViewCards, topicLabel }) {
 }
 
 function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiKey, onApiKeyChange, genModel, onGenModelChange, onDone }) {
-  const [keyInput, setKeyInput] = useState(apiKey || '');
+  // In desktop, apiKey is just a presence sentinel ('saved'); the raw key lives in
+  // the keychain and never reaches the renderer, so the input starts empty there.
+  const [keyInput, setKeyInput] = useState(IS_DESKTOP ? '' : (apiKey || ''));
   const [keyStatus, setKeyStatus] = useState(''); // '' | testing | valid | invalid | untested
   async function testKey() {
     const k = (keyInput || apiKey || '').trim();
@@ -3089,7 +3136,28 @@ function App() {
   const [deck, setDeck] = useState([]);
 
   // ── AI generation (OpenRouter) state ──
-  const [apiKey, setApiKey] = usePersistentState('openrouterKey', '');
+  // Browser: the key string is held + mirrored to localStorage. Desktop: the key
+  // lives in the OS keychain (main process); the renderer only tracks presence via
+  // a 'saved' sentinel and never holds the raw key.
+  const [apiKey, setApiKey] = useState(() => {
+    if (IS_DESKTOP) return RUNICO.keyStatusSync() ? 'saved' : '';
+    try { const raw = localStorage.getItem(STORE_PREFIX + 'openrouterKey'); return raw != null ? JSON.parse(raw) : ''; }
+    catch (e) { return ''; }
+  });
+  useEffect(() => {
+    if (IS_DESKTOP) return;   // desktop key is persisted in the keychain, not localStorage
+    try { localStorage.setItem(STORE_PREFIX + 'openrouterKey', JSON.stringify(apiKey)); } catch (e) { /* ignore */ }
+  }, [apiKey]);
+  // Route key changes to the keychain in desktop; plain state in the browser.
+  function changeApiKey(newKey) {
+    if (IS_DESKTOP) {
+      const k = (newKey || '').trim();
+      if (!k) { try { RUNICO.clearKey(); } catch (e) {} setApiKey(''); return; }
+      Promise.resolve(RUNICO.saveKey(k)).then(r => { if (r && r.ok) setApiKey('saved'); }).catch(() => {});
+      return;
+    }
+    setApiKey(newKey);
+  }
   const [genModel, setGenModel] = usePersistentState('genModel', DEFAULT_GEN_MODEL);
   // Unreviewed draft cards, persisted PER TOPIC so they survive navigation and
   // can be reopened later via the topic's "review" badge. Seeded with the demo
@@ -3656,7 +3724,7 @@ function App() {
             theme={tweaks.theme || 'light'}
             onThemeChange={(code) => setTweak('theme', code)}
             apiKey={apiKey}
-            onApiKeyChange={setApiKey}
+            onApiKeyChange={changeApiKey}
             genModel={genModel}
             onGenModelChange={setGenModel}
             onDone={() => setScreen('folder')}
