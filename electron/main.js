@@ -143,6 +143,8 @@ ipcMain.handle('runico:generate', (e, body) => openRouterGenerate(body));
 ipcMain.handle('runico:export', (e, data) => exportData(data));
 ipcMain.handle('runico:import', () => importData());
 
+const ICON = path.join(__dirname, '..', 'prototype', 'assets', 'runico-ring.png');
+
 let win = null;
 async function createWindow() {
   let port;
@@ -152,6 +154,7 @@ async function createWindow() {
     width: 1200, height: 860, minWidth: 880, minHeight: 600,
     backgroundColor: '#FBFCFD',
     title: 'Runico',
+    icon: ICON,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -165,6 +168,9 @@ async function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Use the Runico ring as the dock icon (macOS dev run shows the default Electron
+  // icon otherwise); packaged builds use build.icon from package.json.
+  if (process.platform === 'darwin' && app.dock) { try { app.dock.setIcon(ICON); } catch (e) {} }
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });

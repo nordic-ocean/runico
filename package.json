@@ -16,6 +16,7 @@
   "build": {
     "appId": "com.runico.app",
     "productName": "Runico",
+    "icon": "prototype/assets/runico-ring.png",
     "files": [
       "electron/**/*",
       "prototype/**/*"

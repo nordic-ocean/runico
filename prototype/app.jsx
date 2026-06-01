@@ -22,7 +22,10 @@ const RUNICO = (typeof window !== 'undefined' && window.runico) ? window.runico 
 const IS_DESKTOP = !!(RUNICO && RUNICO.isDesktop);
 // Desktop: the save document is a { "runico:v3:<key>": value } map loaded once at
 // startup; mutations update it in place and are written back (debounced, atomic).
-const NATIVE_STORE = IS_DESKTOP ? (RUNICO.initialData || {}) : null;
+// IMPORTANT: contextBridge hands `initialData` over as a FROZEN, read-only object,
+// so it must be copied into a plain mutable object — otherwise every write below
+// silently no-ops and nothing ever persists.
+const NATIVE_STORE = IS_DESKTOP ? Object.assign({}, RUNICO.initialData || {}) : null;
 let NATIVE_SAVE_TIMER = null;
 function nativeSaveSoon() {
   if (!IS_DESKTOP) return;
