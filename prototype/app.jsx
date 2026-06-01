@@ -81,6 +81,104 @@ const DRAFT_QUEUE = [
   { id: 'd6', kind: 'occlusion', q: 'Identify each region of the eukaryotic cell.', a: null, regions: ['nucleus', 'mitochondria', 'ribosome', 'golgi', 'er', 'lysosome'] },
 ];
 
+// ── AI card generation (OpenRouter) ──────────────────────────
+// One generation *contract* (a canonical prompt + the expected output shape +
+// one parser) feeds two *transports*: the app calling OpenRouter with the
+// user's key, or the user running the same prompt in their own AI chat and
+// pasting the result back. The manual transport needs no key and no network.
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const DEFAULT_GEN_MODEL = 'google/gemini-3-flash-preview';
+const GEN_MODELS = [
+  { id: 'google/gemini-3-flash-preview', label: 'Gemini 3 Flash' },
+  { id: 'deepseek/deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
+];
+
+function buildGenPrompt(sourceText) {
+  return [
+    'You are creating study flashcards from the source material below.',
+    'Return ONLY a JSON array (no prose, no markdown, no code fences) of 4 to 10 cards.',
+    'Each card is an object {"kind","q","a"} where kind is one of:',
+    '- "qa": a question (q) and its answer (a).',
+    '- "cloze": q is a sentence with the hidden term wrapped in {{double braces}}; a is that term.',
+    '- "rev": q is a term, a is its definition (reversible).',
+    'Keep q and a concise and self-contained.',
+    'Example: [{"kind":"qa","q":"Which organelle makes ATP?","a":"The mitochondrion."},{"kind":"cloze","q":"The {{nucleus}} holds the cell\'s DNA.","a":"nucleus"}]',
+    '',
+    'SOURCE MATERIAL:',
+    sourceText && sourceText.trim() ? sourceText.trim() : '(see the attached image)',
+  ].join('\n');
+}
+
+// Monotonic id counter so generated cards are unique regardless of timing.
+let GEN_ID = 0;
+
+// Tolerant parse: strip fences/prose, extract the JSON array, validate, and map
+// to Runico card shapes. Used by BOTH transports so they produce identical cards.
+function parseGenCards(responseText) {
+  if (!responseText) return [];
+  const text = String(responseText).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+  // Prefer parsing the whole stripped text (a bare array); else fall back to the
+  // first '[' … last ']' span for arrays wrapped in prose.
+  let arr = null;
+  try { const w = JSON.parse(text); if (Array.isArray(w)) arr = w; } catch (e) { /* fall through */ }
+  if (!arr) {
+    const start = text.indexOf('['), end = text.lastIndexOf(']');
+    if (start === -1 || end <= start) return [];
+    try { const s = JSON.parse(text.slice(start, end + 1)); if (Array.isArray(s)) arr = s; } catch (e) { return []; }
+  }
+  if (!Array.isArray(arr)) return [];
+  const KINDS = { qa: 1, cloze: 1, rev: 1 };
+  const prim = v => (typeof v === 'string' || typeof v === 'number') ? String(v).trim() : '';
+  const out = [];
+  arr.forEach(c => {
+    if (!c || typeof c !== 'object') return;
+    let kind = KINDS[c.kind] ? c.kind : 'qa';
+    const q = prim(c.q), a = prim(c.a);
+    if (!q) return;
+    if (kind === 'cloze' && !/\{\{.+?\}\}/.test(q)) kind = 'qa';
+    if (kind !== 'cloze' && !a) return;
+    out.push({ id: 'g-' + (++GEN_ID), kind, q, a });
+  });
+  return out;
+}
+
+// Automatic transport: call OpenRouter with the user's key. Returns the raw
+// model text (to be run through parseGenCards). Throws a short code on failure.
+async function callOpenRouter({ apiKey, model, sourceText, imageDataUrl }) {
+  const content = imageDataUrl
+    ? [{ type: 'text', text: buildGenPrompt(sourceText) }, { type: 'image_url', image_url: { url: imageDataUrl } }]
+    : buildGenPrompt(sourceText);
+  let res;
+  try {
+    res = await fetch(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + apiKey,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://nordic-ocean.github.io/runico/',
+        'X-Title': 'Runico',
+      },
+      body: JSON.stringify({ model: model || DEFAULT_GEN_MODEL, messages: [{ role: 'user', content }] }),
+    });
+  } catch (e) { throw new Error('network'); }
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) throw new Error('key');
+    if (res.status === 429) throw new Error('rate');
+    throw new Error('http');
+  }
+  let data;
+  try { data = await res.json(); } catch (e) { throw new Error('http'); }
+  return (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+}
+
+// Lightweight key check against OpenRouter's key endpoint.
+async function validateOpenRouterKey(apiKey) {
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/key', { headers: { 'Authorization': 'Bearer ' + apiKey } });
+    return res.ok ? 'valid' : ((res.status === 401 || res.status === 403) ? 'invalid' : 'untested');
+  } catch (e) { return 'untested'; }
+}
+
 // Practice scopes — sources, sub-sections, all-the-way-up-to "everything".
 // `isLeaf` marks an ingested source (where cards live). Folders can nest
 // to any depth; the `depth` field is just bookkeeping for display.
@@ -1845,18 +1943,45 @@ function fmtFileSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-function AddScreen({ targetPath, isExistingSource, onCancel, onBegin }) {
+function AddScreen({ targetPath, isExistingSource, hasApiKey, onCancel, onGenerateCards, onGenerated, onGenerateManual }) {
   const [name, setName] = useState('');
   const [priorities, setPriorities] = useState(['definitions','labeledDiagrams','examples','bodyProse']);
   const [dragIdx, setDragIdx] = useState(null);
-  const [file, setFile] = useState(null);        // { name, size, isImage, url }
+  const [file, setFile] = useState(null);        // { name, size, isImage, url, dataUrl, text, _ready }
   const [dropActive, setDropActive] = useState(false);
+  const [sourceText, setSourceText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [localErr, setLocalErr] = useState('');
   const fileInputRef = useRef(null);
+  const readToken = useRef(0);
+  const aliveRef = useRef(true);
+  useEffect(() => () => { aliveRef.current = false; }, []);
 
   function acceptFile(f) {
     if (!f) return;
+    const token = ++readToken.current;
     const isImage = (f.type || '').indexOf('image/') === 0;
-    setFile({ name: f.name, size: f.size, isImage, url: isImage ? URL.createObjectURL(f) : null });
+    const isText = (f.type || '').indexOf('text/') === 0 || /\.(txt|md|markdown|csv)$/i.test(f.name || '');
+    setFile({ name: f.name, size: f.size, isImage, url: isImage ? URL.createObjectURL(f) : null, dataUrl: null, text: null, _ready: false });
+    if (isImage || isText) {
+      const reader = new FileReader();
+      reader.onload = () => setFile(prev => (prev && readToken.current === token)
+        ? { ...prev, [isImage ? 'dataUrl' : 'text']: isImage ? reader.result : String(reader.result || ''), _ready: true }
+        : prev);
+      if (isImage) reader.readAsDataURL(f); else reader.readAsText(f);
+    }
+  }
+
+  // API generation runs inline here (no screen switch), so a failure keeps the
+  // user's typed source and any in-flight result can't yank them off-screen.
+  async function doGenerate() {
+    setLocalErr(''); setBusy(true);
+    let cards = null, err = '';
+    try { cards = await onGenerateCards(payload()); }
+    catch (e) { err = (e && e.message) || 'http'; }
+    if (!aliveRef.current) return; // user left mid-flight — drop the result
+    setBusy(false);
+    if (err) setLocalErr(err); else onGenerated(cards, name.trim());
   }
   function onPickFile(e) { acceptFile(e.target.files && e.target.files[0]); }
   function onDropFile(e) {
@@ -1885,7 +2010,16 @@ function AddScreen({ targetPath, isExistingSource, onCancel, onBegin }) {
     setDragIdx(null);
   }
 
-  const canBegin = (isExistingSource || !!name.trim()) && !!file;
+  const combinedSource = [sourceText, file && file.text].filter(Boolean).join('\n\n');
+  const ready = !!(combinedSource.trim() || (file && file._ready)); // real readable content present
+  const canGenerate = (isExistingSource || !!name.trim()) && ready && !busy;
+  function payload() {
+    return { name: name.trim(), sourceText: combinedSource, imageDataUrl: file && file.isImage ? file.dataUrl : null };
+  }
+  const errMsg = localErr && ({
+    key: t('add.genErrorKey'), rate: t('add.genErrorRate'), network: t('add.genErrorNetwork'),
+    http: t('add.genErrorHttp'), empty: t('add.genErrorEmpty'),
+  })[localErr];
 
   return (
     <div className="stage-inner">
@@ -1917,7 +2051,7 @@ function AddScreen({ targetPath, isExistingSource, onCancel, onBegin }) {
         </>
       )}
 
-      <input ref={fileInputRef} type="file" accept="image/*,.txt,.md,.pdf"
+      <input ref={fileInputRef} type="file" accept="image/*,.txt,.md,.markdown,.csv"
              style={{ display: 'none' }} onChange={onPickFile} />
       {file ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px',
@@ -1946,6 +2080,14 @@ function AddScreen({ targetPath, isExistingSource, onCancel, onBegin }) {
         </div>
       )}
 
+      <textarea
+        className="scope-search"
+        style={{ width: '100%', minHeight: 92, marginTop: 14, resize: 'vertical', fontSize: 15, lineHeight: 1.5 }}
+        placeholder={t('add.sourceTextPlaceholder')}
+        value={sourceText}
+        onChange={e => setSourceText(e.target.value)}
+      />
+
       <div className="priority-list">
         <p className="priority-list-label">{t('add.priorityListLabel')}</p>
         {priorities.map((p, i) => (
@@ -1962,11 +2104,70 @@ function AddScreen({ targetPath, isExistingSource, onCancel, onBegin }) {
         ))}
       </div>
 
-      <div className="home-actions" style={{ marginTop: 40 }}>
-        <button className="primary lg" onClick={() => onBegin(name.trim())} disabled={!canBegin}>
-          {t('add.begin')} <Glyph name="arrow" size={18} />
+      {errMsg && (
+        <div className="add-name-required" style={{ color: 'var(--error-500)', marginTop: 16 }}>{errMsg}</div>
+      )}
+      {!file && !combinedSource.trim() && (
+        <div className="add-name-required" style={{ marginTop: 16 }}>{t('add.needSource')}</div>
+      )}
+      <div className="home-actions" style={{ marginTop: 20 }}>
+        <button className="primary lg"
+                onClick={doGenerate}
+                disabled={!canGenerate || !hasApiKey}
+                title={!hasApiKey ? t('add.genErrorKey') : undefined}>
+          {busy ? t('add.generating') : <>{t('add.generateWithKey')} <Glyph name="arrow" size={18} /></>}
         </button>
-        <button className="quiet" onClick={onCancel}>{t('add.cancel')}</button>
+        <button className="quiet"
+                onClick={() => onGenerateManual(payload())}
+                disabled={!canGenerate}>
+          <Glyph name="spark" size={15} /> {t('add.useOwnAi')}
+        </button>
+        <button className="quiet" onClick={onCancel} disabled={busy}>{t('add.cancel')}</button>
+      </div>
+    </div>
+  );
+}
+
+function ManualGenScreen({ source, onApply, onCancel }) {
+  const prompt = buildGenPrompt(source ? source.sourceText : '');
+  const [pasteText, setPasteText] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [err, setErr] = useState(false);
+  function copy() {
+    try {
+      navigator.clipboard.writeText(prompt);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (e) { /* clipboard may be unavailable; user can select-all manually */ }
+  }
+  return (
+    <div className="stage-inner">
+      <div className="eyebrow">{t('manual.title')}</div>
+      <p className="copy" style={{ marginTop: 8 }}>{t('manual.step1')}</p>
+      {source && source.imageDataUrl && (
+        <div className="add-name-required" style={{ marginTop: 8 }}>{t('manual.imageNote')}</div>
+      )}
+      <textarea readOnly className="scope-search"
+        style={{ width: '100%', minHeight: 150, marginTop: 12, resize: 'vertical', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: 1.5 }}
+        value={prompt} onFocus={e => e.target.select()} />
+      <div className="row-tight" style={{ marginTop: 10 }}>
+        <button className="primary" onClick={copy}><Glyph name="folders" size={14} /> {copied ? t('manual.copied') : t('manual.copyPrompt')}</button>
+      </div>
+
+      <p className="copy" style={{ marginTop: 28 }}>{t('manual.step2')}</p>
+      <textarea className="scope-search"
+        style={{ width: '100%', minHeight: 130, marginTop: 12, resize: 'vertical', fontSize: 14, lineHeight: 1.5 }}
+        placeholder={t('manual.pastePlaceholder')}
+        value={pasteText}
+        onChange={e => { setPasteText(e.target.value); if (err) setErr(false); }} />
+      {err && (
+        <div className="add-name-required" style={{ color: 'var(--error-500)', marginTop: 8 }}>{t('add.genErrorEmpty')}</div>
+      )}
+      <div className="home-actions" style={{ marginTop: 16 }}>
+        <button className="primary lg" onClick={() => { if (!onApply(pasteText)) setErr(true); }} disabled={!pasteText.trim()}>
+          {t('manual.useResponse')} <Glyph name="arrow" size={18} />
+        </button>
+        <button className="quiet" onClick={onCancel}>{t('manual.cancel')}</button>
       </div>
     </div>
   );
@@ -2115,7 +2316,7 @@ function OcclusionEditor({ card, onBoxesChange }) {
   );
 }
 
-function ReviewDraftsScreen({ onApprove, onCancel, onShowSource }) {
+function ReviewDraftsScreen({ drafts, onApprove, onCancel, onShowSource }) {
   const [idx, setIdx] = useState(0);
   const [decisions, setDecisions] = useState({}); // id -> 'keep' | 'skip'
   const [edits, setEdits] = useState({}); // id -> { q, a } for edited drafts
@@ -2125,7 +2326,7 @@ function ReviewDraftsScreen({ onApprove, onCancel, onShowSource }) {
   const [editQ, setEditQ] = useState('');
   const [editA, setEditA] = useState('');
 
-  const card = DRAFT_QUEUE[idx];
+  const card = drafts[idx];
 
   // Note: occBoxes is re-seeded by the remounted OcclusionEditor (key={card.id})
   // via its onBoxesChange mount effect; resetting it here would race and clobber it.
@@ -2136,7 +2337,7 @@ function ReviewDraftsScreen({ onApprove, onCancel, onShowSource }) {
     const nextEdits = edit ? { ...edits, [card.id]: edit } : edits;
     setDecisions(nextDecisions);
     if (edit) setEdits(nextEdits);
-    if (idx === DRAFT_QUEUE.length - 1) {
+    if (idx === drafts.length - 1) {
       onApprove(nextDecisions, nextEdits);
     } else {
       setIdx(idx + 1);
@@ -2146,7 +2347,7 @@ function ReviewDraftsScreen({ onApprove, onCancel, onShowSource }) {
   if (card.kind === 'occlusion') {
     return (
       <div className="stage-inner wide">
-        <div className="eyebrow">{t('add.reviewCardCounter', { idx: idx + 1, total: DRAFT_QUEUE.length })}<span className="dot" />{t('add.reviewOcclusionTag')}</div>
+        <div className="eyebrow">{t('add.reviewCardCounter', { idx: idx + 1, total: drafts.length })}<span className="dot" />{t('add.reviewOcclusionTag')}</div>
 
         <OcclusionEditor key={card.id} card={card} onBoxesChange={setOccBoxes} />
 
@@ -2164,7 +2365,7 @@ function ReviewDraftsScreen({ onApprove, onCancel, onShowSource }) {
 
   return (
     <div className="stage-inner">
-      <div className="eyebrow">{t('add.reviewCardCounter', { idx: idx + 1, total: DRAFT_QUEUE.length })}<span className="dot" />{t('add.reviewDraftedFromSource')}</div>
+      <div className="eyebrow">{t('add.reviewCardCounter', { idx: idx + 1, total: drafts.length })}<span className="dot" />{t('add.reviewDraftedFromSource')}</div>
 
       {editing ? (
         <>
@@ -2235,7 +2436,15 @@ function ApprovedScreen({ keptCount, onHome, onViewCards, topicLabel }) {
   );
 }
 
-function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, onDone }) {
+function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiKey, onApiKeyChange, genModel, onGenModelChange, onDone }) {
+  const [keyInput, setKeyInput] = useState(apiKey || '');
+  const [keyStatus, setKeyStatus] = useState(''); // '' | testing | valid | invalid | untested
+  async function testKey() {
+    const k = (keyInput || apiKey || '').trim();
+    if (!k) return;
+    setKeyStatus('testing');
+    setKeyStatus(await validateOpenRouterKey(k));
+  }
   // The interface renders in the chosen language; card content is
   // never translated (see appearance-settings spec). Shown in each
   // locale's own script.
@@ -2294,6 +2503,47 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, onDo
               <span className="lang-row-check">
                 {language === L.code && <Glyph name="check" size={14} />}
               </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="settings-section">
+        <div className="settings-section-label">{t('settings.aiLabel')}</div>
+        <div className="settings-section-help">{t('settings.aiHelp')}</div>
+        <div className="row-tight" style={{ marginTop: 4 }}>
+          <input
+            type="password"
+            className="scope-search"
+            style={{ flex: 1 }}
+            placeholder={t('settings.apiKeyPlaceholder')}
+            value={keyInput}
+            onChange={e => { setKeyInput(e.target.value); setKeyStatus(''); }}
+            spellCheck={false}
+            autoComplete="off"
+          />
+        </div>
+        <div className="row-tight" style={{ marginTop: 10, alignItems: 'center', gap: 10 }}>
+          <button className="primary" onClick={() => { onApiKeyChange(keyInput.trim()); setKeyStatus(''); }}>{t('settings.apiKeySave')}</button>
+          <button className="quiet" onClick={() => { setKeyInput(''); onApiKeyChange(''); setKeyStatus(''); }}>{t('settings.apiKeyClear')}</button>
+          <button className="quiet" onClick={testKey} disabled={!(keyInput.trim() || apiKey)}>{t('settings.apiKeyTest')}</button>
+          <span className="small" style={{ color: keyStatus === 'valid' ? 'var(--success-500)' : keyStatus === 'invalid' ? 'var(--error-500)' : '#7A8696' }}>
+            {keyStatus === 'testing' && t('settings.apiKeyTesting')}
+            {keyStatus === 'valid' && t('settings.apiKeyValid')}
+            {keyStatus === 'invalid' && t('settings.apiKeyInvalid')}
+            {keyStatus === 'untested' && t('settings.apiKeyUntested')}
+            {keyStatus === '' && apiKey && t('settings.apiKeySavedHint')}
+          </span>
+        </div>
+        <div className="settings-section-label" style={{ marginTop: 18 }}>{t('settings.modelLabel')}</div>
+        <div className="lang-list">
+          {GEN_MODELS.map(m => (
+            <button key={m.id}
+                    className={`lang-row ${genModel === m.id ? 'is-selected' : ''}`}
+                    onClick={() => onGenModelChange(m.id)}>
+              <span className="lang-row-label">{m.label}</span>
+              <span className="lang-row-native" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{m.id}</span>
+              <span className="lang-row-check">{genModel === m.id && <Glyph name="check" size={14} />}</span>
             </button>
           ))}
         </div>
@@ -2412,6 +2662,13 @@ function App() {
   const [sitting, setSitting] = useState({ reviewed: 0, passed: 0, cards: [] });
   // The cards being studied this session (the chosen scope's real cards).
   const [deck, setDeck] = useState([]);
+
+  // ── AI generation (OpenRouter) state ──
+  const [apiKey, setApiKey] = usePersistentState('openrouterKey', '');
+  const [genModel, setGenModel] = usePersistentState('genModel', DEFAULT_GEN_MODEL);
+  // The draft cards currently under review — generated cards, or the mock queue.
+  const [drafts, setDrafts] = useState(DRAFT_QUEUE);
+  const [genSource, setGenSource] = useState(null);           // { sourceText, imageDataUrl } for the manual prompt
 
   // Append a finished sitting to the scope's history (session-level accuracy
   // and per-card pass/miss) so both the trend and the per-card drill-down
@@ -2605,12 +2862,60 @@ function App() {
 
   function reviewDrafts(id) {
     if (id && typeof id === 'string') setAddTargetScope(id);
+    setDrafts(DRAFT_QUEUE); // the pre-seeded pending drafts are the demo queue
     setKeptCount(0);
     setScreen('reviewDrafts');
   }
 
+  // Mark the add target: a folder target means a brand-new source.
+  function prepGenTarget(newName) {
+    const target = scopes.find(s => s.id === addTargetScope);
+    if (target && !target.isLeaf && newName) setPendingNewSource({ parentId: addTargetScope, name: newName });
+    else setPendingNewSource(null);
+  }
+
+  // Automatic transport: generate via OpenRouter. Returns the parsed cards or
+  // throws a normalized code; runs INLINE in AddScreen (no screen switch) so a
+  // failure can't strand the user or lose their typed source.
+  async function generateCards({ sourceText, imageDataUrl }) {
+    if (!apiKey) throw new Error('key');
+    let text;
+    try { text = await callOpenRouter({ apiKey, model: genModel, sourceText, imageDataUrl }); }
+    catch (e) { const c = e && e.message; throw new Error(['key', 'rate', 'network', 'http'].indexOf(c) >= 0 ? c : 'http'); }
+    const cards = parseGenCards(text);
+    if (!cards.length) throw new Error('empty');
+    return cards;
+  }
+  // Take generated cards into the existing draft-review flow.
+  function onGeneratedCards(cards, name) {
+    prepGenTarget(name);
+    setDrafts(cards);
+    setDraftCount(cards.length);
+    setKeptCount(0);
+    setScreen('reviewDrafts');
+  }
+
+  // Manual transport: show the prompt to run in the user's own AI chat.
+  function startGenerateManual({ name, sourceText, imageDataUrl }) {
+    prepGenTarget(name);
+    setGenSource({ sourceText: sourceText || '', imageDataUrl: imageDataUrl || null });
+    setScreen('manualGen');
+  }
+
+  // Parse a response pasted from the user's own AI chat into draft cards.
+  // Returns true if cards were applied (ManualGenScreen shows its own error otherwise).
+  function applyManualResponse(text) {
+    const cards = parseGenCards(text);
+    if (!cards.length) return false;
+    setDrafts(cards);
+    setDraftCount(cards.length);
+    setKeptCount(0);
+    setScreen('reviewDrafts');
+    return true;
+  }
+
   function approveDrafts(decisions, edits = {}) {
-    const keptCards = DRAFT_QUEUE
+    const keptCards = drafts
       .filter(c => decisions[c.id] === 'keep')
       .map(c => {
         const e = edits[c.id] || {};
@@ -2692,7 +2997,7 @@ function App() {
         </div>
       </div>
 
-      {(screen === 'add' || screen === 'processing' || screen === 'processedNotice' || screen === 'reviewDrafts' || screen === 'settings') && (
+      {(screen === 'add' || screen === 'processing' || screen === 'processedNotice' || screen === 'manualGen' || screen === 'reviewDrafts' || screen === 'settings') && (
         <div className="back-bar">
           <button className="nav-btn" onClick={() => setScreen('folder')}>
             <Glyph name="back" size={14} /> {t('common.nav.back')}
@@ -2825,8 +3130,11 @@ function App() {
             <AddScreen
               targetPath={crumbs}
               isExistingSource={isExistingSource}
+              hasApiKey={!!apiKey}
               onCancel={() => setScreen('folder')}
-              onBegin={startBegin}
+              onGenerateCards={generateCards}
+              onGenerated={onGeneratedCards}
+              onGenerateManual={startGenerateManual}
             />
           );
         })()}
@@ -2847,8 +3155,16 @@ function App() {
             </div>
           </div>
         )}
+        {screen === 'manualGen' && (
+          <ManualGenScreen
+            source={genSource}
+            onApply={applyManualResponse}
+            onCancel={() => setScreen('add')}
+          />
+        )}
         {screen === 'reviewDrafts' && (
           <ReviewDraftsScreen
+            drafts={drafts}
             onApprove={approveDrafts}
             onCancel={() => setScreen('folder')}
             onShowSource={(r) => setOverlayRegion(r || null)}
@@ -2872,6 +3188,10 @@ function App() {
             onLanguageChange={(code) => setTweak('language', code)}
             theme={tweaks.theme || 'light'}
             onThemeChange={(code) => setTweak('theme', code)}
+            apiKey={apiKey}
+            onApiKeyChange={setApiKey}
+            genModel={genModel}
+            onGenModelChange={setGenModel}
             onDone={() => setScreen('folder')}
           />
         )}
