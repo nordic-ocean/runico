@@ -79,7 +79,14 @@ function applyImportedData(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) { try { alert(t('nav.loadError')); } catch (e) {} return; }
   if (!window.confirm(t('nav.loadConfirm'))) return;
   if (IS_DESKTOP) {
-    try { (RUNICO.saveDataSync || RUNICO.saveData)(data); } catch (e) { /* best-effort */ }
+    // Sync the in-memory store to the imported data IN PLACE before reloading, so
+    // the pagehide/beforeunload flush writes the imported data — not the stale
+    // store, which would silently undo the import.
+    try {
+      for (const k in NATIVE_STORE) delete NATIVE_STORE[k];
+      Object.assign(NATIVE_STORE, data);
+      (RUNICO.saveDataSync || RUNICO.saveData)(NATIVE_STORE);
+    } catch (e) { /* best-effort */ }
   } else {
     try {
       const keep = localStorage.getItem(KEY_STORE_KEY);              // preserve the saved key
@@ -100,16 +107,23 @@ async function importSaveFile() {
     applyImportedData(r.data);
     return;
   }
+  // Append to the DOM and keep it there until the picker returns — a detached
+  // input can be garbage-collected before `change` fires, so nothing would happen.
   const input = document.createElement('input');
-  input.type = 'file'; input.accept = '.json,application/json';
+  input.type = 'file'; input.accept = '.json,application/json'; input.style.display = 'none';
+  document.body.appendChild(input);
+  const cleanup = () => { try { input.remove(); } catch (e) {} };
   input.onchange = () => {
-    const f = input.files && input.files[0]; if (!f) return;
+    const f = input.files && input.files[0];
+    if (!f) { cleanup(); return; }
     const reader = new FileReader();
     reader.onload = () => {
+      cleanup();
       let data = null;
       try { data = JSON.parse(String(reader.result || '')); } catch (e) { try { alert(t('nav.loadError')); } catch (e2) {} return; }
       applyImportedData(data);
     };
+    reader.onerror = () => { cleanup(); try { alert(t('nav.loadError')); } catch (e) {} };
     reader.readAsText(f);
   };
   input.click();
