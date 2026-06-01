@@ -508,10 +508,10 @@ const SCOPES = [
   { id: 'all',       label: 'Everything',                    parent: null,         depth: 0, due: 29, total: 318, last: 'today', isLeaf: false },
   { id: 'bio',       label: 'Biology',                       parent: 'all',        depth: 1, due: 19, total: 184, last: 'today', isLeaf: false },
   { id: 'bio-cell',  label: 'Cell Biology',                  parent: 'bio',        depth: 2, due: 11, total: 64,  last: 'today', isLeaf: false },
-  { id: 'bio-cell-organelles', label: 'Organelles · Ch. 4',  parent: 'bio-cell',   depth: 3, due: 4,  total: 18,  last: '7d ago', isLeaf: true },
-  { id: 'bio-cell-membrane',   label: 'Membrane transport',  parent: 'bio-cell',   depth: 3, due: 3,  total: 12,  last: '3d ago', isLeaf: true },
+  { id: 'bio-cell-organelles', label: 'Organelles · Ch. 4',  parent: 'bio-cell',   depth: 3, due: 4,  total: 8,   last: '7d ago', isLeaf: true },
+  { id: 'bio-cell-membrane',   label: 'Membrane transport',  parent: 'bio-cell',   depth: 3, due: 3,  total: 4,   last: '3d ago', isLeaf: true },
   { id: 'bio-cell-mitosis',    label: 'Mitosis · five phases', parent: 'bio-cell', depth: 3, due: 0,  total: 0,   last: 'never', isLeaf: true },
-  { id: 'bio-cell-photo',      label: 'Photosynthesis',      parent: 'bio-cell',   depth: 3, due: 4,  total: 22,  last: '9d ago', isLeaf: true, paused: { at: 2, remaining: 3 } },
+  { id: 'bio-cell-photo',      label: 'Photosynthesis',      parent: 'bio-cell',   depth: 3, due: 4,  total: 6,   last: '9d ago', isLeaf: true, paused: { at: 2, remaining: 3 } },
   { id: 'bio-genetics',        label: 'Genetics',            parent: 'bio',        depth: 2, due: 7,  total: 72,  last: '2d ago', isLeaf: false },
   { id: 'bio-ecology',         label: 'Ecology',             parent: 'bio',        depth: 2, due: 1,  total: 48,  last: '11d ago', isLeaf: false },
   { id: 'chem',                label: 'Chemistry',           parent: 'all',        depth: 1, due: 8,  total: 96,  last: '5d ago', isLeaf: false },
@@ -3321,6 +3321,20 @@ function App() {
     }
   }, []);
 
+  // One-time cleanup: drop pending-draft sets whose topic no longer exists (a
+  // deleted topic used to leave its drafts behind). These orphans can't be
+  // reviewed and would keep the "N new cards ready" banner stuck forever.
+  useEffect(() => {
+    const scopeIds = new Set(scopes.map(s => s.id));
+    setPendingDrafts(prev => {
+      const orphans = Object.keys(prev).filter(k => !scopeIds.has(k));
+      if (!orphans.length) return prev;
+      const n = { ...prev };
+      orphans.forEach(k => delete n[k]);
+      return n;
+    });
+  }, []);
+
   // If a generation was interrupted by a page reload, return the user to the Add
   // screen with their input restored (the network request can't be resumed).
   useEffect(() => {
@@ -3623,9 +3637,12 @@ function App() {
       });
     const kept = keptCards.length;
     if (kept > 0 && targetId) {
+      // total tracks the REAL card count (array length), not a running increment off
+      // a possibly-stale base — keeps scope.total === sourceCards[id].length.
+      const newTotal = (sourceCards[targetId] || []).length + kept;
       setSourceCards(s => ({ ...s, [targetId]: [...keptCards, ...(s[targetId] || [])] }));
       setScopes(prev => prev.map(s => s.id === targetId
-        ? { ...s, total: (s.total || 0) + kept, last: 'today' }
+        ? { ...s, total: newTotal, last: 'today' }
         : s));
     }
     // Clear this topic's pending drafts (reviewed).
@@ -3731,14 +3748,16 @@ function App() {
               ...s,
               [scope.id]: (s[scope.id] || []).map(c => c.id === id ? { ...c, ...patch } : c),
             }))}
-            onDeleteCard={(id) => setSourceCards(s => ({
-              ...s,
-              [scope.id]: (s[scope.id] || []).filter(c => c.id !== id),
-            }))}
-            onAddManual={(card) => setSourceCards(s => ({
-              ...s,
-              [scope.id]: [card, ...(s[scope.id] || [])],
-            }))}
+            onDeleteCard={(id) => {
+              const next = (sourceCards[scope.id] || []).filter(c => c.id !== id);
+              setSourceCards(s => ({ ...s, [scope.id]: next }));
+              setScopes(prev => prev.map(sc => sc.id === scope.id ? { ...sc, total: next.length } : sc));
+            }}
+            onAddManual={(card) => {
+              const next = [card, ...(sourceCards[scope.id] || [])];
+              setSourceCards(s => ({ ...s, [scope.id]: next }));
+              setScopes(prev => prev.map(sc => sc.id === scope.id ? { ...sc, total: next.length } : sc));
+            }}
             onAddFromFile={() => { setAddTargetScope(scope.id); setScreen('add'); }}
             onViewProgress={() => { setPerfReturn('source'); setScreen('performance'); }}
             onBegin={() => {
