@@ -486,7 +486,9 @@ async function generateOcclusionCard({ apiKey, model, imageDataUrl, theme }) {
   const boxes = remapLabelsToCrop(labels, cf);
   if (!boxes.length) return null;
   const q = (typeof t === 'function' ? t('add.occlusionCardPrompt') : '') || 'Identify each labeled part.';
-  return { id: genId('g'), kind: 'occlusion', q, a: null, boxes, image: cropped };
+  // Keep the FULL image + the crop box on the draft so the user can re-crop from
+  // the original in the editor when the auto-crop is wrong (dropped on approve).
+  return { id: genId('g'), kind: 'occlusion', q, a: null, boxes, image: cropped, fullImage: imageDataUrl, cropBox: cf };
 }
 
 // Lightweight key check against OpenRouter's key endpoint. Desktop validates via
@@ -2751,6 +2753,23 @@ function OcclusionEditor({ card, onBoxesChange, onImageChange }) {
     if (selId === id) setSelId(null);
   }
   function cancelCrop() { setMode('mask'); setCropSel(null); }
+  // When the auto-crop cut the figure wrong, expand back to the FULL original
+  // image (re-mapping the masks to their true positions via the stored crop box)
+  // and drop into crop mode so the user can re-cut the figure correctly.
+  function expandToOriginal() {
+    const cf = card.cropBox;
+    if (!card.fullImage || !cf) return;
+    setBoxes(bs => bs.map(b => ({
+      ...b,
+      x: (cf.x + (b.x / 100) * cf.w) * 100,
+      y: (cf.y + (b.y / 100) * cf.h) * 100,
+      w: (b.w / 100) * cf.w * 100,
+      h: (b.h / 100) * cf.h * 100,
+    })));
+    setImg(card.fullImage);
+    setMode('crop');
+    setCropSel(null);
+  }
   async function applyCrop() {
     if (!img || !cropSel || cropSel.w < 3 || cropSel.h < 3) { cancelCrop(); return; }
     const cropped = await cropImageToBox(img, { x: cropSel.x / 100, y: cropSel.y / 100, w: cropSel.w / 100, h: cropSel.h / 100 });
@@ -2818,7 +2837,12 @@ function OcclusionEditor({ card, onBoxesChange, onImageChange }) {
         ) : (
           <>
             <span><Glyph name="plus" size={12} /> {t('occ.dragHint')} · {tp('occ.regionCount', boxes.length, { n: boxes.length })}</span>
-            {img && <button className="quiet" onClick={() => { setMode('crop'); setCropSel(null); }}>{t('occ.crop')}</button>}
+            <span className="row-tight">
+              {card.fullImage && img === card.image && (
+                <button className="quiet" onClick={expandToOriginal}>{t('occ.useOriginal')}</button>
+              )}
+              {img && <button className="quiet" onClick={() => { setMode('crop'); setCropSel(null); }}>{t('occ.crop')}</button>}
+            </span>
           </>
         )}
       </div>
