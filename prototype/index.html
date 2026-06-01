@@ -1430,6 +1430,14 @@
   .app.theme-warm .src-card-q { color: #1A1714; }
   .app.theme-warm .src-card-a { color: #5C5147; }
 
+  /* Occlusion card row: figure thumbnail + mask count */
+  .src-card-occ { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .src-card-thumb {
+    max-height: 64px; max-width: 120px; height: auto; width: auto;
+    border-radius: 6px; border: 1px solid var(--border-subtle); display: block;
+  }
+  .src-card-occ-meta { font-size: 13px; color: #5C6878; }
+
   .src-card-actions {
     display: flex; gap: 4px; align-items: center; flex: none;
     opacity: 0;

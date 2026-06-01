@@ -1566,12 +1566,19 @@ function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSav
   const [editDraft, setEditDraft] = useState({ kind: 'qa', q: '', a: '' });
   const [addingNew, setAddingNew] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  // Live masks/image for an occlusion card being edited. The remounted
+  // OcclusionEditor (key={card.id}) re-seeds these via its mount effects, so we
+  // only null them here and never reset them mid-edit (that would race the seed).
+  const [occBoxes, setOccBoxes] = useState(null);
+  const [occImage, setOccImage] = useState(null);
 
   React.useEffect(() => { setName(scope.label); }, [scope.id, scope.label]);
 
   function startEdit(card) {
     setAddingNew(false);
     setEditingId(card.id);
+    setOccBoxes(null);
+    setOccImage(null);
     setEditDraft({ kind: card.kind, q: card.q, a: card.a || '' });
   }
   function saveEdit() {
@@ -1689,15 +1696,50 @@ function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSav
           return (
             <div key={c.id} className={`src-card ${isEditing ? 'is-editing' : ''} ${isDeleting ? 'is-deleting' : ''}`}>
               {isEditing ? (
-                <>
-                  <CardEditor draft={editDraft} setDraft={setEditDraft} />
-                  <div className="src-card-edit-actions">
-                    <button className="quiet" onClick={() => setEditingId(null)}>{t('add.cancel')}</button>
-                    <button className="primary" onClick={saveEdit}>
-                      <Glyph name="check" size={14} /> {t('add.save')}
-                    </button>
-                  </div>
-                </>
+                c.kind === 'occlusion' ? (
+                  <>
+                    <OcclusionEditor key={c.id} card={c} onBoxesChange={setOccBoxes} onImageChange={setOccImage} />
+                    <textarea
+                      className="card-editor-input card-editor-q"
+                      placeholder={t('add.editorQPlaceholder')}
+                      value={editDraft.q}
+                      onChange={e => setEditDraft(d => ({ ...d, q: e.target.value }))}
+                      rows={2}
+                    />
+                    <div className="src-card-edit-actions">
+                      <button className="quiet" onClick={() => setEditingId(null)}>{t('add.cancel')}</button>
+                      <button className="primary"
+                              disabled={!(occBoxes ? occBoxes.length : (c.boxes && c.boxes.length))}
+                              onClick={() => {
+                                // Patch q + masks + image; onSaveCard merges, so kind and
+                                // fullImage/cropBox are preserved by default. But if the user
+                                // re-cropped (occImage differs from the card's image), the saved
+                                // image is a new crop and cropBox would be stale — so drop both,
+                                // disabling "Use original" rather than mis-mapping it.
+                                const reCropped = !!(occImage && occImage !== c.image);
+                                onSaveCard(c.id, {
+                                  q: editDraft.q,
+                                  boxes: occBoxes || c.boxes,
+                                  image: occImage || c.image,
+                                  ...(reCropped ? { fullImage: undefined, cropBox: undefined } : {}),
+                                });
+                                setEditingId(null);
+                              }}>
+                        <Glyph name="check" size={14} /> {t('add.save')}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <CardEditor draft={editDraft} setDraft={setEditDraft} />
+                    <div className="src-card-edit-actions">
+                      <button className="quiet" onClick={() => setEditingId(null)}>{t('add.cancel')}</button>
+                      <button className="primary" onClick={saveEdit}>
+                        <Glyph name="check" size={14} /> {t('add.save')}
+                      </button>
+                    </div>
+                  </>
+                )
               ) : (
                 <>
                   <div className="src-card-body">
@@ -1705,7 +1747,15 @@ function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSav
                     <div className="src-card-q">
                       {c.kind === 'cloze' ? <Cloze text={c.q} revealed={true} /> : c.q}
                     </div>
-                    {c.a && <div className="src-card-a">{c.a}</div>}
+                    {c.kind === 'occlusion' && (
+                      <div className="src-card-occ">
+                        {c.image && <img className="src-card-thumb" src={c.image} alt="" />}
+                        <span className="src-card-occ-meta">
+                          {tp('occ.regionCount', (c.boxes || c.regions || []).length, { n: (c.boxes || c.regions || []).length })}
+                        </span>
+                      </div>
+                    )}
+                    {c.a && c.kind !== 'occlusion' && <div className="src-card-a">{c.a}</div>}
                   </div>
                   <div className="src-card-actions">
                     {isDeleting ? (
@@ -3748,6 +3798,11 @@ function App() {
                     : e.image ? {}
                     : (c.boxes && c.boxes.length ? { boxes: c.boxes } : (c.regions ? { regions: c.regions } : {}))),
                 ...((e.image || c.image) ? { image: e.image || c.image } : {}),  // prefer the cropped image
+                // Keep the full original + crop box so "Use original" works on the saved
+                // card too — but ONLY when it wasn't re-cropped here (a re-crop, e.image
+                // !== c.image, would leave cropBox describing the wrong region).
+                ...((c.fullImage && c.cropBox && (!e.image || e.image === c.image))
+                    ? { fullImage: c.fullImage, cropBox: c.cropBox } : {}),
               }
             : {}),
         };
