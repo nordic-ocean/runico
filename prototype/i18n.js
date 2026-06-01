@@ -248,7 +248,8 @@ const RUNICO_STRINGS = {
     "study.flipTerm": "Term",
     "study.flipDefinition": "Definition",
     "study.flipQuestion": "Question",
-    "study.flipAnswer": "Answer"
+    "study.flipAnswer": "Answer",
+    "add.occlusionCardPrompt": "Identify each labeled part."
   },
   "pt-BR": {
     "common.nav.settings": "Configurações",
@@ -494,7 +495,8 @@ const RUNICO_STRINGS = {
     "study.flipTerm": "Termo",
     "study.flipDefinition": "Definição",
     "study.flipQuestion": "Pergunta",
-    "study.flipAnswer": "Resposta"
+    "study.flipAnswer": "Resposta",
+    "add.occlusionCardPrompt": "Identifique cada parte rotulada."
   },
   "pt-PT": {
     "common.nav.settings": "Definições",
@@ -740,7 +742,8 @@ const RUNICO_STRINGS = {
     "study.flipTerm": "Termo",
     "study.flipDefinition": "Definição",
     "study.flipQuestion": "Pergunta",
-    "study.flipAnswer": "Resposta"
+    "study.flipAnswer": "Resposta",
+    "add.occlusionCardPrompt": "Identifique cada parte rotulada."
   },
   "es": {
     "common.nav.settings": "Ajustes",
@@ -986,7 +989,8 @@ const RUNICO_STRINGS = {
     "study.flipTerm": "Término",
     "study.flipDefinition": "Definición",
     "study.flipQuestion": "Pregunta",
-    "study.flipAnswer": "Respuesta"
+    "study.flipAnswer": "Respuesta",
+    "add.occlusionCardPrompt": "Identifica cada parte etiquetada."
   },
   "ru": {
     "common.nav.settings": "Настройки",
@@ -1232,7 +1236,8 @@ const RUNICO_STRINGS = {
     "study.flipTerm": "Термин",
     "study.flipDefinition": "Определение",
     "study.flipQuestion": "Вопрос",
-    "study.flipAnswer": "Ответ"
+    "study.flipAnswer": "Ответ",
+    "add.occlusionCardPrompt": "Определите каждую подписанную часть."
   },
   "it": {
     "common.nav.settings": "Impostazioni",
@@ -1478,7 +1483,8 @@ const RUNICO_STRINGS = {
     "study.flipTerm": "Termine",
     "study.flipDefinition": "Definizione",
     "study.flipQuestion": "Domanda",
-    "study.flipAnswer": "Risposta"
+    "study.flipAnswer": "Risposta",
+    "add.occlusionCardPrompt": "Identifica ogni parte etichettata."
   },
   "zh": {
     "common.nav.settings": "设置",
@@ -1724,7 +1730,8 @@ const RUNICO_STRINGS = {
     "study.flipTerm": "术语",
     "study.flipDefinition": "定义",
     "study.flipQuestion": "问题",
-    "study.flipAnswer": "答案"
+    "study.flipAnswer": "答案",
+    "add.occlusionCardPrompt": "识别每个标注的部分。"
   }
 };
 

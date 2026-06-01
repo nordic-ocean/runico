@@ -156,9 +156,9 @@ function parseGenCards(responseText) {
   const out = [];
   arr.forEach(c => {
     if (!c || typeof c !== 'object') return;
-    // Occlusion is never AI-generated: a model can read labels but can't place
-    // masks, and a page dump is the wrong thing to occlude anyway. Occlusion is a
-    // manual, draw-your-own-masks card kind.
+    // Occlusion never comes from this text array — it's built separately by a
+    // dedicated vision pass that crops the figure out of the image (see
+    // generateOcclusionCard). A model can't place masks from a JSON list.
     if (c.kind === 'occlusion') return;
     let kind = KINDS[c.kind] ? c.kind : 'qa';
     const q = prim(c.q), a = prim(c.a);
@@ -171,11 +171,13 @@ function parseGenCards(responseText) {
 }
 
 // Automatic transport: call OpenRouter with the user's key. Returns the raw
-// model text (to be run through parseGenCards). Throws a short code on failure.
-async function callOpenRouter({ apiKey, model, sourceText, imageDataUrl }) {
+// model text. With `prompt` it runs that exact prompt (used by the occlusion
+// pass); otherwise it builds the card-generation prompt. Throws a short code.
+async function callOpenRouter({ apiKey, model, sourceText, imageDataUrl, prompt }) {
+  const promptText = prompt || buildGenPrompt(sourceText);
   const content = imageDataUrl
-    ? [{ type: 'text', text: buildGenPrompt(sourceText) }, { type: 'image_url', image_url: { url: imageDataUrl } }]
-    : buildGenPrompt(sourceText);
+    ? [{ type: 'text', text: promptText }, { type: 'image_url', image_url: { url: imageDataUrl } }]
+    : promptText;
   let res;
   try {
     res = await fetch(OPENROUTER_URL, {
@@ -197,6 +199,109 @@ async function callOpenRouter({ apiKey, model, sourceText, imageDataUrl }) {
   let data;
   try { data = await res.json(); } catch (e) { throw new Error('http'); }
   return (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+}
+
+// ── Image occlusion (a dedicated vision pass) ────────────────
+// Occlusion can't be inferred from a JSON list of cards. Instead we ask the model
+// to (1) bound the single FIGURE in the image (a diagram/map/illustration — NOT
+// the page's body text) and (2) list the printed labels on it. We then CROP the
+// image to that figure client-side so only the figure remains (no surrounding
+// prose/answers), and place a mask over each label. The user fine-tunes the masks
+// in draft review on the clean, cropped figure.
+function buildOcclusionPrompt() {
+  return [
+    'You are shown an image that may be a textbook/document page containing a diagram, map, or labeled illustration.',
+    'Your job: locate the SINGLE main figure (the diagram/map/illustration itself) and the printed labels on it. Ignore body paragraphs, titles, and captions outside the figure.',
+    'Return ONLY JSON (no prose, no markdown, no code fences): {"figure":{"x":0.0,"y":0.0,"w":0.0,"h":0.0},"labels":[{"text":"...","x":0.0,"y":0.0,"w":0.0,"h":0.0}, ...]}',
+    'ALL coordinates are NORMALIZED fractions of the FULL image, range 0..1: x,y = top-left corner, w,h = width,height.',
+    '"figure" = a TIGHT box around just the figure (exclude the body text columns and the source caption).',
+    '"labels" = the words printed ON the figure that a student should be quizzed on (place names, part names, structures…). For each, give its text and a tight box around just that word, in FULL-image coordinates. Provide 3 to 10 labels.',
+    'If there is NO real figure/diagram (the page is only text), return {"figure":null,"labels":[]}.',
+  ].join('\n');
+}
+
+// Tolerant parse of the occlusion JSON. Accepts 0..1 or 0..100 coordinates.
+function parseOcclusionResult(responseText) {
+  if (!responseText) return null;
+  const t = String(responseText).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+  let obj = null;
+  try { obj = JSON.parse(t); } catch (e) {
+    const s = t.indexOf('{'), e2 = t.lastIndexOf('}');
+    if (s === -1 || e2 <= s) return null;
+    try { obj = JSON.parse(t.slice(s, e2 + 1)); } catch (e3) { return null; }
+  }
+  if (!obj || typeof obj !== 'object') return null;
+  const norm = (b) => {
+    if (!b || typeof b !== 'object') return null;
+    let x = +b.x, y = +b.y, w = +b.w, h = +b.h;
+    if (![x, y, w, h].every(n => Number.isFinite(n))) return null;
+    if (x > 1 || y > 1 || w > 1 || h > 1) { x /= 100; y /= 100; w /= 100; h /= 100; } // tolerate 0..100
+    if (w <= 0 || h <= 0) return null;
+    return { x, y, w, h };
+  };
+  const figure = norm(obj.figure);
+  const labels = (Array.isArray(obj.labels) ? obj.labels : []).map(l => {
+    const box = norm(l); if (!box) return null;
+    return { ...box, text: (typeof l.text === 'string' ? l.text.trim() : '') };
+  }).filter(Boolean);
+  return { figure, labels };
+}
+
+// Crop a data URL to a normalized box, returning a new (smaller) JPEG data URL.
+function cropImageToBox(dataUrl, fig) {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const W = img.width, H = img.height;
+          const sx = Math.max(0, Math.min(W - 1, fig.x * W));
+          const sy = Math.max(0, Math.min(H - 1, fig.y * H));
+          const sw = Math.max(1, Math.min(W - sx, fig.w * W));
+          const sh = Math.max(1, Math.min(H - sy, fig.h * H));
+          const cw = Math.round(sw), ch = Math.round(sh);
+          const canvas = document.createElement('canvas');
+          canvas.width = cw; canvas.height = ch;
+          canvas.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, cw, ch);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        } catch (e) { resolve(null); }
+      };
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    } catch (e) { resolve(null); }
+  });
+}
+
+// Re-map full-image label boxes into the cropped figure's percent coordinate space.
+function remapLabelsToCrop(labels, fig) {
+  const out = [];
+  labels.forEach((l, i) => {
+    let x = (l.x - fig.x) / fig.w, y = (l.y - fig.y) / fig.h;
+    let w = l.w / fig.w, h = l.h / fig.h;
+    if (x < -0.05 || y < -0.05 || x > 1.02 || y > 1.02) return; // label sits outside the figure
+    x = Math.max(0, Math.min(1, x)); y = Math.max(0, Math.min(1, y));
+    w = Math.max(0.02, Math.min(1 - x, w)); h = Math.max(0.02, Math.min(1 - y, h));
+    out.push({ id: 'b' + i, x: x * 100, y: y * 100, w: w * 100, h: h * 100, label: l.text || ('Region ' + (i + 1)) });
+  });
+  return out;
+}
+
+// Build ONE occlusion card from an image: find + crop the figure, mask its labels.
+// Best-effort — returns null (no card) on any failure or when there's no figure,
+// so it can never break or block the text-card generation.
+async function generateOcclusionCard({ apiKey, model, imageDataUrl }) {
+  if (!imageDataUrl) return null;
+  let text;
+  try { text = await callOpenRouter({ apiKey, model, imageDataUrl, prompt: buildOcclusionPrompt() }); }
+  catch (e) { return null; }
+  const data = parseOcclusionResult(text);
+  if (!data || !data.figure || !data.labels.length) return null;
+  const cropped = await cropImageToBox(imageDataUrl, data.figure);
+  if (!cropped) return null;
+  const boxes = remapLabelsToCrop(data.labels, data.figure);
+  if (!boxes.length) return null;
+  const q = (typeof t === 'function' ? t('add.occlusionCardPrompt') : '') || 'Identify each labeled part.';
+  return { id: genId('g'), kind: 'occlusion', q, a: null, boxes, image: cropped };
 }
 
 // Lightweight key check against OpenRouter's key endpoint.
@@ -2823,8 +2928,8 @@ function App() {
     // the unrelated seeded cell diagram. Surviving occlusion cards embed the image
     // on the card itself so the study/edit surface is self-contained.
     return cards
-      .filter(c => c.kind !== 'occlusion' || imageDataUrl)
-      .map(c => ({ ...c, sourceId: srcId, ...(c.kind === 'occlusion' && imageDataUrl ? { image: imageDataUrl } : {}) }));
+      .filter(c => c.kind !== 'occlusion' || c.image || imageDataUrl)
+      .map(c => ({ ...c, sourceId: srcId, ...(c.kind === 'occlusion' ? { image: c.image || imageDataUrl } : {}) }));
   }
   const [perfReturn, setPerfReturn] = useState('folder');
   const [tweaks, setTweaks] = usePersistentState('settings', TWEAK_DEFAULTS);
@@ -3088,6 +3193,15 @@ function App() {
     catch (e) { const c = e && e.message; throw new Error(['key', 'rate', 'network', 'http'].indexOf(c) >= 0 ? c : 'http'); }
     const cards = parseGenCards(text);
     if (!cards.length) throw new Error('empty');
+    // When a source image is attached, also try to build ONE image-occlusion card
+    // from the figure in it (best-effort; a failure here never affects the text
+    // cards already produced).
+    if (imageDataUrl) {
+      try {
+        const occ = await generateOcclusionCard({ apiKey, model: model || genModel, imageDataUrl });
+        if (occ) cards.push(occ);
+      } catch (e) { /* occlusion is optional */ }
+    }
     return cards;
   }
   function onGeneratedCards(cards, name, src) { storeDraftsAndReview(cards, src, name); }
