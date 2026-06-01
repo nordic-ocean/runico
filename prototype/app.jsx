@@ -2537,6 +2537,11 @@ function App() {
     });
     setTimeout(() => {
       setDraftCount(DRAFT_QUEUE.length);
+      // Reflect the freshly drafted (unreviewed) count on an existing target
+      // topic so its pending badge is factual. A brand-new source does not
+      // exist yet — its drafts appear once the source is created on approve.
+      setScopes(prev => prev.map(s =>
+        (s.id === addTargetScope && s.isLeaf) ? { ...s, pendingDrafts: DRAFT_QUEUE.length } : s));
       setScreen('processedNotice');
     }, 5200);
   }
