@@ -11,7 +11,7 @@ const { useState, useEffect, useMemo, useRef } = React;
 // restart, not just a reload. In the desktop build this same seam
 // is backed by the OS keychain / local save file (see the
 // add-electron-desktop-wrapper change).
-const STORE_PREFIX = 'runico:v2:';
+const STORE_PREFIX = 'runico:v3:';
 function usePersistentState(key, initial) {
   const [val, setVal] = useState(() => {
     try {
@@ -105,13 +105,13 @@ const DEFAULT_SCOPE = 'bio-cell-organelles';
 // Cards belonging to each leaf source — used by the Source Detail screen.
 const SOURCE_CARDS_SEED = {
   'bio-cell-organelles': [
-    { id: 'sc1', kind: 'cloze', q: 'The {{nucleus}} contains the cell’s genetic material.', a: 'nucleus' },
-    { id: 'sc2', kind: 'qa', q: 'Which organelle is the site of aerobic respiration?', a: 'Mitochondrion.' },
-    { id: 'sc3', kind: 'qa', q: 'What name is given to the infolded inner-membrane projections of a mitochondrion?', a: 'Cristae.' },
-    { id: 'sc4', kind: 'cloze', q: 'Rough ER is studded with {{ribosomes}}, giving it its name.', a: 'ribosomes' },
-    { id: 'sc5', kind: 'rev', q: 'Ribosome', a: 'Site of protein synthesis; assembles polypeptides from mRNA templates.' },
-    { id: 'sc6', kind: 'qa', q: 'What is the primary function of the Golgi apparatus?', a: 'Modifies, sorts, and packages proteins.' },
-    { id: 'sc7', kind: 'qa', q: 'Lysosomes contain hydrolytic enzymes that perform what general function?', a: 'Intracellular digestion — break down macromolecules, worn-out organelles, and engulfed material.' },
+    { id: 'sc1', kind: 'cloze', q: 'The {{nucleus}} contains the cell’s genetic material.', a: 'nucleus', region: 'nucleus' },
+    { id: 'sc2', kind: 'qa', q: 'Which organelle is the site of aerobic respiration?', a: 'Mitochondrion.', region: 'mitochondria' },
+    { id: 'sc3', kind: 'qa', q: 'What name is given to the infolded inner-membrane projections of a mitochondrion?', a: 'Cristae.', region: 'mitochondria' },
+    { id: 'sc4', kind: 'cloze', q: 'Rough ER is studded with {{ribosomes}}, giving it its name.', a: 'ribosomes', region: 'er' },
+    { id: 'sc5', kind: 'rev', q: 'Ribosome', a: 'Site of protein synthesis; assembles polypeptides from mRNA templates.', region: 'ribosome' },
+    { id: 'sc6', kind: 'qa', q: 'What is the primary function of the Golgi apparatus?', a: 'Modifies, sorts, and packages proteins.', region: 'golgi' },
+    { id: 'sc7', kind: 'qa', q: 'Lysosomes contain hydrolytic enzymes that perform what general function?', a: 'Intracellular digestion — break down macromolecules, worn-out organelles, and engulfed material.', region: 'lysosome' },
     { id: 'sc8', kind: 'occlusion', q: 'Identify each labeled region of the eukaryotic cell.', a: '6 regions · image occlusion', regions: ['nucleus', 'mitochondria', 'ribosome', 'golgi', 'er', 'lysosome'] },
   ],
   'bio-cell-photo': [
@@ -384,10 +384,12 @@ function cardPreviewText(c) {
   return c.q;
 }
 
-function QuickResume({ lastSession, scopes, onResume }) {
+function QuickResume({ lastSession, scopes, onResume, hasStudyCards }) {
   if (!lastSession) return null;
   const target = scopes.find(s => s.id === lastSession.scopeId);
   if (!target) return null;
+  // Don't offer resume if the topic has no cards left to study (would no-op).
+  if (hasStudyCards && !hasStudyCards(lastSession.scopeId)) return null;
 
   const remaining = Math.max(0, lastSession.total - lastSession.position);
   let label, sub, icon;
@@ -424,7 +426,7 @@ function FolderView({
   onEnterChild, onBack, onBegin,
   onCreateFolder, onAddSource,
   onRenameFolder, onDeleteFolder,
-  onOpenSource, onViewProgress,
+  onOpenSource, onViewProgress, hasStudyCards,
 }) {
   // ── Finder-style column view ─────────────────────────────────
   // The Single-folder view above was replaced by a multi-column
@@ -459,15 +461,17 @@ function FolderView({
     setEditingId(null);
   }
 
-  // Folder counts roll up from their descendant leaf sources, so adding or
-  // creating cards anywhere keeps ancestor totals current. Counts are
-  // factual totals — there is no spaced-repetition "due" schedule in v1.
+  // Card counts are the REAL number of cards (what study actually iterates),
+  // rolled up from descendant leaf sources. Factual totals — there is no
+  // spaced-repetition "due" schedule in v1.
   function descendantStats(id) {
+    const scope = scopes.find(s => s.id === id);
+    if (scope && scope.isLeaf) return { total: (sourceCards[id] || []).length };
     let total = 0;
     const stack = scopes.filter(s => s.parent === id);
     while (stack.length) {
       const s = stack.pop();
-      if (s.isLeaf) { total += s.total || 0; }
+      if (s.isLeaf) { total += (sourceCards[s.id] || []).length; }
       else stack.push(...scopes.filter(c => c.parent === s.id));
     }
     return { total };
@@ -488,7 +492,7 @@ function FolderView({
       <div className="columns-header">
         <div className="eyebrow">{t('browse.columnsHeaderDate', { weekday: TODAY.toLocaleDateString(getRunicoLocale(), { weekday: 'long' }), monthDay: TODAY.toLocaleDateString(getRunicoLocale(), { month: 'short', day: 'numeric' }) })}</div>
         <div className="columns-header-title">{t('browse.columnsHeaderTitle')}</div>
-        <QuickResume lastSession={lastSession} scopes={scopes} onResume={onResume} />
+        <QuickResume lastSession={lastSession} scopes={scopes} onResume={onResume} hasStudyCards={hasStudyCards} />
         {draftCount > 0 && (
           <button className="quiet" onClick={onReviewDrafts}
                   style={{ marginTop: 12 }}>
@@ -516,7 +520,7 @@ function FolderView({
                       </div>
                     );
                   })()}
-                  {descendantStats(parent.id).total > 0 && (
+                  {hasStudyCards(parent.id) && (
                     <button className="column-head-begin"
                             onClick={() => onBegin(parent.id)}>
                       {t('browse.practiceAll')} <Glyph name="arrow" size={12} />
@@ -535,7 +539,7 @@ function FolderView({
                       </div>
                     );
                   })()}
-                  {descendantStats('all').total > 0 && (
+                  {hasStudyCards('all') && (
                     <button className="column-head-begin"
                             onClick={() => onBegin('all')}>
                       {t('browse.practiceAll')} <Glyph name="arrow" size={12} />
@@ -582,9 +586,10 @@ function FolderView({
                               <Glyph name="spark" size={10} /> {c.pendingDrafts}
                             </span>
                           )}
-                          {(isLeaf ? c.total : descendantStats(c.id).total) > 0 && (
-                            <span className="column-item-due">{isLeaf ? c.total : descendantStats(c.id).total}</span>
-                          )}
+                          {(() => {
+                            const n = isLeaf ? (sourceCards[c.id] || []).length : descendantStats(c.id).total;
+                            return n > 0 && <span className="column-item-due">{n}</span>;
+                          })()}
                           {!isLeaf && (
                             <Glyph name="caret"
                                    size={11}
@@ -672,6 +677,7 @@ function FolderView({
             scope={selectedScope}
             cards={sourceCards[selectedScope.id] || []}
             history={(history || {})[selectedScope.id]}
+            hasCards={hasStudyCards(selectedScope.id)}
             onBegin={() => onBegin(selectedScope.id)}
             onOpen={() => onOpenSource(selectedScope.id)}
             onEdit={() => startRename(selectedScope)}
@@ -730,7 +736,7 @@ function ActionTrend({ history }) {
 }
 
 function ActionCard({
-  scope, cards = [], history, onBegin, onOpen, onEdit, onDelete, onAddFromFile, onReviewDrafts, onViewProgress,
+  scope, cards = [], history, hasCards, onBegin, onOpen, onEdit, onDelete, onAddFromFile, onReviewDrafts, onViewProgress,
   isPendingDelete, onConfirmDelete, onCancelDelete, askDelete,
   renaming, editName, setEditName, finishRename,
 }) {
@@ -753,7 +759,7 @@ function ActionCard({
         <div className="action-card-name">{scope.label}</div>
       )}
       <div className="action-card-meta">
-        {tp('browse.cardCount', scope.total, { n: scope.total })}
+        {tp('browse.cardCount', cards.length, { n: cards.length })}
         {scope.last !== 'never' && t('browse.lastStudied', { last: scope.last })}
       </div>
 
@@ -773,7 +779,7 @@ function ActionCard({
         )}
         <button className="primary action-card-primary"
                 onClick={onBegin}
-                disabled={scope.total === 0 || scope.pendingDrafts > 0}>
+                disabled={!hasCards || scope.pendingDrafts > 0}>
           <Glyph name="arrow" size={14} /> {scope.paused ? t('browse.continuePractice') : t('browse.beginPractice')}
         </button>
         {scope.pendingDrafts > 0 && (
@@ -1131,7 +1137,7 @@ function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSav
     setAddingNew(false);
   }
 
-  const cardCount = scope.total;
+  const cardCount = cards.length;
 
   // Build the full path: ancestors → this source
   const crumbs = [];
@@ -1640,14 +1646,20 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
 
   // Occlusion mode
   if (card.kind === 'occlusion') {
-    const regions = card.regions;
+    // Unified region geometry: drawn boxes (already percent) or seed region
+    // keys resolved through REGIONS (px → percent). Both yield {x,y,w,h,label}.
+    const items = (card.boxes && card.boxes.length)
+      ? card.boxes
+      : (card.regions || []).map(rid => {
+          const r = REGIONS[rid] || { x: 0, y: 0, w: 0, h: 0, label: rid };
+          return { x: (r.x / 600) * 100, y: (r.y / 400) * 100, w: (r.w / 600) * 100, h: (r.h / 400) * 100, label: r.label };
+        });
     const step = occState?.step || 0;
-    const done = step >= regions.length;
-    const currentRid = regions[step];
+    const done = step >= items.length;
     return (
       <div className="stage-inner wide">
         <div className="progress-dots">
-          {regions.map((_, i) => {
+          {items.map((_, i) => {
             const mark = occState?.marks[i];
             return <div key={i} className={`progress-dot ${
               i === step && !done ? 'is-current' :
@@ -1659,23 +1671,22 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
 
         <div className="figure-wrap" style={{ aspectRatio: '600 / 400' }}>
           <CellFigure />
-          {regions.map((rid, i) => {
-            const r = REGIONS[rid];
+          {items.map((it, i) => {
             const isCurrent = i === step && !done;
             const past = i < step;
             const mark = occState?.marks[i];
             return (
-              <div key={rid}
+              <div key={i}
                    className={`occ-region ${
                      isCurrent ? (revealed ? 'is-revealed is-current-revealed' : 'is-current') :
                      past ? (mark === 'right' ? 'is-revealed is-right' : 'is-revealed is-wrong') :
                      done ? 'is-revealed' : ''
                    }`}
                    style={{
-                     left:   `${(r.x / 600) * 100}%`,
-                     top:    `${(r.y / 400) * 100}%`,
-                     width:  `${(r.w / 600) * 100}%`,
-                     height: `${(r.h / 400) * 100}%`,
+                     left:   `${it.x}%`,
+                     top:    `${it.y}%`,
+                     width:  `${it.w}%`,
+                     height: `${it.h}%`,
                    }} />
             );
           })}
@@ -1685,7 +1696,7 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
           <div style={{ marginTop: 36, textAlign: 'center' }}>
             <div className="lede center" style={{ marginBottom: 24 }}>
               {revealed
-                ? <span style={{ color: '#0076B4', fontWeight: 500 }}>{REGIONS[currentRid].label}</span>
+                ? <span style={{ color: '#0076B4', fontWeight: 500 }}>{items[step] ? items[step].label : ''}</span>
                 : <span style={{ color: '#9BA5B3' }}>{t('study.occlusionPrompt')}</span>}
             </div>
 
@@ -1712,10 +1723,10 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
         {done && (
           <div style={{ marginTop: 36 }}>
             <div className="eyebrow">
-              {t('study.occlusionScore', { correct: occState.marks.filter(m => m === 'right').length, total: regions.length })}
-              {' · '}{occState.marks.every(m => m === 'right') ? t('study.resultGotIt') : t('study.resultMissed')}
+              {t('study.occlusionScore', { correct: occState.marks.filter(m => m === 'right').length, total: items.length })}
+              {' · '}{items.length > 0 && occState.marks.every(m => m === 'right') ? t('study.resultGotIt') : t('study.resultMissed')}
             </div>
-            <GradeRow continueLabel={t('study.done')} onContinue={() => onGrade(occState.marks.every(m => m === 'right') ? 'good' : 'miss')} onPause={onExit} />
+            <GradeRow continueLabel={t('study.done')} onContinue={() => onGrade(items.length > 0 && occState.marks.every(m => m === 'right') ? 'good' : 'miss')} onPause={onExit} />
           </div>
         )}
       </div>
@@ -1749,9 +1760,9 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
           <RecallChoice onMissed={() => onGrade('miss')} onGotIt={() => onGrade('good')} onPause={onExit} />
           <div className="card-foot-row">
             <div className="card-meta">
-              <button onClick={onShowSource}><Glyph name="book" size={13} /> {t('study.source')}</button>
-              <span className="dot" />
-              <span>{card.sourceLabel}</span>
+              {card.region && <button onClick={onShowSource}><Glyph name="book" size={13} /> {t('study.source')}</button>}
+              {card.region && card.sourceLabel && <span className="dot" />}
+              {card.sourceLabel && <span>{card.sourceLabel}</span>}
             </div>
             <div className="card-meta">
               <span>{t('study.footHintEnter')}</span>
@@ -1987,7 +1998,7 @@ function ProcessingScreen({ phase, onDone }) {
   );
 }
 
-function OcclusionEditor({ card }) {
+function OcclusionEditor({ card, onBoxesChange }) {
   const wrapRef = useRef(null);
   const [boxes, setBoxes] = useState(() =>
     (card.regions || []).map((rid, i) => {
@@ -2002,6 +2013,9 @@ function OcclusionEditor({ card }) {
   );
   const [selId, setSelId] = useState(null);
   const drag = useRef(null);
+
+  // Surface the current boxes to the parent so a kept card stores them.
+  useEffect(() => { if (onBoxesChange) onBoxesChange(boxes); }, [boxes]);
 
   function getPct(e) {
     const rect = wrapRef.current.getBoundingClientRect();
@@ -2105,6 +2119,7 @@ function ReviewDraftsScreen({ onApprove, onCancel, onShowSource }) {
   const [idx, setIdx] = useState(0);
   const [decisions, setDecisions] = useState({}); // id -> 'keep' | 'skip'
   const [edits, setEdits] = useState({}); // id -> { q, a } for edited drafts
+  const [occBoxes, setOccBoxes] = useState(null); // live boxes for the current occlusion draft
   const [revealed, setRevealed] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editQ, setEditQ] = useState('');
@@ -2112,6 +2127,8 @@ function ReviewDraftsScreen({ onApprove, onCancel, onShowSource }) {
 
   const card = DRAFT_QUEUE[idx];
 
+  // Note: occBoxes is re-seeded by the remounted OcclusionEditor (key={card.id})
+  // via its onBoxesChange mount effect; resetting it here would race and clobber it.
   useEffect(() => { setRevealed(false); setEditing(false); }, [idx]);
 
   function decide(d, edit) {
@@ -2131,14 +2148,14 @@ function ReviewDraftsScreen({ onApprove, onCancel, onShowSource }) {
       <div className="stage-inner wide">
         <div className="eyebrow">{t('add.reviewCardCounter', { idx: idx + 1, total: DRAFT_QUEUE.length })}<span className="dot" />{t('add.reviewOcclusionTag')}</div>
 
-        <OcclusionEditor key={card.id} card={card} />
+        <OcclusionEditor key={card.id} card={card} onBoxesChange={setOccBoxes} />
 
         <div className="card-question smaller">{card.q}</div>
 
         <div className="card-foot">
           <div className="row">
             <button className="quiet" onClick={() => decide('skip')}>{t('add.reviewRemove')}</button>
-            <button className="primary" onClick={() => decide('keep')}>{t('add.reviewKeep')} <Glyph name="check" size={14} /></button>
+            <button className="primary" onClick={() => decide('keep', occBoxes ? { boxes: occBoxes } : undefined)}>{t('add.reviewKeep')} <Glyph name="check" size={14} /></button>
           </div>
         </div>
       </div>
@@ -2391,21 +2408,56 @@ function App() {
   // demo data and then durably persisted. Real sessions append a sitting on finish.
   const [history, setHistory] = usePersistentState('history', () => REVIEW_HISTORY);
   // Accumulates the current sitting's results; "Got it" = pass, "Missed" = miss.
-  const [sitting, setSitting] = useState({ reviewed: 0, passed: 0 });
+  // `cards` holds per-card {id, passed} so per-card history can be recorded.
+  const [sitting, setSitting] = useState({ reviewed: 0, passed: 0, cards: [] });
+  // The cards being studied this session (the chosen scope's real cards).
+  const [deck, setDeck] = useState([]);
 
-  // Append a finished sitting to the scope's history so the per-session
-  // accuracy trend reflects real study. Records session-level reviewed/passed
-  // only; per-card pass/miss (cardHist) stays demo-seeded because study runs
-  // the shared demo deck rather than the scope's own cards — wiring study to
-  // each scope's real cards (and recording per-card) is future work.
-  function recordSitting(scopeId, reviewed, passed) {
+  // Append a finished sitting to the scope's history (session-level accuracy
+  // and per-card pass/miss) so both the trend and the per-card drill-down
+  // reflect real study and survive a restart.
+  function recordSitting(scopeId, reviewed, passed, cards) {
     if (reviewed <= 0) return;
     setHistory(prev => {
       const h = prev[scopeId] || { sessions: [], cardHist: {} };
-      const session = { id: scopeId + '-live-' + Date.now(), ts: Date.now(), reviewed, passed };
-      return { ...prev, [scopeId]: { ...h, sessions: [...(h.sessions || []), session] } };
+      const ts = Date.now();
+      const sid = 'live-' + ts;
+      const session = { id: scopeId + '-' + sid, ts, reviewed, passed };
+      const cardHist = { ...(h.cardHist || {}) };
+      for (const c of (cards || [])) {
+        cardHist[c.id] = [...(cardHist[c.id] || []), { ts, passed: c.passed, sid }];
+      }
+      return { ...prev, [scopeId]: { ...h, sessions: [...(h.sessions || []), session], cardHist } };
     });
   }
+
+  // Build the deck of real cards to study for a scope: a leaf's own cards, or
+  // (for a folder) all cards under its descendant leaves. Each card is tagged
+  // with its owning topic's label for the study footer. v1 has no SRS, so the
+  // deck is simply every card in the chosen scope.
+  function scopeLabelFor(id) {
+    const s = scopes.find(x => x.id === id);
+    return (s && (scopeLabelOverrides[id] || s.label)) || '';
+  }
+  function deckFor(scopeId) {
+    const s = scopes.find(x => x.id === scopeId);
+    if (!s) return [];
+    if (s.isLeaf) {
+      return (sourceCards[scopeId] || []).map(c => ({ ...c, sourceLabel: scopeLabelFor(scopeId) }));
+    }
+    const out = [];
+    const stack = scopes.filter(x => x.parent === scopeId);
+    while (stack.length) {
+      const x = stack.pop();
+      if (x.isLeaf) {
+        for (const c of (sourceCards[x.id] || [])) out.push({ ...c, sourceLabel: scopeLabelFor(x.id) });
+      } else {
+        stack.push(...scopes.filter(y => y.parent === x.id));
+      }
+    }
+    return out;
+  }
+  function hasStudyCards(scopeId) { return deckFor(scopeId).length > 0; }
 
   const scope = scopes.find(s => s.id === scopeId) || scopes[0];
   const scopeLabel = scopeLabelOverrides[scope.id] || scope.label;
@@ -2471,21 +2523,24 @@ function App() {
   }
 
   function onGrade(g) {
+    const card = deck[cardIdx];
     const next = cardIdx + 1;
-    const total = QUEUE.length;
+    const total = deck.length || 1;
+    const isPass = g === 'good';
     const reviewed = sitting.reviewed + 1;
-    const passed = sitting.passed + (g === 'good' ? 1 : 0);
+    const passed = sitting.passed + (isPass ? 1 : 0);
+    const cards = card ? [...sitting.cards, { id: card.id, passed: isPass }] : sitting.cards;
     // End the session when the deck runs out, recording the sitting.
-    if (next >= QUEUE.length) {
-      // Only leaf topics keep history/progress; Practice-all on a folder
-      // studies the demo deck but does not record a folder-level sitting.
-      if (scope.isLeaf) recordSitting(scope.id, reviewed, passed);
-      setSitting({ reviewed: 0, passed: 0 });
+    if (next >= deck.length) {
+      // Only leaf topics keep per-topic history; Practice-all on a folder spans
+      // multiple topics and does not record a single folder-level sitting.
+      if (scope.isLeaf) recordSitting(scope.id, reviewed, passed, cards);
+      setSitting({ reviewed: 0, passed: 0, cards: [] });
       setLastSession({ scopeId: scope.id, status: 'finished', position: total, total });
       setCardIdx(0);
       setScreen('done');
     } else {
-      setSitting({ reviewed, passed });
+      setSitting({ reviewed, passed, cards });
       setLastSession({ scopeId: scope.id, status: 'paused', position: next, total });
       setCardIdx(next);
     }
@@ -2493,7 +2548,7 @@ function App() {
 
   // Leaving study mid-session = pause. Remembers where we stopped.
   function pauseSession() {
-    const total = QUEUE.length;
+    const total = deck.length || 0;
     setLastSession({
       scopeId: scope.id,
       status: cardIdx > 0 ? 'paused' : 'open',
@@ -2503,20 +2558,22 @@ function App() {
     setScreen('folder');
   }
 
-  // Quick-resume action: jump back into the last practice.
+  // Quick-resume action: jump back into the last practice with its real deck.
   function resumeLastSession() {
     if (!lastSession) return;
     const target = scopes.find(s => s.id === lastSession.scopeId);
     if (!target) return;
+    const d = deckFor(lastSession.scopeId);
+    if (!d.length) return; // nothing left to study (cards were removed)
     setScopeId(lastSession.scopeId);
+    setDeck(d);
     if (lastSession.status === 'finished') {
-      const total = QUEUE.length;
       setCardIdx(0);
-      setLastSession({ scopeId: target.id, status: 'open', position: 0, total });
+      setLastSession({ scopeId: target.id, status: 'open', position: 0, total: d.length });
     } else {
-      setCardIdx(lastSession.position);
+      setCardIdx(Math.min(lastSession.position, d.length - 1));
     }
-    setSitting({ reviewed: 0, passed: 0 });
+    setSitting({ reviewed: 0, passed: 0, cards: [] });
     setScreen('study');
   }
 
@@ -2567,7 +2624,9 @@ function App() {
           kind,
           q,
           a,
-          ...(c.regions ? { regions: c.regions } : {}),
+          ...(c.kind === 'occlusion'
+            ? (e.boxes && e.boxes.length ? { boxes: e.boxes } : (c.regions ? { regions: c.regions } : {}))
+            : {}),
         };
       });
     const kept = keptCards.length;
@@ -2609,8 +2668,8 @@ function App() {
     setScreen('approved');
   }
 
-  // Compose currently visible source region (for overlay)
-  const currentCard = QUEUE[cardIdx];
+  // The card currently being studied (from the active real-cards deck).
+  const currentCard = deck[cardIdx];
 
   // Inline size scaling via CSS variable (small/normal/large)
   const sizeMul = tweaks.size === 'small' ? 0.9 : tweaks.size === 'large' ? 1.12 : 1;
@@ -2653,21 +2712,24 @@ function App() {
             onResume={resumeLastSession}
             sourceCards={sourceCards}
             history={history}
+            hasStudyCards={hasStudyCards}
             onEnterChild={(id) => { setScopeId(id); setCardIdx(0); }}
             onBack={(parentId) => { setScopeId(parentId); setCardIdx(0); }}
             onBegin={(targetId) => {
+              const d = deckFor(targetId);
+              if (!d.length) return;
               const target = scopes.find(s => s.id === targetId);
-              const startIdx = target && target.paused ? target.paused.at - 1 : 0;
-              const total = QUEUE.length;
+              const startIdx = (target && target.paused && target.paused.at - 1 < d.length) ? target.paused.at - 1 : 0;
               setScopeId(targetId);
+              setDeck(d);
               setCardIdx(startIdx);
               setLastSession({
                 scopeId: targetId,
                 status: startIdx > 0 ? 'paused' : 'open',
                 position: startIdx,
-                total,
+                total: d.length,
               });
-              setSitting({ reviewed: 0, passed: 0 });
+              setSitting({ reviewed: 0, passed: 0, cards: [] });
               setScreen('study');
             }}
             onCreateFolder={createFolder}
@@ -2705,10 +2767,12 @@ function App() {
             onAddFromFile={() => { setAddTargetScope(scope.id); setScreen('add'); }}
             onViewProgress={() => { setPerfReturn('source'); setScreen('performance'); }}
             onBegin={() => {
-              const total = QUEUE.length;
+              const d = deckFor(scope.id);
+              if (!d.length) return;
+              setDeck(d);
               setCardIdx(0);
-              setLastSession({ scopeId: scope.id, status: 'open', position: 0, total });
-              setSitting({ reviewed: 0, passed: 0 });
+              setLastSession({ scopeId: scope.id, status: 'open', position: 0, total: d.length });
+              setSitting({ reviewed: 0, passed: 0, cards: [] });
               setScreen('study');
             }}
             onBack={(id) => {
@@ -2734,7 +2798,7 @@ function App() {
           <StudyScreen
             card={currentCard}
             idx={cardIdx}
-            total={QUEUE.length}
+            total={deck.length}
             onGrade={onGrade}
             onExit={pauseSession}
             onShowSource={() => setOverlayRegion(currentCard.region || null)}

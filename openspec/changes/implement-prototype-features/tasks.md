@@ -11,10 +11,17 @@
      t()/tp() call sites across all components; reactivity traps handled. Translation
      data validated (placeholder parity, no entities, {{ }} preserved); migration
      adversarially verified. Translations are machine-generated — flag for native review.
-     Still deferred to Batch B: file-drop intake (6.1), factual pending-draft counts
-     (6.5), occlusion box→card production (7.4/7.5), and source-view generalization
-     (8.x) — the source overlay is still canned demo content, so its two chrome
-     strings ("From this source", "Highlighted:") are intentionally left until 8.x. -->
+     Batch B3+ (done): file-drop intake (6.1), factual pending-draft counts (6.5),
+     source overlay chrome localized + review highlight, and study-on-real-cards —
+     study now iterates each topic's real cards, records real per-card pass/miss
+     history, and the occlusion editor's drawn boxes flow into the produced card
+     (7.4/7.5). Begin/Practice-all are gated on real card availability; counts are
+     real. Note: only 3 topics have seeded cards, so the other ~7 are intentionally
+     non-practiceable until real content exists; a resumed (paused) session records
+     only its resumed portion (a sitting = one continuous run).
+     Still open: source-view full generalization (8.1/8.2/8.4 — content-limited; the
+     overlay is one canned page) and the manual in-browser pass (10.1/10.2 — the app
+     is browser-only JSX-via-Babel; verified here by esbuild + adversarial review). -->
 
 ## 1. Library model
 
@@ -77,8 +84,8 @@
 - [x] 7.1 Implement the editing surface over a figure: drag to draw a mask box
 - [x] 7.2 Implement move (drag), resize (corner handle), and remove (× control)
 - [x] 7.3 Show the interaction hint and a live region count
-- [ ] 7.4 Produce one occlusion card per kept box (hiding that region's label)
-- [ ] 7.5 Verify draw/move/resize/remove and card generation
+- [x] 7.4 Produce one occlusion card per kept box (hiding that region's label)
+- [x] 7.5 Verify draw/move/resize/remove and card generation
 
 ## 8. Source view
 
