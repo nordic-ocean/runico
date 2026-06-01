@@ -243,7 +243,8 @@ const RUNICO_STRINGS = {
     "add.fileRemoveTitle": "Remove file",
     "add.generating": "Generating cards…",
     "source.fromThisSource": "From this source",
-    "source.highlighted": "Highlighted: {label}."
+    "source.highlighted": "Highlighted: {label}.",
+    "source.unavailable": "The source for this card isn’t available."
   },
   "pt-BR": {
     "common.nav.settings": "Configurações",
@@ -484,7 +485,8 @@ const RUNICO_STRINGS = {
     "add.fileRemoveTitle": "Remover arquivo",
     "add.generating": "Gerando cartões…",
     "source.fromThisSource": "Desta fonte",
-    "source.highlighted": "Destacado: {label}."
+    "source.highlighted": "Destacado: {label}.",
+    "source.unavailable": "A fonte deste cartão não está disponível."
   },
   "pt-PT": {
     "common.nav.settings": "Definições",
@@ -725,7 +727,8 @@ const RUNICO_STRINGS = {
     "add.fileRemoveTitle": "Remover ficheiro",
     "add.generating": "A gerar cartões…",
     "source.fromThisSource": "Desta fonte",
-    "source.highlighted": "Destacado: {label}."
+    "source.highlighted": "Destacado: {label}.",
+    "source.unavailable": "A fonte deste cartão não está disponível."
   },
   "es": {
     "common.nav.settings": "Ajustes",
@@ -966,7 +969,8 @@ const RUNICO_STRINGS = {
     "add.fileRemoveTitle": "Quitar archivo",
     "add.generating": "Generando tarjetas…",
     "source.fromThisSource": "De esta fuente",
-    "source.highlighted": "Destacado: {label}."
+    "source.highlighted": "Destacado: {label}.",
+    "source.unavailable": "La fuente de esta tarjeta no está disponible."
   },
   "ru": {
     "common.nav.settings": "Настройки",
@@ -1207,7 +1211,8 @@ const RUNICO_STRINGS = {
     "add.fileRemoveTitle": "Удалить файл",
     "add.generating": "Создание карточек…",
     "source.fromThisSource": "Из этого источника",
-    "source.highlighted": "Выделено: {label}."
+    "source.highlighted": "Выделено: {label}.",
+    "source.unavailable": "Источник для этой карточки недоступен."
   },
   "it": {
     "common.nav.settings": "Impostazioni",
@@ -1448,7 +1453,8 @@ const RUNICO_STRINGS = {
     "add.fileRemoveTitle": "Rimuovi file",
     "add.generating": "Generazione carte…",
     "source.fromThisSource": "Da questa fonte",
-    "source.highlighted": "Evidenziato: {label}."
+    "source.highlighted": "Evidenziato: {label}.",
+    "source.unavailable": "La fonte di questa carta non è disponibile."
   },
   "zh": {
     "common.nav.settings": "设置",
@@ -1689,7 +1695,8 @@ const RUNICO_STRINGS = {
     "add.fileRemoveTitle": "移除文件",
     "add.generating": "正在生成卡片…",
     "source.fromThisSource": "来自此来源",
-    "source.highlighted": "高亮：{label}。"
+    "source.highlighted": "高亮：{label}。",
+    "source.unavailable": "此卡片的来源不可用。"
   }
 };
 

@@ -87,22 +87,33 @@ const DRAFT_QUEUE = [
 // user's key, or the user running the same prompt in their own AI chat and
 // pasting the result back. The manual transport needs no key and no network.
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const DEFAULT_GEN_MODEL = 'google/gemini-3-flash-preview';
+const DEFAULT_GEN_MODEL = 'google/gemini-3.5-flash';
+// Curated OpenRouter models, cheap → powerful. `in`/`out` are USD per 1M tokens
+// (indicative — OpenRouter is the source of truth). `vision` = accepts images.
 const GEN_MODELS = [
-  { id: 'google/gemini-3-flash-preview', label: 'Gemini 3 Flash' },
-  { id: 'deepseek/deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
+  { id: 'deepseek/deepseek-v4-flash',   label: 'DeepSeek V4 Flash',     vision: false, in: 0.10, out: 0.20 },
+  { id: 'qwen/qwen3.5-35b-a3b',         label: 'Qwen 3.5 35B',          vision: true,  in: 0.14, out: 1.00 },
+  { id: 'google/gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite', vision: true,  in: 0.25, out: 1.50 },
+  { id: 'openai/gpt-5.4-mini',          label: 'GPT-5.4 Mini',          vision: true,  in: 0.75, out: 4.50 },
+  { id: 'mistralai/mistral-medium-3.5', label: 'Mistral Medium 3.5',    vision: true,  in: 1.50, out: 7.50 },
+  { id: 'google/gemini-3.5-flash',      label: 'Gemini 3.5 Flash',      vision: true,  in: 1.50, out: 9.00 },
+  { id: 'openai/gpt-5.4',               label: 'GPT-5.4 · flagship',    vision: true,  in: 2.50, out: 15.00 },
 ];
+function modelById(id) { return GEN_MODELS.find(m => m.id === id); }
+function modelPrice(m) { return m ? ('$' + m.in.toFixed(2) + ' / $' + m.out.toFixed(2) + ' per 1M') : ''; }
 
 function buildGenPrompt(sourceText) {
   return [
-    'You are creating study flashcards from the source material below.',
-    'Return ONLY a JSON array (no prose, no markdown, no code fences) of 4 to 10 cards.',
-    'Each card is an object {"kind","q","a"} where kind is one of:',
-    '- "qa": a question (q) and its answer (a).',
-    '- "cloze": q is a sentence with the hidden term wrapped in {{double braces}}; a is that term.',
-    '- "rev": q is a term, a is its definition (reversible).',
-    'Keep q and a concise and self-contained.',
-    'Example: [{"kind":"qa","q":"Which organelle makes ATP?","a":"The mitochondrion."},{"kind":"cloze","q":"The {{nucleus}} holds the cell\'s DNA.","a":"nucleus"}]',
+    'You are an expert tutor creating high-quality study flashcards from the source material below.',
+    'Cover the material thoroughly: capture every important fact, name, date, definition, cause-and-effect, and relationship — not just the headline idea. Aim for 8–15 cards (more for richer sources).',
+    'Write specific, self-contained questions that test real understanding and recall. Each card must stand on its own (never "according to the text"). Avoid trivial, yes/no, or vague questions, and do not duplicate cards.',
+    'Match the language of the source material.',
+    'Return ONLY a JSON array (no prose, no markdown, no code fences). Each card is an object {"kind","q","a"} where kind is one of:',
+    '- "qa": a precise question (q) with a complete answer (a).',
+    '- "cloze": q is a full sentence with the single key term hidden as {{term}}; a is that term.',
+    '- "rev": q is a key term, a is its definition (for reversible study).',
+    'Pick the kind that best fits each fact, and use a mix.',
+    'Example: [{"kind":"qa","q":"Which European powers seized Caribbean islands from Spain in the 17th century?","a":"The English, Dutch, and French."},{"kind":"cloze","q":"The English captured the island of {{Jamaica}} from Spain.","a":"Jamaica"}]',
     '',
     'SOURCE MATERIAL:',
     sourceText && sourceText.trim() ? sourceText.trim() : '(see the attached image)',
@@ -186,7 +197,7 @@ const SCOPES = [
   { id: 'all',       label: 'Everything',                    parent: null,         depth: 0, due: 29, total: 318, last: 'today', isLeaf: false },
   { id: 'bio',       label: 'Biology',                       parent: 'all',        depth: 1, due: 19, total: 184, last: 'today', isLeaf: false },
   { id: 'bio-cell',  label: 'Cell Biology',                  parent: 'bio',        depth: 2, due: 11, total: 64,  last: 'today', isLeaf: false },
-  { id: 'bio-cell-organelles', label: 'Organelles · Ch. 4',  parent: 'bio-cell',   depth: 3, due: 4,  total: 18,  last: '7d ago', isLeaf: true, pendingDrafts: 6 },
+  { id: 'bio-cell-organelles', label: 'Organelles · Ch. 4',  parent: 'bio-cell',   depth: 3, due: 4,  total: 18,  last: '7d ago', isLeaf: true },
   { id: 'bio-cell-membrane',   label: 'Membrane transport',  parent: 'bio-cell',   depth: 3, due: 3,  total: 12,  last: '3d ago', isLeaf: true },
   { id: 'bio-cell-mitosis',    label: 'Mitosis · five phases', parent: 'bio-cell', depth: 3, due: 0,  total: 0,   last: 'never', isLeaf: true },
   { id: 'bio-cell-photo',      label: 'Photosynthesis',      parent: 'bio-cell',   depth: 3, due: 4,  total: 22,  last: '9d ago', isLeaf: true, paused: { at: 2, remaining: 3 } },
@@ -524,7 +535,7 @@ function FolderView({
   onEnterChild, onBack, onBegin,
   onCreateFolder, onAddSource,
   onRenameFolder, onDeleteFolder,
-  onOpenSource, onViewProgress, hasStudyCards,
+  onOpenSource, onViewProgress, hasStudyCards, pendingDrafts,
 }) {
   // ── Finder-style column view ─────────────────────────────────
   // The Single-folder view above was replaced by a multi-column
@@ -679,11 +690,14 @@ function FolderView({
                             <Glyph name={isLeaf ? 'spark' : 'folders'} size={13} />
                           </span>
                           <span className="column-item-name">{c.label}</span>
-                          {c.pendingDrafts > 0 && (
-                            <span className="column-item-pending" title={tp('browse.pendingDraftsTitle', c.pendingDrafts, { n: c.pendingDrafts })}>
-                              <Glyph name="spark" size={10} /> {c.pendingDrafts}
-                            </span>
-                          )}
+                          {(() => {
+                            const pc = (pendingDrafts[c.id] || []).length;
+                            return pc > 0 && (
+                              <span className="column-item-pending" title={tp('browse.pendingDraftsTitle', pc, { n: pc })}>
+                                <Glyph name="spark" size={10} /> {pc}
+                              </span>
+                            );
+                          })()}
                           {(() => {
                             const n = isLeaf ? (sourceCards[c.id] || []).length : descendantStats(c.id).total;
                             return n > 0 && <span className="column-item-due">{n}</span>;
@@ -776,6 +790,7 @@ function FolderView({
             cards={sourceCards[selectedScope.id] || []}
             history={(history || {})[selectedScope.id]}
             hasCards={hasStudyCards(selectedScope.id)}
+            pendingCount={(pendingDrafts[selectedScope.id] || []).length}
             onBegin={() => onBegin(selectedScope.id)}
             onOpen={() => onOpenSource(selectedScope.id)}
             onEdit={() => startRename(selectedScope)}
@@ -834,7 +849,7 @@ function ActionTrend({ history }) {
 }
 
 function ActionCard({
-  scope, cards = [], history, hasCards, onBegin, onOpen, onEdit, onDelete, onAddFromFile, onReviewDrafts, onViewProgress,
+  scope, cards = [], history, hasCards, pendingCount = 0, onBegin, onOpen, onEdit, onDelete, onAddFromFile, onReviewDrafts, onViewProgress,
   isPendingDelete, onConfirmDelete, onCancelDelete, askDelete,
   renaming, editName, setEditName, finishRename,
 }) {
@@ -869,20 +884,20 @@ function ActionCard({
       )}
 
       <div className="action-card-actions">
-        {scope.pendingDrafts > 0 && (
+        {pendingCount > 0 && (
           <button className="action-card-btn action-card-pending"
                   onClick={onReviewDrafts}>
-            <Glyph name="spark" size={13} /> {tp('browse.reviewNewCards', scope.pendingDrafts, { count: scope.pendingDrafts })}
+            <Glyph name="spark" size={13} /> {tp('browse.reviewNewCards', pendingCount, { count: pendingCount })}
           </button>
         )}
         <button className="primary action-card-primary"
                 onClick={onBegin}
-                disabled={!hasCards || scope.pendingDrafts > 0}>
+                disabled={!hasCards || pendingCount > 0}>
           <Glyph name="arrow" size={14} /> {scope.paused ? t('browse.continuePractice') : t('browse.beginPractice')}
         </button>
-        {scope.pendingDrafts > 0 && (
+        {pendingCount > 0 && (
           <div className="action-card-blocked">
-            {tp('browse.reviewBlockedNote', scope.pendingDrafts, { count: scope.pendingDrafts })}
+            {tp('browse.reviewBlockedNote', pendingCount, { count: pendingCount })}
           </div>
         )}
         <button className="action-card-btn" onClick={onOpen}>
@@ -1858,8 +1873,8 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
           <RecallChoice onMissed={() => onGrade('miss')} onGotIt={() => onGrade('good')} onPause={onExit} />
           <div className="card-foot-row">
             <div className="card-meta">
-              {card.region && <button onClick={onShowSource}><Glyph name="book" size={13} /> {t('study.source')}</button>}
-              {card.region && card.sourceLabel && <span className="dot" />}
+              {(card.region || card.sourceId) && <button onClick={onShowSource}><Glyph name="book" size={13} /> {t('study.source')}</button>}
+              {(card.region || card.sourceId) && card.sourceLabel && <span className="dot" />}
               {card.sourceLabel && <span>{card.sourceLabel}</span>}
             </div>
             <div className="card-meta">
@@ -1943,8 +1958,9 @@ function fmtFileSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-function AddScreen({ targetPath, isExistingSource, hasApiKey, onCancel, onGenerateCards, onGenerated, onGenerateManual }) {
+function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCancel, onGenerateCards, onGenerated, onGenerateManual }) {
   const [name, setName] = useState('');
+  const [model, setModel] = useState(modelById(defaultModel) ? defaultModel : DEFAULT_GEN_MODEL);
   const [priorities, setPriorities] = useState(['definitions','labeledDiagrams','examples','bodyProse']);
   const [dragIdx, setDragIdx] = useState(null);
   const [file, setFile] = useState(null);        // { name, size, isImage, url, dataUrl, text, _ready }
@@ -1981,7 +1997,7 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, onCancel, onGenera
     catch (e) { err = (e && e.message) || 'http'; }
     if (!aliveRef.current) return; // user left mid-flight — drop the result
     setBusy(false);
-    if (err) setLocalErr(err); else onGenerated(cards, name.trim());
+    if (err) setLocalErr(err); else onGenerated(cards, name.trim(), payload());
   }
   function onPickFile(e) { acceptFile(e.target.files && e.target.files[0]); }
   function onDropFile(e) {
@@ -2014,7 +2030,7 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, onCancel, onGenera
   const ready = !!(combinedSource.trim() || (file && file._ready)); // real readable content present
   const canGenerate = (isExistingSource || !!name.trim()) && ready && !busy;
   function payload() {
-    return { name: name.trim(), sourceText: combinedSource, imageDataUrl: file && file.isImage ? file.dataUrl : null };
+    return { name: name.trim(), sourceText: combinedSource, imageDataUrl: file && file.isImage ? file.dataUrl : null, model };
   }
   const errMsg = localErr && ({
     key: t('add.genErrorKey'), rate: t('add.genErrorRate'), network: t('add.genErrorNetwork'),
@@ -2102,6 +2118,16 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, onCancel, onGenera
             <span className="priority-label">{t(PRIORITY_KEY[p])}</span>
           </div>
         ))}
+      </div>
+
+      <div style={{ marginTop: 18 }}>
+        <label className="settings-section-help" style={{ display: 'block', marginBottom: 6 }}>{t('settings.modelLabel')}</label>
+        <select className="scope-search" style={{ width: '100%', fontSize: 15 }}
+                value={model} onChange={e => setModel(e.target.value)}>
+          {GEN_MODELS.map(m => (
+            <option key={m.id} value={m.id}>{m.label} — {modelPrice(m)}{m.vision ? '' : ' · text only'}</option>
+          ))}
+        </select>
       </div>
 
       {errMsg && (
@@ -2397,7 +2423,7 @@ function ReviewDraftsScreen({ drafts, onApprove, onCancel, onShowSource }) {
         {(revealed || editing) && (
           <div className="card-foot-row">
             <div className="card-meta">
-              <button onClick={() => onShowSource(card.region)}><Glyph name="book" size={13} /> {t('add.reviewSource')}</button>
+              {(card.region || card.sourceId) && <button onClick={() => onShowSource(card)}><Glyph name="book" size={13} /> {t('add.reviewSource')}</button>}
             </div>
             {editing ? (
               <div className="row-tight">
@@ -2541,8 +2567,8 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiK
             <button key={m.id}
                     className={`lang-row ${genModel === m.id ? 'is-selected' : ''}`}
                     onClick={() => onGenModelChange(m.id)}>
-              <span className="lang-row-label">{m.label}</span>
-              <span className="lang-row-native" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{m.id}</span>
+              <span className="lang-row-label">{m.label}{m.vision ? '' : ' · text only'}</span>
+              <span className="lang-row-native" style={{ fontSize: 12, color: '#7A8696' }}>{modelPrice(m)}</span>
               <span className="lang-row-check">{genModel === m.id && <Glyph name="check" size={14} />}</span>
             </button>
           ))}
@@ -2560,18 +2586,27 @@ function PageTerm({ id, region, children }) {
   return <span className={`page-term ${region === id ? 'is-active' : ''}`}>{children}</span>;
 }
 
-function SourceOverlay({ region, onClose }) {
+function SourceOverlay({ region, source, onClose }) {
+  const hasSource = source && (source.text || source.imageDataUrl);
   return (
     <div className="overlay" onClick={onClose}>
       <div className="overlay-card source-page" onClick={e => e.stopPropagation()}>
         <div className="source-page-head">
           <div>
             <div className="eyebrow" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Glyph name="book" size={13} /> {t('source.fromThisSource')}</div>
-            <div className="source-page-title">Eukaryotic cell · Ch. 4</div>
+            <div className="source-page-title">{hasSource ? (source.title || t('source.fromThisSource')) : (region ? 'Eukaryotic cell · Ch. 4' : t('source.fromThisSource'))}</div>
           </div>
           <button className="overlay-close" onClick={onClose}><Glyph name="close" /></button>
         </div>
 
+        {hasSource ? (
+          <div className="source-page-body">
+            {source.imageDataUrl && (
+              <img src={source.imageDataUrl} alt="" style={{ maxWidth: '100%', borderRadius: 10, marginBottom: source.text ? 18 : 0, display: 'block' }} />
+            )}
+            {source.text && <p className="source-page-lead" style={{ whiteSpace: 'pre-wrap' }}>{source.text}</p>}
+          </div>
+        ) : region ? (
         <div className="source-page-body">
           <p className="source-page-lead">
             The eukaryotic cell is defined by its system of internal membranes, which
@@ -2615,6 +2650,11 @@ function SourceOverlay({ region, onClose }) {
             cell&rsquo;s interior in balance.
           </p>
         </div>
+        ) : (
+          <div className="source-page-body">
+            <p className="source-page-lead">{t('source.unavailable')}</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2633,17 +2673,36 @@ function App() {
   const [scopeId, setScopeId] = useState('all');
   const [addTargetScope, setAddTargetScope] = useState('bio-cell');
   // When adding a brand-new source (vs. adding to an existing leaf), holds { parentId, name }
-  const [pendingNewSource, setPendingNewSource] = useState(null);
   const [cardIdx, setCardIdx] = useState(0);
   // Tracks the last practice the user engaged with, for the quick-resume action.
   // status: 'open' (started, no progress) | 'paused' (mid-session) | 'finished'
   const [lastSession, setLastSession] = usePersistentState('lastSession', {
     scopeId: 'bio-cell-photo', status: 'paused', position: 1, total: 4,
   });
-  const [draftCount, setDraftCount] = useState(0);
   const [keptCount, setKeptCount] = useState(0);
   const [processingPhase, setProcessingPhase] = useState(0);
-  const [overlayRegion, setOverlayRegion] = useState(undefined);
+  const [overlay, setOverlay] = useState(null); // null = closed; else { region, source }
+  // Open the source view for a card: its stored source document if it has one,
+  // else (for the seeded cell cards) the canned figure page via its region.
+  function openSource(card) {
+    if (!card) return;
+    // A generated card resolves to its stored source — and NEVER falls back to
+    // the canned region/figure page (which is unrelated to its material).
+    if (card.sourceId) { setOverlay({ region: null, source: sources[card.sourceId] || null }); return; }
+    setOverlay({ region: card.region || null, source: null });
+  }
+  // Store the source a batch of cards was generated from, and tag the cards.
+  function tagWithSource(cards, src, name) {
+    const text = (src && src.sourceText) || '';
+    let imageDataUrl = (src && src.imageDataUrl) || null;
+    // Large base64 images can blow the localStorage quota (silent failure); keep
+    // only reasonably-sized ones so the saved source can't desync from the cards.
+    if (imageDataUrl && imageDataUrl.length > 1500000) imageDataUrl = null;
+    if (!text.trim() && !imageDataUrl) return cards;
+    const srcId = 'usrc-' + (++GEN_ID);
+    setSources(prev => ({ ...prev, [srcId]: { text, imageDataUrl, title: (name || '').trim() } }));
+    return cards.map(c => ({ ...c, sourceId: srcId }));
+  }
   const [perfReturn, setPerfReturn] = useState('folder');
   const [tweaks, setTweaks] = usePersistentState('settings', TWEAK_DEFAULTS);
   // Sync the interface language before children render (switching is live).
@@ -2666,9 +2725,15 @@ function App() {
   // ── AI generation (OpenRouter) state ──
   const [apiKey, setApiKey] = usePersistentState('openrouterKey', '');
   const [genModel, setGenModel] = usePersistentState('genModel', DEFAULT_GEN_MODEL);
-  // The draft cards currently under review — generated cards, or the mock queue.
-  const [drafts, setDrafts] = useState(DRAFT_QUEUE);
-  const [genSource, setGenSource] = useState(null);           // { sourceText, imageDataUrl } for the manual prompt
+  // Unreviewed draft cards, persisted PER TOPIC so they survive navigation and
+  // can be reopened later via the topic's "review" badge. Seeded with the demo
+  // queue under the organelles topic.
+  const [pendingDrafts, setPendingDrafts] = usePersistentState('pendingDrafts', () => ({ 'bio-cell-organelles': DRAFT_QUEUE }));
+  const [genSource, setGenSource] = useState(null);           // { sourceText, imageDataUrl, name } for the manual prompt
+  // Stored source documents (the material cards were generated from), keyed by id.
+  const [sources, setSources] = usePersistentState('sources', () => ({}));
+  const pendingFor = (id) => (pendingDrafts[id] || []);
+  const draftCount = Object.keys(pendingDrafts).reduce((n, k) => n + (pendingDrafts[k] ? pendingDrafts[k].length : 0), 0);
 
   // Append a finished sitting to the scope's history (session-level accuracy
   // and per-card pass/miss) so both the trend and the per-card drill-down
@@ -2835,70 +2900,60 @@ function App() {
   }
 
   function startAdd() { setScreen('add'); }
-  function startBegin(newName) {
-    // If we're targeting a folder (not a leaf), this is a brand-new source.
-    const target = scopes.find(s => s.id === addTargetScope);
-    if (target && !target.isLeaf && newName) {
-      setPendingNewSource({ parentId: addTargetScope, name: newName });
-    } else {
-      setPendingNewSource(null);
-    }
-    setProcessingPhase(0);
-    setScreen('processing');
-    // simulate pipeline
-    [1, 2, 3, 4].forEach((p, i) => {
-      setTimeout(() => setProcessingPhase(p), (i + 1) * 1100);
-    });
-    setTimeout(() => {
-      setDraftCount(DRAFT_QUEUE.length);
-      // Reflect the freshly drafted (unreviewed) count on an existing target
-      // topic so its pending badge is factual. A brand-new source does not
-      // exist yet — its drafts appear once the source is created on approve.
-      setScopes(prev => prev.map(s =>
-        (s.id === addTargetScope && s.isLeaf) ? { ...s, pendingDrafts: DRAFT_QUEUE.length } : s));
-      setScreen('processedNotice');
-    }, 5200);
-  }
 
+  // Open the review screen for a topic's pending drafts. Without an id (the
+  // global "new cards ready" banner), pick the first topic that has any.
   function reviewDrafts(id) {
-    if (id && typeof id === 'string') setAddTargetScope(id);
-    setDrafts(DRAFT_QUEUE); // the pre-seeded pending drafts are the demo queue
+    const sid = (id && typeof id === 'string')
+      ? id
+      : Object.keys(pendingDrafts).find(k => pendingDrafts[k] && pendingDrafts[k].length);
+    if (sid) setAddTargetScope(sid);
     setKeptCount(0);
     setScreen('reviewDrafts');
   }
 
-  // Mark the add target: a folder target means a brand-new source.
-  function prepGenTarget(newName) {
+  // Store a freshly generated batch under its target topic (persisted) and open
+  // review. A folder target becomes a new leaf source, created now so the drafts
+  // survive navigation and can be reopened from the topic's badge.
+  function storeDraftsAndReview(cards, src, name) {
+    let targetId = addTargetScope;
     const target = scopes.find(s => s.id === addTargetScope);
-    if (target && !target.isLeaf && newName) setPendingNewSource({ parentId: addTargetScope, name: newName });
-    else setPendingNewSource(null);
+    if (target && !target.isLeaf) {
+      targetId = 'src-' + (++GEN_ID);
+      const depth = (target.depth || 1) + 1;
+      const newScope = { id: targetId, label: (name && name.trim()) || 'New source', parent: target.id, depth, total: 0, last: 'never', isLeaf: true };
+      setScopes(prev => {
+        const next = [...prev];
+        let insertAt = next.findIndex(s => s.id === target.id) + 1;
+        while (insertAt < next.length && (next[insertAt].depth || 0) > target.depth) insertAt++;
+        next.splice(insertAt > 0 ? insertAt : next.length, 0, newScope);
+        return next;
+      });
+      setAddTargetScope(targetId);
+    }
+    const tagged = tagWithSource(cards, src, (name || (target && target.label) || ''));
+    setPendingDrafts(prev => ({ ...prev, [targetId]: tagged }));
+    setKeptCount(0);
+    setScreen('reviewDrafts');
   }
 
   // Automatic transport: generate via OpenRouter. Returns the parsed cards or
   // throws a normalized code; runs INLINE in AddScreen (no screen switch) so a
   // failure can't strand the user or lose their typed source.
-  async function generateCards({ sourceText, imageDataUrl }) {
+  async function generateCards({ sourceText, imageDataUrl, model }) {
     if (!apiKey) throw new Error('key');
     let text;
-    try { text = await callOpenRouter({ apiKey, model: genModel, sourceText, imageDataUrl }); }
+    try { text = await callOpenRouter({ apiKey, model: model || genModel, sourceText, imageDataUrl }); }
     catch (e) { const c = e && e.message; throw new Error(['key', 'rate', 'network', 'http'].indexOf(c) >= 0 ? c : 'http'); }
     const cards = parseGenCards(text);
     if (!cards.length) throw new Error('empty');
     return cards;
   }
-  // Take generated cards into the existing draft-review flow.
-  function onGeneratedCards(cards, name) {
-    prepGenTarget(name);
-    setDrafts(cards);
-    setDraftCount(cards.length);
-    setKeptCount(0);
-    setScreen('reviewDrafts');
-  }
+  function onGeneratedCards(cards, name, src) { storeDraftsAndReview(cards, src, name); }
 
   // Manual transport: show the prompt to run in the user's own AI chat.
   function startGenerateManual({ name, sourceText, imageDataUrl }) {
-    prepGenTarget(name);
-    setGenSource({ sourceText: sourceText || '', imageDataUrl: imageDataUrl || null });
+    setGenSource({ sourceText: sourceText || '', imageDataUrl: imageDataUrl || null, name: name || '' });
     setScreen('manualGen');
   }
 
@@ -2907,15 +2962,14 @@ function App() {
   function applyManualResponse(text) {
     const cards = parseGenCards(text);
     if (!cards.length) return false;
-    setDrafts(cards);
-    setDraftCount(cards.length);
-    setKeptCount(0);
-    setScreen('reviewDrafts');
+    const name = (genSource && genSource.name) || ((scopes.find(s => s.id === addTargetScope) || {}).label) || '';
+    storeDraftsAndReview(cards, genSource, name);
     return true;
   }
 
   function approveDrafts(decisions, edits = {}) {
-    const keptCards = drafts
+    const targetId = addTargetScope;
+    const keptCards = pendingFor(targetId)
       .filter(c => decisions[c.id] === 'keep')
       .map(c => {
         const e = edits[c.id] || {};
@@ -2926,50 +2980,24 @@ function App() {
         const kind = (c.kind === 'cloze' && !/\{\{.+?\}\}/.test(q)) ? 'qa' : c.kind;
         return {
           id: 'n-' + c.id + '-' + Math.random().toString(36).slice(2, 5),
-          kind,
-          q,
-          a,
+          kind, q, a,
+          ...(c.region ? { region: c.region } : {}),
+          ...(c.sourceId ? { sourceId: c.sourceId } : {}),
           ...(c.kind === 'occlusion'
             ? (e.boxes && e.boxes.length ? { boxes: e.boxes } : (c.regions ? { regions: c.regions } : {}))
             : {}),
         };
       });
     const kept = keptCards.length;
-
-    if (pendingNewSource) {
-      // Create a brand-new leaf source under its parent folder.
-      const parentScope = scopes.find(s => s.id === pendingNewSource.parentId);
-      const newId = 'src-' + Math.random().toString(36).slice(2, 7);
-      const newScope = {
-        id: newId,
-        label: pendingNewSource.name,
-        parent: pendingNewSource.parentId,
-        depth: (parentScope ? parentScope.depth : 1) + 1,
-        due: kept, total: kept, last: 'today', isLeaf: true,
-      };
-      setScopes(prev => {
-        const next = [...prev];
-        let insertAt = next.findIndex(s => s.id === pendingNewSource.parentId) + 1;
-        const pd = parentScope ? parentScope.depth : 1;
-        while (insertAt < next.length && (next[insertAt].depth || 0) > pd) insertAt++;
-        next.splice(insertAt > 0 ? insertAt : next.length, 0, newScope);
-        return next;
-      });
-      setSourceCards(s => ({ ...s, [newId]: keptCards }));
-      setAddTargetScope(newId);
-      setPendingNewSource(null);
-    } else {
-      // Adding to an existing leaf source.
-      const targetId = addTargetScope;
-      if (kept > 0 && targetId) {
-        setSourceCards(s => ({ ...s, [targetId]: [...keptCards, ...(s[targetId] || [])] }));
-        setScopes(prev => prev.map(s => s.id === targetId
-          ? { ...s, total: (s.total || 0) + kept, due: (s.due || 0) + kept, last: 'today', pendingDrafts: 0 }
-          : s));
-      }
+    if (kept > 0 && targetId) {
+      setSourceCards(s => ({ ...s, [targetId]: [...keptCards, ...(s[targetId] || [])] }));
+      setScopes(prev => prev.map(s => s.id === targetId
+        ? { ...s, total: (s.total || 0) + kept, last: 'today' }
+        : s));
     }
+    // Clear this topic's pending drafts (reviewed).
+    setPendingDrafts(prev => { const n = { ...prev }; delete n[targetId]; return n; });
     setKeptCount(kept);
-    setDraftCount(0);
     setScreen('approved');
   }
 
@@ -3012,6 +3040,7 @@ function App() {
             scopes={scopes}
             isRoot={scope.id === 'all'}
             draftCount={draftCount}
+            pendingDrafts={pendingDrafts}
             onReviewDrafts={reviewDrafts}
             lastSession={lastSession}
             onResume={resumeLastSession}
@@ -3054,8 +3083,8 @@ function App() {
             scopes={scopes}
             cards={sourceCards[scope.id] || []}
             history={history[scope.id]}
-            draftCount={draftCount}
-            onReviewDrafts={reviewDrafts}
+            draftCount={(pendingDrafts[scope.id] || []).length}
+            onReviewDrafts={() => reviewDrafts(scope.id)}
             onChangeName={(name) => setScopeLabelOverrides(o => ({ ...o, [scope.id]: name }))}
             onSaveCard={(id, patch) => setSourceCards(s => ({
               ...s,
@@ -3106,7 +3135,7 @@ function App() {
             total={deck.length}
             onGrade={onGrade}
             onExit={pauseSession}
-            onShowSource={() => setOverlayRegion(currentCard.region || null)}
+            onShowSource={() => openSource(currentCard)}
           />
         )}
         {screen === 'done' && (
@@ -3131,6 +3160,7 @@ function App() {
               targetPath={crumbs}
               isExistingSource={isExistingSource}
               hasApiKey={!!apiKey}
+              defaultModel={genModel}
               onCancel={() => setScreen('folder')}
               onGenerateCards={generateCards}
               onGenerated={onGeneratedCards}
@@ -3164,10 +3194,10 @@ function App() {
         )}
         {screen === 'reviewDrafts' && (
           <ReviewDraftsScreen
-            drafts={drafts}
+            drafts={pendingFor(addTargetScope)}
             onApprove={approveDrafts}
             onCancel={() => setScreen('folder')}
-            onShowSource={(r) => setOverlayRegion(r || null)}
+            onShowSource={(card) => openSource(card)}
           />
         )}
         {screen === 'approved' && (
@@ -3197,8 +3227,8 @@ function App() {
         )}
       </div>
 
-      {overlayRegion !== undefined && (
-        <SourceOverlay region={overlayRegion} onClose={() => setOverlayRegion(undefined)} />
+      {overlay && (
+        <SourceOverlay region={overlay.region} source={overlay.source} onClose={() => setOverlay(null)} />
       )}
 
     </div>
