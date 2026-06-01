@@ -244,7 +244,9 @@ const RUNICO_STRINGS = {
     "add.generating": "Generating cards…",
     "source.fromThisSource": "From this source",
     "source.highlighted": "Highlighted: {label}.",
-    "source.unavailable": "The source for this card isn’t available."
+    "source.unavailable": "The source for this card isn’t available.",
+    "study.flipTerm": "Term",
+    "study.flipDefinition": "Definition"
   },
   "pt-BR": {
     "common.nav.settings": "Configurações",
@@ -486,7 +488,9 @@ const RUNICO_STRINGS = {
     "add.generating": "Gerando cartões…",
     "source.fromThisSource": "Desta fonte",
     "source.highlighted": "Destacado: {label}.",
-    "source.unavailable": "A fonte deste cartão não está disponível."
+    "source.unavailable": "A fonte deste cartão não está disponível.",
+    "study.flipTerm": "Termo",
+    "study.flipDefinition": "Definição"
   },
   "pt-PT": {
     "common.nav.settings": "Definições",
@@ -728,7 +732,9 @@ const RUNICO_STRINGS = {
     "add.generating": "A gerar cartões…",
     "source.fromThisSource": "Desta fonte",
     "source.highlighted": "Destacado: {label}.",
-    "source.unavailable": "A fonte deste cartão não está disponível."
+    "source.unavailable": "A fonte deste cartão não está disponível.",
+    "study.flipTerm": "Termo",
+    "study.flipDefinition": "Definição"
   },
   "es": {
     "common.nav.settings": "Ajustes",
@@ -970,7 +976,9 @@ const RUNICO_STRINGS = {
     "add.generating": "Generando tarjetas…",
     "source.fromThisSource": "De esta fuente",
     "source.highlighted": "Destacado: {label}.",
-    "source.unavailable": "La fuente de esta tarjeta no está disponible."
+    "source.unavailable": "La fuente de esta tarjeta no está disponible.",
+    "study.flipTerm": "Término",
+    "study.flipDefinition": "Definición"
   },
   "ru": {
     "common.nav.settings": "Настройки",
@@ -1212,7 +1220,9 @@ const RUNICO_STRINGS = {
     "add.generating": "Создание карточек…",
     "source.fromThisSource": "Из этого источника",
     "source.highlighted": "Выделено: {label}.",
-    "source.unavailable": "Источник для этой карточки недоступен."
+    "source.unavailable": "Источник для этой карточки недоступен.",
+    "study.flipTerm": "Термин",
+    "study.flipDefinition": "Определение"
   },
   "it": {
     "common.nav.settings": "Impostazioni",
@@ -1454,7 +1464,9 @@ const RUNICO_STRINGS = {
     "add.generating": "Generazione carte…",
     "source.fromThisSource": "Da questa fonte",
     "source.highlighted": "Evidenziato: {label}.",
-    "source.unavailable": "La fonte di questa carta non è disponibile."
+    "source.unavailable": "La fonte di questa carta non è disponibile.",
+    "study.flipTerm": "Termine",
+    "study.flipDefinition": "Definizione"
   },
   "zh": {
     "common.nav.settings": "设置",
@@ -1696,7 +1708,9 @@ const RUNICO_STRINGS = {
     "add.generating": "正在生成卡片…",
     "source.fromThisSource": "来自此来源",
     "source.highlighted": "高亮：{label}。",
-    "source.unavailable": "此卡片的来源不可用。"
+    "source.unavailable": "此卡片的来源不可用。",
+    "study.flipTerm": "术语",
+    "study.flipDefinition": "定义"
   }
 };
 

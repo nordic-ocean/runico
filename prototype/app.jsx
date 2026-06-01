@@ -1885,16 +1885,34 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
   // Q&A / cloze / reversible — same template
   return (
     <div className="stage-inner">
-      <div className="eyebrow subtle">{t('study.cardMarker', { idx: idx + 1, total })}</div>
+      <div className="eyebrow subtle">{t('study.cardMarker', { idx: idx + 1, total })}<span className="dot" />{kindLabel(card.kind)}</div>
 
-      <div className="card-question">
-        {card.kind === 'cloze'
-          ? <Cloze text={card.q} revealed={revealed} />
-          : card.q}
-      </div>
+      {card.kind === 'rev' ? (
+        // Reversible: the term flips on its axis to reveal the definition.
+        <div className="flip-card">
+          <div className={`flip-inner ${revealed ? 'is-flipped' : ''}`}>
+            <div className="flip-face flip-front">
+              <span className="flip-edge"><Glyph name="restart" size={12} /> {t('study.flipTerm')}</span>
+              <div className="card-question">{card.q}</div>
+            </div>
+            <div className="flip-face flip-back">
+              <span className="flip-edge"><Glyph name="restart" size={12} /> {t('study.flipDefinition')}</span>
+              <div className="card-answer">{card.a}</div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="study-card">
+          <div className="card-question">
+            {card.kind === 'cloze'
+              ? <Cloze text={card.q} revealed={revealed} />
+              : card.q}
+          </div>
 
-      {revealed && card.kind !== 'cloze' && (
-        <div className="card-answer">{card.a}</div>
+          {revealed && card.kind !== 'cloze' && (
+            <div className="card-answer">{card.a}</div>
+          )}
+        </div>
       )}
 
       {!revealed && (
