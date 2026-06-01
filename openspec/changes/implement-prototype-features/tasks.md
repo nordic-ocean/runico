@@ -6,9 +6,15 @@
      Verification is by code inspection + adversarial review workflow + esbuild parse
      check (the app is browser-only JSX-via-Babel and can't be headless-run); a full
      in-browser click-through remains as task 10.1.
-     Still deferred to Batch B: the i18n translation engine + 6 locale dictionaries
-     (9.2/9.3), file-drop intake (6.1), factual pending-draft counts (6.5), occlusion
-     box→card production (7.4/7.5), and source-view generalization (8.x). -->
+     Batch B2 (done): i18n engine (prototype/i18n.js: t/tp + 7-locale string table,
+     202 keys × en/pt-BR/pt-PT/es/ru/it/zh) wired live from tweaks.language; ~203
+     t()/tp() call sites across all components; reactivity traps handled. Translation
+     data validated (placeholder parity, no entities, {{ }} preserved); migration
+     adversarially verified. Translations are machine-generated — flag for native review.
+     Still deferred to Batch B: file-drop intake (6.1), factual pending-draft counts
+     (6.5), occlusion box→card production (7.4/7.5), and source-view generalization
+     (8.x) — the source overlay is still canned demo content, so its two chrome
+     strings ("From this source", "Highlighted:") are intentionally left until 8.x. -->
 
 ## 1. Library model
 
@@ -84,8 +90,8 @@
 ## 9. Appearance settings
 
 - [x] 9.1 Implement theme selection (Light / Warm / Dark) applied across the interface and persisted
-- [ ] 9.2 Implement interface-language selection (English, Português BR, Português PT, Español, Русский, Italiano, 中文), UI-only (no card-content translation), persisted
-- [ ] 9.3 Verify theme and language switching and persistence
+- [x] 9.2 Implement interface-language selection (English, Português BR, Português PT, Español, Русский, Italiano, 中文), UI-only (no card-content translation), persisted
+- [x] 9.3 Verify theme and language switching and persistence
 
 ## 10. Baseline verification
 

@@ -130,12 +130,8 @@ const SOURCE_CARDS_SEED = {
   ],
 };
 
-const KIND_LABEL = {
-  qa:        'Q&A',
-  cloze:     'Cloze',
-  rev:       'Reversible',
-  occlusion: 'Image',
-};
+// Card-kind label, resolved at render time so it follows the chosen language.
+function kindLabel(k){ return t(({ qa:'progress.cardKindQa', cloze:'progress.cardKindCloze', rev:'progress.cardKindReversible', occlusion:'progress.cardKindImage' })[k] || k); }
 
 // ── Review history ───────────────────────────────────────────
 // Per-session accuracy is the one and only metric: cards passed ÷ cards
@@ -374,7 +370,7 @@ function pathFor(scopes, scopeId) {
 function Breadcrumb({ scopes, scope, onNavigate }) {
   const parentId = scope.parent || 'all';
   const parent = scopes.find(s => s.id === parentId);
-  const label = parent && parent.id !== 'all' ? parent.label : 'All folders';
+  const label = parent && parent.id !== 'all' ? parent.label : t('common.breadcrumb.allFolders');
   return (
     <button className="breadcrumb" onClick={() => onNavigate(parentId)}>
       <Glyph name="back" size={14} /> {label}
@@ -382,7 +378,6 @@ function Breadcrumb({ scopes, scope, onNavigate }) {
   );
 }
 
-const CARD_KIND_LABEL = { cloze: 'Cloze', qa: 'Q&A', rev: 'Reversible', occlusion: 'Image' };
 const CARD_KIND_GLYPH = { cloze: 'book', qa: 'spark', rev: 'restart', occlusion: 'eye' };
 function cardPreviewText(c) {
   if (c.kind === 'cloze') return c.q.replace(/\{\{(.+?)\}\}/g, '____');
@@ -397,15 +392,15 @@ function QuickResume({ lastSession, scopes, onResume }) {
   const remaining = Math.max(0, lastSession.total - lastSession.position);
   let label, sub, icon;
   if (lastSession.status === 'finished') {
-    label = 'Restart practice';
+    label = t('common.quickResume.restart');
     sub = target.label;
     icon = 'restart';
   } else if (lastSession.status === 'paused') {
-    label = 'Continue practice';
-    sub = `${target.label} · ${remaining} ${remaining === 1 ? 'card' : 'cards'} remaining`;
+    label = t('common.quickResume.continue');
+    sub = tp('common.quickResume.cardsRemaining', remaining, { label: target.label, n: remaining });
     icon = 'pause';
   } else {
-    label = 'Begin practice';
+    label = t('common.quickResume.begin');
     sub = target.label;
     icon = 'play';
   }
@@ -460,7 +455,7 @@ function FolderView({
     setEditName(s.label);
   }
   function finishRename(id) {
-    onRenameFolder(id, editName.trim() || 'Untitled');
+    onRenameFolder(id, editName.trim() || t('browse.untitledFolder'));
     setEditingId(null);
   }
 
@@ -491,13 +486,13 @@ function FolderView({
   return (
     <div className="stage-inner stage-columns">
       <div className="columns-header">
-        <div className="eyebrow">{TODAY.toLocaleDateString('en-US', { weekday: 'long' })} · {TODAY.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
-        <div className="columns-header-title">Browse & practice</div>
+        <div className="eyebrow">{t('browse.columnsHeaderDate', { weekday: TODAY.toLocaleDateString(getRunicoLocale(), { weekday: 'long' }), monthDay: TODAY.toLocaleDateString(getRunicoLocale(), { month: 'short', day: 'numeric' }) })}</div>
+        <div className="columns-header-title">{t('browse.columnsHeaderTitle')}</div>
         <QuickResume lastSession={lastSession} scopes={scopes} onResume={onResume} />
         {draftCount > 0 && (
           <button className="quiet" onClick={onReviewDrafts}
                   style={{ marginTop: 12 }}>
-            <Glyph name="spark" /> {draftCount} new cards ready
+            <Glyph name="spark" /> {t('browse.draftsReady', { count: draftCount })}
           </button>
         )}
       </div>
@@ -517,33 +512,33 @@ function FolderView({
                     const st = descendantStats(parent.id);
                     return (
                       <div className="column-head-meta">
-                        {st.total} {st.total === 1 ? 'card' : 'cards'}
+                        {tp('browse.cardCount', st.total, { n: st.total })}
                       </div>
                     );
                   })()}
                   {descendantStats(parent.id).total > 0 && (
                     <button className="column-head-begin"
                             onClick={() => onBegin(parent.id)}>
-                      Practice all <Glyph name="arrow" size={12} />
+                      {t('browse.practiceAll')} <Glyph name="arrow" size={12} />
                     </button>
                   )}
                 </div>
               )}
               {parent && parent.id === 'all' && (
                 <div className="column-head">
-                  <div className="column-head-title">Everything</div>
+                  <div className="column-head-title">{t('browse.columnHeadEverything')}</div>
                   {(() => {
                     const st = descendantStats('all');
                     return (
                       <div className="column-head-meta">
-                        {st.total} {st.total === 1 ? 'card' : 'cards'}
+                        {tp('browse.cardCount', st.total, { n: st.total })}
                       </div>
                     );
                   })()}
                   {descendantStats('all').total > 0 && (
                     <button className="column-head-begin"
                             onClick={() => onBegin('all')}>
-                      Practice all <Glyph name="arrow" size={12} />
+                      {t('browse.practiceAll')} <Glyph name="arrow" size={12} />
                     </button>
                   )}
                 </div>
@@ -583,7 +578,7 @@ function FolderView({
                           </span>
                           <span className="column-item-name">{c.label}</span>
                           {c.pendingDrafts > 0 && (
-                            <span className="column-item-pending" title={`${c.pendingDrafts} cards waiting for review`}>
+                            <span className="column-item-pending" title={tp('browse.pendingDraftsTitle', c.pendingDrafts, { n: c.pendingDrafts })}>
                               <Glyph name="spark" size={10} /> {c.pendingDrafts}
                             </span>
                           )}
@@ -600,22 +595,22 @@ function FolderView({
                       <div className="column-item-actions">
                         {isDeleting ? (
                           <>
-                            <button className="src-action" onClick={() => setPendingDeleteId(null)}>Cancel</button>
+                            <button className="src-action" onClick={() => setPendingDeleteId(null)}>{t('browse.cancel')}</button>
                             <button className="src-action src-action-destructive"
                                     onClick={() => { onDeleteFolder(c.id); setPendingDeleteId(null); }}>
-                              Delete
+                              {t('browse.delete')}
                             </button>
                           </>
                         ) : !isEditing && (
                           <>
                             <button className="src-action src-action-quiet"
                                     onClick={(e) => { e.stopPropagation(); startRename(c); }}
-                                    title="Rename">
+                                    title={t('browse.renameTitle')}>
                               <Glyph name="pencil" size={12} />
                             </button>
                             <button className="src-action src-action-quiet"
                                     onClick={(e) => { e.stopPropagation(); setPendingDeleteId(c.id); }}
-                                    title="Delete">
+                                    title={t('browse.deleteTitle')}>
                               <Glyph name="close" size={13} />
                             </button>
                           </>
@@ -632,7 +627,7 @@ function FolderView({
                       className="folder-rename"
                       value={creatingName}
                       autoFocus
-                      placeholder="Folder name"
+                      placeholder={t('browse.folderNamePlaceholder')}
                       onChange={e => setCreatingName(e.target.value)}
                       onKeyDown={e => {
                         if (e.key === 'Enter' && creatingName.trim()) {
@@ -658,13 +653,13 @@ function FolderView({
                 {parent && !parent.isLeaf && (
                   <button className="column-foot-btn"
                           onClick={() => { setCreatingIn(parentId); setCreatingName(''); }}>
-                    <Glyph name="plus" size={12} /> New folder
+                    <Glyph name="plus" size={12} /> {t('browse.newFolder')}
                   </button>
                 )}
                 {parent && !parent.isLeaf && (
                   <button className="column-foot-btn"
                           onClick={() => onAddSource(parentId)}>
-                    <Glyph name="plus" size={12} /> Add AI Cards
+                    <Glyph name="plus" size={12} /> {t('browse.addAICards')}
                   </button>
                 )}
               </div>
@@ -728,7 +723,7 @@ function ActionTrend({ history }) {
         <circle className="action-trend-dot" cx={xs(pts.length - 1)} cy={ys(pts[pts.length - 1])} r="2.6" />
       </svg>
       <div className="action-trend-foot">
-        <span className="action-trend-cap">Accuracy trend</span>
+        <span className="action-trend-cap">{t('progress.accuracyTrendCaption')}</span>
       </div>
     </div>
   );
@@ -758,14 +753,14 @@ function ActionCard({
         <div className="action-card-name">{scope.label}</div>
       )}
       <div className="action-card-meta">
-        {scope.total} {scope.total === 1 ? 'card' : 'cards'}
-        {scope.last !== 'never' && ` · last studied ${scope.last}`}
+        {tp('browse.cardCount', scope.total, { n: scope.total })}
+        {scope.last !== 'never' && t('browse.lastStudied', { last: scope.last })}
       </div>
 
       {scope.paused && (
         <div className="action-card-resume">
           <Glyph name="pause" size={12} />
-          Paused at card {scope.paused.at} · {scope.paused.remaining} {scope.paused.remaining === 1 ? 'card' : 'cards'} remaining
+          {tp('browse.pausedResume', scope.paused.remaining, { at: scope.paused.at, remaining: scope.paused.remaining })}
         </div>
       )}
 
@@ -773,44 +768,44 @@ function ActionCard({
         {scope.pendingDrafts > 0 && (
           <button className="action-card-btn action-card-pending"
                   onClick={onReviewDrafts}>
-            <Glyph name="spark" size={13} /> Review {scope.pendingDrafts} new cards
+            <Glyph name="spark" size={13} /> {tp('browse.reviewNewCards', scope.pendingDrafts, { count: scope.pendingDrafts })}
           </button>
         )}
         <button className="primary action-card-primary"
                 onClick={onBegin}
                 disabled={scope.total === 0 || scope.pendingDrafts > 0}>
-          <Glyph name="arrow" size={14} /> {scope.paused ? 'Continue practice' : 'Begin practice'}
+          <Glyph name="arrow" size={14} /> {scope.paused ? t('browse.continuePractice') : t('browse.beginPractice')}
         </button>
         {scope.pendingDrafts > 0 && (
           <div className="action-card-blocked">
-            Review the {scope.pendingDrafts} new cards before practicing.
+            {tp('browse.reviewBlockedNote', scope.pendingDrafts, { count: scope.pendingDrafts })}
           </div>
         )}
         <button className="action-card-btn" onClick={onOpen}>
-          <Glyph name="folders" size={13} /> Open cards
+          <Glyph name="folders" size={13} /> {t('browse.openCards')}
         </button>
         <button className="action-card-btn" onClick={onViewProgress}>
-          <Glyph name="trend" size={13} /> View progress
+          <Glyph name="trend" size={13} /> {t('browse.viewProgress')}
         </button>
         <button className="action-card-btn" onClick={onEdit}>
-          <Glyph name="pencil" size={13} /> Rename
+          <Glyph name="pencil" size={13} /> {t('browse.rename')}
         </button>
         <button className="action-card-btn" onClick={onAddFromFile}>
-          <Glyph name="plus" size={13} /> Add more AI Cards
+          <Glyph name="plus" size={13} /> {t('browse.addMoreAICards')}
         </button>
         {isPendingDelete ? (
           <div className="action-card-confirm">
-            <span>Delete this source and all its cards?</span>
+            <span>{t('browse.confirmDeleteSource')}</span>
             <div className="row-tight">
-              <button className="src-action" onClick={onCancelDelete}>Cancel</button>
+              <button className="src-action" onClick={onCancelDelete}>{t('browse.cancel')}</button>
               <button className="src-action src-action-destructive" onClick={onConfirmDelete}>
-                Delete
+                {t('browse.delete')}
               </button>
             </div>
           </div>
         ) : (
           <button className="action-card-btn action-card-destructive" onClick={askDelete}>
-            <Glyph name="close" size={13} /> Delete
+            <Glyph name="close" size={13} /> {t('browse.delete')}
           </button>
         )}
       </div>
@@ -834,9 +829,9 @@ function CreateInlineRow({ placeholder, name, setName, onSubmit, onCancel }) {
         }}
       />
       <div className="child-actions" style={{ opacity: 1 }}>
-        <button className="src-action" onClick={onCancel}>Cancel</button>
+        <button className="src-action" onClick={onCancel}>{t('browse.cancel')}</button>
         <button className="src-action src-action-primary" onClick={onSubmit} disabled={!name.trim()}>
-          Create
+          {t('browse.create')}
         </button>
       </div>
     </div>
@@ -866,11 +861,11 @@ function ScopeScreen({ currentScopeId, scopes, onPick, onEdit, onCreate, onCance
 
   return (
     <div className="stage-inner">
-      <div className="eyebrow">What would you like to practice?</div>
+      <div className="eyebrow">{t('browse.scopeEyebrow')}</div>
 
       <input
         className="scope-search"
-        placeholder="Search sources, chapters, subjects…"
+        placeholder={t('browse.scopeSearchPlaceholder')}
         value={query}
         onChange={e => setQuery(e.target.value)}
         autoFocus
@@ -888,7 +883,7 @@ function ScopeScreen({ currentScopeId, scopes, onPick, onEdit, onCreate, onCance
                 <div className="scope-item-body">
                   <div className={`scope-item-label ${s.depth <= 1 ? 'is-section' : ''}`}>{s.label}</div>
                   <div className="scope-item-meta">
-                    {s.total} cards · last studied {s.last}
+                    {t('browse.scopeItemMeta', { total: s.total, last: s.last })}
                   </div>
                 </div>
                 <div className="scope-check">
@@ -898,8 +893,8 @@ function ScopeScreen({ currentScopeId, scopes, onPick, onEdit, onCreate, onCance
               {isLeaf && (
                 <button className="scope-edit"
                         onClick={(e) => { e.stopPropagation(); onEdit(s.id); }}
-                        title="Edit this source">
-                  Edit
+                        title={t('browse.editSourceTitle')}>
+                  {t('browse.edit')}
                 </button>
               )}
             </div>
@@ -907,7 +902,7 @@ function ScopeScreen({ currentScopeId, scopes, onPick, onEdit, onCreate, onCance
         })}
         {visible.length === 0 && (
           <div style={{ padding: '60px 0', textAlign: 'center', color: '#9BA5B3' }}>
-            Nothing matches "{query}".
+            {t('browse.noMatches', { query })}
           </div>
         )}
       </div>
@@ -917,14 +912,14 @@ function ScopeScreen({ currentScopeId, scopes, onPick, onEdit, onCreate, onCance
           <input
             className="scope-search"
             style={{ fontSize: 18, marginBottom: 14 }}
-            placeholder="Folder name (e.g. Microbiology)"
+            placeholder={t('browse.newFolderNamePlaceholder')}
             value={newName}
             autoFocus
             onChange={e => setNewName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') submitCreate(); }}
           />
           <div className="scope-create-row">
-            <label className="scope-create-label">Inside</label>
+            <label className="scope-create-label">{t('browse.createInsideLabel')}</label>
             <select className="scope-create-select"
                     value={newParent}
                     onChange={e => setNewParent(e.target.value)}>
@@ -936,20 +931,20 @@ function ScopeScreen({ currentScopeId, scopes, onPick, onEdit, onCreate, onCance
             </select>
           </div>
           <div className="scope-create-actions">
-            <button className="quiet" onClick={() => { setCreating(false); setNewName(''); }}>Cancel</button>
+            <button className="quiet" onClick={() => { setCreating(false); setNewName(''); }}>{t('browse.cancel')}</button>
             <button className="primary" onClick={submitCreate} disabled={!newName.trim()}>
-              <Glyph name="check" size={14} /> Create folder
+              <Glyph name="check" size={14} /> {t('browse.createFolder')}
             </button>
           </div>
         </div>
       ) : (
         <button className="scope-new-btn" onClick={() => setCreating(true)}>
-          <Glyph name="plus" size={14} /> New folder
+          <Glyph name="plus" size={14} /> {t('browse.newFolder')}
         </button>
       )}
 
       <div className="home-actions" style={{ marginTop: 32 }}>
-        <button className="quiet" onClick={onCancel}>Cancel</button>
+        <button className="quiet" onClick={onCancel}>{t('browse.cancel')}</button>
       </div>
     </div>
   );
@@ -980,21 +975,21 @@ function FoldersScreen({ scopes, onRename, onDelete, onCreate, onOpenSource, onD
     setCreatingUnder(null);
   }
   function submitRename(id) {
-    onRename(id, editName.trim() || 'Untitled');
+    onRename(id, editName.trim() || t('browse.untitledFolder'));
     setEditingId(null);
   }
 
   return (
     <div className="stage-inner">
-      <div className="eyebrow">Folders</div>
-      <div className="lede center" style={{ marginBottom: 12 }}>Organize your spaces</div>
+      <div className="eyebrow">{t('browse.foldersEyebrow')}</div>
+      <div className="lede center" style={{ marginBottom: 12 }}>{t('browse.foldersLede')}</div>
       <p className="copy center" style={{ marginTop: 0, marginBottom: 28 }}>
-        Folders nest as deep as you like. Sources live inside the deepest folder.
+        {t('browse.foldersCopy')}
       </p>
 
       <button className="scope-new-btn" onClick={() => startCreate('all')}
               style={{ marginTop: 0, marginBottom: 20 }}>
-        <Glyph name="plus" size={14} /> New folder at root
+        <Glyph name="plus" size={14} /> {t('browse.newFolderAtRoot')}
       </button>
 
       {creatingUnder === 'all' && (
@@ -1032,24 +1027,24 @@ function FoldersScreen({ scopes, onRename, onDelete, onCreate, onOpenSource, onD
                   <span className="folder-name">{s.label}</span>
                 )}
                 <span className="folder-meta">
-                  {isLeaf ? `${s.total} cards` : `${s.total} cards`}
+                  {tp('browse.cardCount', s.total, { n: s.total })}
                 </span>
                 <div className="folder-actions">
                   {isDeleting ? (
                     <>
-                      <button className="src-action" onClick={() => setPendingDeleteId(null)}>Cancel</button>
+                      <button className="src-action" onClick={() => setPendingDeleteId(null)}>{t('browse.cancel')}</button>
                       <button className="src-action src-action-destructive"
                               onClick={() => { onDelete(s.id); setPendingDeleteId(null); }}>
-                        Delete
+                        {t('browse.delete')}
                       </button>
                     </>
                   ) : (
                     <>
                       {isLeaf
-                        ? <button className="src-action" onClick={() => onOpenSource(s.id)}>Open</button>
-                        : <button className="src-action" title="Add subfolder"
+                        ? <button className="src-action" onClick={() => onOpenSource(s.id)}>{t('browse.open')}</button>
+                        : <button className="src-action" title={t('browse.addSubfolderTitle')}
                                   onClick={() => startCreate(s.id)}>
-                            <Glyph name="plus" size={13} /> Subfolder
+                            <Glyph name="plus" size={13} /> {t('browse.subfolder')}
                           </button>}
                       <button className="src-action" onClick={() => startRename(s)}>
                         <Glyph name="pencil" size={13} />
@@ -1076,7 +1071,7 @@ function FoldersScreen({ scopes, onRename, onDelete, onCreate, onOpenSource, onD
       </div>
 
       <div className="home-actions" style={{ marginTop: 32 }}>
-        <button className="primary" onClick={onDone}>Done</button>
+        <button className="primary" onClick={onDone}>{t('browse.done')}</button>
       </div>
     </div>
   );
@@ -1090,7 +1085,7 @@ function CreateFolderRow({ depth = 1, name, setName, onSubmit, onCancel }) {
         className="folder-rename"
         value={name}
         autoFocus
-        placeholder="Folder name"
+        placeholder={t('browse.folderNamePlaceholder')}
         onChange={e => setName(e.target.value)}
         onKeyDown={e => {
           if (e.key === 'Enter') onSubmit();
@@ -1098,9 +1093,9 @@ function CreateFolderRow({ depth = 1, name, setName, onSubmit, onCancel }) {
         }}
       />
       <div className="folder-actions" style={{ opacity: 1 }}>
-        <button className="src-action" onClick={onCancel}>Cancel</button>
+        <button className="src-action" onClick={onCancel}>{t('browse.cancel')}</button>
         <button className="src-action src-action-primary" onClick={onSubmit} disabled={!name.trim()}>
-          Create
+          {t('browse.create')}
         </button>
       </div>
     </div>
@@ -1167,7 +1162,7 @@ function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSav
 
       <div className={`home-count ${cardCount === 0 ? 'dim' : ''}`}>{cardCount}</div>
       <p className="home-label">
-        {cardCount === 0 ? 'No cards in ' : (cardCount === 1 ? 'card in ' : 'cards in ')}
+        {cardCount === 0 ? t('add.sourceLabelNoCards') : (cardCount === 1 ? t('add.sourceLabelCardSingular') : t('add.sourceLabelCardsPlural'))}{' '}
         {editingTitle ? (
           <input
             className="folder-pill-input"
@@ -1183,7 +1178,7 @@ function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSav
             size={Math.max(8, name.length + 1)}
           />
         ) : (
-          <button className="folder-pill folder-pill-button" onClick={() => setEditingTitle(true)} title="Rename source">
+          <button className="folder-pill folder-pill-button" onClick={() => setEditingTitle(true)} title={t('add.renameSourceTitle')}>
             {name}
             <Glyph name="pencil" size={12} />
           </button>
@@ -1192,27 +1187,27 @@ function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSav
 
       <div className="home-actions">
         {cardCount > 0
-          ? <button className="primary lg" onClick={onBegin}>Begin <Glyph name="arrow" size={18} /></button>
+          ? <button className="primary lg" onClick={onBegin}>{t('add.begin')} <Glyph name="arrow" size={18} /></button>
           : null}
         <button className="quiet" onClick={onViewProgress}>
-          <Glyph name="trend" size={15} /> View progress
+          <Glyph name="trend" size={15} /> {t('add.viewProgress')}
         </button>
         {draftCount > 0 && (
           <button className="quiet" onClick={onReviewDrafts}>
-            <Glyph name="spark" /> {draftCount} new cards ready
+            <Glyph name="spark" /> {t('add.newCardsReady', { draftCount })}
           </button>
         )}
       </div>
 
       {history && history.sessions && history.sessions.length >= 2 && (
-        <button className="src-trend" onClick={onViewProgress} title="View full performance">
+        <button className="src-trend" onClick={onViewProgress} title={t('add.viewFullPerformance')}>
           <ActionTrend history={history} />
-          <span className="src-trend-hint">View full performance <Glyph name="arrow" size={12} /></span>
+          <span className="src-trend-hint">{t('add.viewFullPerformance')} <Glyph name="arrow" size={12} /></span>
         </button>
       )}
 
       <div className="folder-section-head">
-        <span className="folder-section-label">Cards</span>
+        <span className="folder-section-label">{t('add.cardsSectionLabel')}</span>
         <span className="folder-section-count">{cards.length}</span>
       </div>
 
@@ -1220,10 +1215,10 @@ function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSav
         <div className="src-card-edit src-card-edit-new">
           <CardEditor draft={editDraft} setDraft={setEditDraft} />
           <div className="src-card-edit-actions">
-            <button className="quiet" onClick={() => setAddingNew(false)}>Cancel</button>
+            <button className="quiet" onClick={() => setAddingNew(false)}>{t('add.cancel')}</button>
             <button className="primary" onClick={saveAdd}
                     disabled={!editDraft.q.trim() || (editDraft.kind !== 'occlusion' && !editDraft.a.trim())}>
-              <Glyph name="check" size={14} /> Save card
+              <Glyph name="check" size={14} /> {t('add.saveCard')}
             </button>
           </div>
         </div>
@@ -1239,16 +1234,16 @@ function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSav
                 <>
                   <CardEditor draft={editDraft} setDraft={setEditDraft} />
                   <div className="src-card-edit-actions">
-                    <button className="quiet" onClick={() => setEditingId(null)}>Cancel</button>
+                    <button className="quiet" onClick={() => setEditingId(null)}>{t('add.cancel')}</button>
                     <button className="primary" onClick={saveEdit}>
-                      <Glyph name="check" size={14} /> Save
+                      <Glyph name="check" size={14} /> {t('add.save')}
                     </button>
                   </div>
                 </>
               ) : (
                 <>
                   <div className="src-card-body">
-                    <div className="src-card-kind">{KIND_LABEL[c.kind]}</div>
+                    <div className="src-card-kind">{kindLabel(c.kind)}</div>
                     <div className="src-card-q">
                       {c.kind === 'cloze' ? <Cloze text={c.q} revealed={true} /> : c.q}
                     </div>
@@ -1257,15 +1252,15 @@ function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSav
                   <div className="src-card-actions">
                     {isDeleting ? (
                       <>
-                        <button className="quiet src-action" onClick={() => setPendingDeleteId(null)}>Cancel</button>
+                        <button className="quiet src-action" onClick={() => setPendingDeleteId(null)}>{t('add.cancel')}</button>
                         <button className="src-action src-action-destructive"
                                 onClick={() => { onDeleteCard(c.id); setPendingDeleteId(null); }}>
-                          Remove
+                          {t('add.cardRemove')}
                         </button>
                       </>
                     ) : (
                       <>
-                        <button className="src-action" onClick={() => startEdit(c)}>Edit</button>
+                        <button className="src-action" onClick={() => startEdit(c)}>{t('add.cardEdit')}</button>
                         <button className="src-action src-action-quiet" onClick={() => setPendingDeleteId(c.id)}>
                           <Glyph name="close" size={14} />
                         </button>
@@ -1280,17 +1275,17 @@ function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSav
 
         {cards.length === 0 && !addingNew && (
           <div style={{ padding: '40px 0', textAlign: 'center', color: '#9BA5B3' }}>
-            No cards yet.
+            {t('add.noCardsYet')}
           </div>
         )}
       </div>
 
       <div className="folder-add-buttons">
         <button className="quiet" onClick={startAdd}>
-          <Glyph name="plus" size={14} /> Add a card
+          <Glyph name="plus" size={14} /> {t('add.addACard')}
         </button>
         <button className="quiet" onClick={onAddFromFile}>
-          <Glyph name="plus" size={14} /> Add more AI Cards
+          <Glyph name="plus" size={14} /> {t('add.addMoreAiCards')}
         </button>
       </div>
     </div>
@@ -1305,20 +1300,20 @@ function CardEditor({ draft, setDraft }) {
           <button key={k}
                   className={`card-editor-kind ${draft.kind === k ? 'is-on' : ''}`}
                   onClick={() => setDraft(d => ({ ...d, kind: k }))}>
-            {KIND_LABEL[k]}
+            {kindLabel(k)}
           </button>
         ))}
       </div>
       <textarea
         className="card-editor-input card-editor-q"
-        placeholder={draft.kind === 'cloze' ? 'Question — wrap the blank in {{ }}' : draft.kind === 'rev' ? 'Front · the term' : 'Question'}
+        placeholder={draft.kind === 'cloze' ? t('add.editorClozeQPlaceholder') : draft.kind === 'rev' ? t('add.editorRevFrontPlaceholder') : t('add.editorQPlaceholder')}
         value={draft.q}
         onChange={e => setDraft(d => ({ ...d, q: e.target.value }))}
         rows={2}
       />
       <textarea
         className="card-editor-input card-editor-a"
-        placeholder={draft.kind === 'rev' ? 'Back · the definition' : 'Answer'}
+        placeholder={draft.kind === 'rev' ? t('add.editorRevBackPlaceholder') : t('add.editorAPlaceholder')}
         value={draft.a}
         onChange={e => setDraft(d => ({ ...d, a: e.target.value }))}
         rows={2}
@@ -1424,7 +1419,7 @@ function PerfChart({ points, windowStart, windowEnd, mode }) {
       </svg>
 
       {inWin.length === 0 && (
-        <div className="chart-empty">No sittings in this window.</div>
+        <div className="chart-empty">{t('progress.chartEmpty')}</div>
       )}
 
       {hover != null && inWin[hover] && (() => {
@@ -1435,13 +1430,13 @@ function PerfChart({ points, windowStart, windowEnd, mode }) {
           <div className="chart-tooltip" style={{ left: `${left}%`, top: `${top}%` }}>
             {mode === 'card' ? (
               <>
-                <div>{p.passed ? 'Passed' : 'Missed'}</div>
+                <div>{p.passed ? t('progress.tooltipPassed') : t('progress.tooltipMissed')}</div>
                 <div className="chart-tooltip-sub">{fmtDay(p.ts)}</div>
               </>
             ) : (
               <>
-                <div>{p.value}% accuracy</div>
-                <div className="chart-tooltip-sub">{p.passed}/{p.reviewed} passed · {fmtDay(p.ts)}</div>
+                <div>{t('progress.tooltipAccuracy', { value: p.value })}</div>
+                <div className="chart-tooltip-sub">{t('progress.tooltipPassedRatio', { passed: p.passed, reviewed: p.reviewed, day: fmtDay(p.ts) })}</div>
               </>
             )}
           </div>
@@ -1514,26 +1509,26 @@ function PerformanceScreen({ scope, scopes, cards, history, onJumpFolder, onOpen
           );
         })}
         <span className="add-path-sep">›</span>
-        <span className="add-path-crumb is-last">Performance</span>
+        <span className="add-path-crumb is-last">{t('progress.breadcrumbPerformance')}</span>
       </div>
 
       <div className="perf-head">
-        <div className="perf-eyebrow">Performance over time</div>
+        <div className="perf-eyebrow">{t('progress.eyebrow')}</div>
         <div className="perf-title">{mode === 'card' ? cardLabel(selectedCard) : scope.label}</div>
         <div className="perf-sub">
           {mode === 'card'
-            ? 'Pass or miss on this card, each sitting'
-            : 'Per-session accuracy — cards passed ÷ cards reviewed'}
+            ? t('progress.subCard')
+            : t('progress.subDeck')}
         </div>
       </div>
 
       {mode === 'card' && (
         <div className="perf-mode">
           <span className="perf-mode-label">
-            <Glyph name="spark" size={13} /> Viewing a single card
+            <Glyph name="spark" size={13} /> {t('progress.viewingSingleCard')}
           </span>
           <button className="perf-mode-back" onClick={() => setCardId(null)}>
-            <Glyph name="back" size={13} /> Deck overview
+            <Glyph name="back" size={13} /> {t('progress.deckOverview')}
           </button>
         </div>
       )}
@@ -1541,23 +1536,23 @@ function PerformanceScreen({ scope, scopes, cards, history, onJumpFolder, onOpen
       <div className="perf-stats">
         <div className="perf-stat">
           <div className="perf-stat-value accent">{latest != null ? `${latest}%` : '—'}</div>
-          <div className="perf-stat-label">Latest sitting</div>
+          <div className="perf-stat-label">{t('progress.statLatestSitting')}</div>
           {delta != null && delta !== 0 && (
             <div className={`perf-stat-delta ${delta > 0 ? 'up' : 'down'}`}>
-              {delta > 0 ? '▲' : '▼'} {Math.abs(delta)} pts vs prior
+              {t('progress.deltaVsPrior', { arrow: delta > 0 ? '▲' : '▼', delta: Math.abs(delta) })}
             </div>
           )}
-          {delta === 0 && <div className="perf-stat-delta flat">No change vs prior</div>}
+          {delta === 0 && <div className="perf-stat-delta flat">{t('progress.noChangeVsPrior')}</div>}
         </div>
         <div className="perf-stat">
           <div className="perf-stat-value">{winAvg != null ? `${winAvg}%` : '—'}</div>
-          <div className="perf-stat-label">Window average</div>
+          <div className="perf-stat-label">{t('progress.statWindowAverage')}</div>
         </div>
         <div className="perf-stat">
           <div className="perf-stat-value">{winPts.length}</div>
           <div className="perf-stat-label">
-            {winPts.length === 1 ? 'Sitting' : 'Sittings'}
-            {reviewedTotal > 0 && mode === 'deck' ? ` · ${reviewedTotal} cards` : ''}
+            {winPts.length === 1 ? t('progress.statSitting') : t('progress.statSittings')}
+            {reviewedTotal > 0 && mode === 'deck' ? t('progress.statSittingsCardsSuffix', { reviewedTotal }) : ''}
           </div>
         </div>
       </div>
@@ -1569,20 +1564,20 @@ function PerformanceScreen({ scope, scopes, cards, history, onJumpFolder, onOpen
       <div className="perf-paging">
         <button className="perf-page-btn" disabled={!canEarlier}
                 onClick={() => canEarlier && setOffset(o => o + 1)}>
-          <Glyph name="back" size={13} /> Earlier 30 days
+          <Glyph name="back" size={13} /> {t('progress.earlier30Days')}
         </button>
         <span className="perf-range">
           {fmtDay(windowStart + DAY_MS)} – {fmtDay(windowEnd)}
-          <span className="perf-range-tag">{offset === 0 ? 'Last 30 days' : `${offset * 30} days back`}</span>
+          <span className="perf-range-tag">{offset === 0 ? t('progress.rangeTagLast30Days') : t('progress.rangeTagDaysBack', { days: offset * 30 })}</span>
         </span>
         <button className="perf-page-btn" disabled={!canLater}
                 onClick={() => canLater && setOffset(o => Math.max(0, o - 1))}>
-          Later 30 days <Glyph name="arrow" size={13} />
+          {t('progress.later30Days')} <Glyph name="arrow" size={13} />
         </button>
       </div>
 
       <div className="folder-section-head" style={{ marginTop: 40 }}>
-        <span className="folder-section-label">Drill into a card</span>
+        <span className="folder-section-label">{t('progress.drillIntoCard')}</span>
         <span className="folder-section-count">{cards.length}</span>
       </div>
 
@@ -1596,7 +1591,7 @@ function PerformanceScreen({ scope, scopes, cards, history, onJumpFolder, onOpen
           return (
             <button key={c.id} className={`perf-card-row ${active ? 'is-active' : ''}`}
                     onClick={() => setCardId(active ? null : c.id)}>
-              <span className="perf-card-kind">{KIND_LABEL[c.kind]}</span>
+              <span className="perf-card-kind">{kindLabel(c.kind)}</span>
               <span className="perf-card-q">{cardLabel(c)}</span>
               <MiniSpark points={spark} />
               <span className={`perf-card-rate ${rate == null ? 'dim' : ''}`}>
@@ -1608,7 +1603,7 @@ function PerformanceScreen({ scope, scopes, cards, history, onJumpFolder, onOpen
         })}
         {cards.length === 0 && (
           <div style={{ padding: '32px 0', textAlign: 'center', color: '#9BA5B3', fontSize: 13 }}>
-            No cards in this source.
+            {t('progress.noCardsInSource')}
           </div>
         )}
       </div>
@@ -1691,24 +1686,24 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
             <div className="lede center" style={{ marginBottom: 24 }}>
               {revealed
                 ? <span style={{ color: '#0076B4', fontWeight: 500 }}>{REGIONS[currentRid].label}</span>
-                : <span style={{ color: '#9BA5B3' }}>What’s the highlighted region?</span>}
+                : <span style={{ color: '#9BA5B3' }}>{t('study.occlusionPrompt')}</span>}
             </div>
 
             {!revealed ? (
               <>
-                <button className="reveal-btn" onClick={() => setRevealed(true)}><Glyph name="eye" size={15} /> Show</button>
-                <div className="reveal-hint" style={{ marginTop: 14 }}>or <kbd>Space</kbd></div>
+                <button className="reveal-btn" onClick={() => setRevealed(true)}><Glyph name="eye" size={15} /> {t('study.show')}</button>
+                <div className="reveal-hint" style={{ marginTop: 14 }}>{t('study.revealHintSpace', { space: '' })}<kbd>Space</kbd></div>
               </>
             ) : (
               <div className="row">
                 <button className="quiet" onClick={() => {
                   setOccState(s => ({ step: s.step + 1, marks: [...s.marks, 'wrong'] }));
                   setRevealed(false);
-                }}>Got it wrong</button>
+                }}>{t('study.gotItWrong')}</button>
                 <button className="primary" onClick={() => {
                   setOccState(s => ({ step: s.step + 1, marks: [...s.marks, 'right'] }));
                   setRevealed(false);
-                }}>Got it right <Glyph name="check" size={16} /></button>
+                }}>{t('study.gotItRight')} <Glyph name="check" size={16} /></button>
               </div>
             )}
           </div>
@@ -1717,10 +1712,10 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
         {done && (
           <div style={{ marginTop: 36 }}>
             <div className="eyebrow">
-              {occState.marks.filter(m => m === 'right').length} of {regions.length} correct
-              {' · '}{occState.marks.every(m => m === 'right') ? 'Got it' : 'Missed'}
+              {t('study.occlusionScore', { correct: occState.marks.filter(m => m === 'right').length, total: regions.length })}
+              {' · '}{occState.marks.every(m => m === 'right') ? t('study.resultGotIt') : t('study.resultMissed')}
             </div>
-            <GradeRow continueLabel="Done" onContinue={() => onGrade(occState.marks.every(m => m === 'right') ? 'good' : 'miss')} onPause={onExit} />
+            <GradeRow continueLabel={t('study.done')} onContinue={() => onGrade(occState.marks.every(m => m === 'right') ? 'good' : 'miss')} onPause={onExit} />
           </div>
         )}
       </div>
@@ -1730,7 +1725,7 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
   // Q&A / cloze / reversible — same template
   return (
     <div className="stage-inner">
-      <div className="eyebrow subtle">{idx + 1} of {total}</div>
+      <div className="eyebrow subtle">{t('study.cardMarker', { idx: idx + 1, total })}</div>
 
       <div className="card-question">
         {card.kind === 'cloze'
@@ -1744,8 +1739,8 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
 
       {!revealed && (
         <div className="reveal-wrap">
-          <button className="reveal-btn" onClick={() => setRevealed(true)}><Glyph name="eye" size={15} /> Show answer</button>
-          <button className="quiet reveal-pause" onClick={onExit}><Glyph name="pause" size={14} /> Pause</button>
+          <button className="reveal-btn" onClick={() => setRevealed(true)}><Glyph name="eye" size={15} /> {t('study.showAnswer')}</button>
+          <button className="quiet reveal-pause" onClick={onExit}><Glyph name="pause" size={14} /> {t('study.pause')}</button>
         </div>
       )}
 
@@ -1754,16 +1749,16 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
           <RecallChoice onMissed={() => onGrade('miss')} onGotIt={() => onGrade('good')} onPause={onExit} />
           <div className="card-foot-row">
             <div className="card-meta">
-              <button onClick={onShowSource}><Glyph name="book" size={13} /> Source</button>
+              <button onClick={onShowSource}><Glyph name="book" size={13} /> {t('study.source')}</button>
               <span className="dot" />
               <span>{card.sourceLabel}</span>
             </div>
             <div className="card-meta">
-              <span>Enter · Got it</span>
+              <span>{t('study.footHintEnter')}</span>
               <span className="dot" />
-              <span>X · Missed</span>
+              <span>{t('study.footHintMiss')}</span>
               <span className="dot" />
-              <span>Esc · Pause</span>
+              <span>{t('study.footHintEsc')}</span>
             </div>
           </div>
         </div>
@@ -1772,15 +1767,16 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
   );
 }
 
-function GradeRow({ onContinue, onPause, continueLabel = 'Continue' }) {
+function GradeRow({ onContinue, onPause, continueLabel }) {
+  const resolvedContinueLabel = continueLabel != null ? continueLabel : t('common.gradeRow.continue');
   return (
     <div className="grade-row two">
       <button className="grade grade-pause" onClick={onPause}>
         <Glyph name="pause" size={17} />
-        <span className="grade-name">Pause</span>
+        <span className="grade-name">{t('common.gradeRow.pause')}</span>
       </button>
       <button className="grade grade-continue" onClick={onContinue}>
-        <span className="grade-name">{continueLabel}</span>
+        <span className="grade-name">{resolvedContinueLabel}</span>
         <Glyph name="arrow" size={17} />
       </button>
     </div>
@@ -1795,14 +1791,14 @@ function RecallChoice({ onMissed, onGotIt, onPause }) {
     <div className="grade-row three">
       <button className="grade grade-pause" onClick={onPause}>
         <Glyph name="pause" size={17} />
-        <span className="grade-name">Pause</span>
+        <span className="grade-name">{t('study.pause')}</span>
       </button>
       <button className="grade grade-miss" onClick={onMissed}>
         <Glyph name="close" size={17} />
-        <span className="grade-name">Missed</span>
+        <span className="grade-name">{t('study.recallMissed')}</span>
       </button>
       <button className="grade grade-continue" onClick={onGotIt}>
-        <span className="grade-name">Got it</span>
+        <span className="grade-name">{t('study.recallGotIt')}</span>
         <Glyph name="check" size={17} />
       </button>
     </div>
@@ -1815,29 +1811,26 @@ function DoneScreen({ onHome, draftCount, onReviewDrafts }) {
       <div className="done-mark">
         <Glyph name="check" size={28} />
       </div>
-      <div className="lede center">Deck complete.</div>
-      <p className="copy center">Practice again whenever you like.</p>
+      <div className="lede center">{t('common.done.title')}</div>
+      <p className="copy center">{t('common.done.sub')}</p>
 
       <div className="home-actions">
         {draftCount > 0 && (
           <button className="primary" onClick={onReviewDrafts}>
-            <Glyph name="spark" size={16} /> Review {draftCount} new cards
+            <Glyph name="spark" size={16} /> {tp('common.done.reviewNewCards', draftCount, { n: draftCount })}
           </button>
         )}
-        <button className="quiet" onClick={onHome}>Back home</button>
+        <button className="quiet" onClick={onHome}>{t('common.done.backHome')}</button>
       </div>
     </div>
   );
 }
 
+const PRIORITY_KEY = { definitions:'add.priorityDefinitions', labeledDiagrams:'add.priorityLabeledDiagrams', examples:'add.priorityExamples', bodyProse:'add.priorityBodyProse' };
+
 function AddScreen({ targetPath, isExistingSource, onCancel, onBegin }) {
   const [name, setName] = useState('');
-  const [priorities, setPriorities] = useState([
-    'Definitions',
-    'Labeled diagrams',
-    'Examples',
-    'Body prose',
-  ]);
+  const [priorities, setPriorities] = useState(['definitions','labeledDiagrams','examples','bodyProse']);
   const [dragIdx, setDragIdx] = useState(null);
 
   function onDrop(targetIdx) {
@@ -1854,7 +1847,7 @@ function AddScreen({ targetPath, isExistingSource, onCancel, onBegin }) {
   return (
     <div className="stage-inner">
       <div className="eyebrow">
-        {isExistingSource ? 'Adding more AI Cards to' : 'New AI Cards in'}
+        {isExistingSource ? t('add.eyebrowExisting') : t('add.eyebrowNew')}
       </div>
       <div className="add-path">
         {targetPath.map((label, i) => (
@@ -1866,28 +1859,28 @@ function AddScreen({ targetPath, isExistingSource, onCancel, onBegin }) {
       </div>
       {!isExistingSource && (
         <>
-          <div className="lede center" style={{ marginBottom: 32 }}>What are you learning?</div>
+          <div className="lede center" style={{ marginBottom: 32 }}>{t('add.whatAreYouLearning')}</div>
           <input
             className="scope-search"
             style={{ fontSize: 22, marginBottom: name.trim() ? 20 : 6 }}
-            placeholder="Give it a name"
+            placeholder={t('add.namePlaceholder')}
             value={name}
             autoFocus
             onChange={e => setName(e.target.value)}
           />
           {!name.trim() && (
-            <div className="add-name-required">A name is required to continue.</div>
+            <div className="add-name-required">{t('add.nameRequired')}</div>
           )}
         </>
       )}
 
       <div className="drop">
-        <p className="drop-title">Drop, paste, or browse</p>
-        <p className="drop-sub">An image, a chapter, a screenshot, a page of notes.</p>
+        <p className="drop-title">{t('add.dropTitle')}</p>
+        <p className="drop-sub">{t('add.dropSub')}</p>
       </div>
 
       <div className="priority-list">
-        <p className="priority-list-label">What matters most? Drag to reorder.</p>
+        <p className="priority-list-label">{t('add.priorityListLabel')}</p>
         {priorities.map((p, i) => (
           <div key={p}
                className={`priority-row ${dragIdx === i ? 'dragging' : ''}`}
@@ -1897,16 +1890,16 @@ function AddScreen({ targetPath, isExistingSource, onCancel, onBegin }) {
                onDrop={() => onDrop(i)}>
             <span className="priority-rank">{i + 1}</span>
             <span className="priority-handle"><Glyph name="drag" /></span>
-            <span className="priority-label">{p}</span>
+            <span className="priority-label">{t(PRIORITY_KEY[p])}</span>
           </div>
         ))}
       </div>
 
       <div className="home-actions" style={{ marginTop: 40 }}>
         <button className="primary lg" onClick={() => onBegin(name.trim())} disabled={!isExistingSource && !name.trim()}>
-          Begin <Glyph name="arrow" size={18} />
+          {t('add.begin')} <Glyph name="arrow" size={18} />
         </button>
-        <button className="quiet" onClick={onCancel}>Cancel</button>
+        <button className="quiet" onClick={onCancel}>{t('add.cancel')}</button>
       </div>
     </div>
   );
@@ -1914,13 +1907,13 @@ function AddScreen({ targetPath, isExistingSource, onCancel, onBegin }) {
 
 function ProcessingScreen({ phase, onDone }) {
   // phase: 0..4
-  const phases = ['Reading', 'Understanding', 'Drafting cards', 'Choosing the best', 'Ready'];
-  const message = phase < phases.length ? phases[phase] : 'Ready';
+  const phases = [t('add.phaseReading'), t('add.phaseUnderstanding'), t('add.phaseDrafting'), t('add.phaseChoosing'), t('add.phaseReady')];
+  const message = phase < phases.length ? phases[phase] : t('add.phaseReady');
   return (
     <div className="stage-inner">
-      <div className="eyebrow">Working in the background</div>
+      <div className="eyebrow">{t('add.processingEyebrow')}</div>
       <div className="lede center" style={{ marginBottom: 8 }}>{message}.</div>
-      <p className="copy center">You can come back to this any time.</p>
+      <p className="copy center">{t('add.processingHint')}</p>
 
       {/* Subtle progress band */}
       <div style={{ margin: '40px auto 0', width: 240, height: 2, background: '#EBEEF2', borderRadius: 2, overflow: 'hidden' }}>
@@ -1932,7 +1925,7 @@ function ProcessingScreen({ phase, onDone }) {
         }} />
       </div>
       <div className="home-actions" style={{ marginTop: 36 }}>
-        <button className="quiet" onClick={onDone}>Back home</button>
+        <button className="quiet" onClick={onDone}>{t('add.backHome')}</button>
       </div>
     </div>
   );
@@ -1996,7 +1989,7 @@ function OcclusionEditor({ card }) {
   function startCreate(e) {
     const p = getPct(e);
     const id = 'b' + Date.now();
-    setBoxes(bs => [...bs, { id, x: p.x, y: p.y, w: 0, h: 0, label: 'Region ' + (bs.length + 1) }]);
+    setBoxes(bs => [...bs, { id, x: p.x, y: p.y, w: 0, h: 0, label: t('occ.defaultRegionLabel', { n: bs.length + 1 }) }]);
     setSelId(id);
     drag.current = { mode: 'create', id, startX: p.x, startY: p.y };
   }
@@ -2033,11 +2026,11 @@ function OcclusionEditor({ card }) {
                      value={b.label}
                      onPointerDown={e => e.stopPropagation()}
                      onChange={e => setBoxes(bs => bs.map(x => x.id === b.id ? { ...x, label: e.target.value } : x))}
-                     placeholder="Label" />
+                     placeholder={t('occ.labelPlaceholder')} />
             ) : (
               b.label && <span className="occ-edit-tag">{b.label}</span>
             )}
-            <button className="occ-edit-del" onPointerDown={e => del(e, b.id)} title="Delete">
+            <button className="occ-edit-del" onPointerDown={e => del(e, b.id)} title={t('occ.deleteTitle')}>
               <Glyph name="close" size={11} />
             </button>
             <span className="occ-edit-handle" onPointerDown={e => startResize(e, b)} />
@@ -2045,8 +2038,8 @@ function OcclusionEditor({ card }) {
         ))}
       </div>
       <div className="occ-edit-hint">
-        <Glyph name="plus" size={12} /> Drag on the image to add a box · drag to move · pull the corner to resize
-        <span className="occ-edit-count">{boxes.length} {boxes.length === 1 ? 'region' : 'regions'}</span>
+        <Glyph name="plus" size={12} /> {t('occ.dragHint')}
+        <span className="occ-edit-count">{tp('occ.regionCount', boxes.length, { n: boxes.length })}</span>
       </div>
     </>
   );
@@ -2080,7 +2073,7 @@ function ReviewDraftsScreen({ onApprove, onCancel, onShowSource }) {
   if (card.kind === 'occlusion') {
     return (
       <div className="stage-inner wide">
-        <div className="eyebrow">Card {idx + 1} of {DRAFT_QUEUE.length}<span className="dot" />Image occlusion · editable</div>
+        <div className="eyebrow">{t('add.reviewCardCounter', { idx: idx + 1, total: DRAFT_QUEUE.length })}<span className="dot" />{t('add.reviewOcclusionTag')}</div>
 
         <OcclusionEditor key={card.id} card={card} />
 
@@ -2088,8 +2081,8 @@ function ReviewDraftsScreen({ onApprove, onCancel, onShowSource }) {
 
         <div className="card-foot">
           <div className="row">
-            <button className="quiet" onClick={() => decide('skip')}>Remove</button>
-            <button className="primary" onClick={() => decide('keep')}>Keep <Glyph name="check" size={14} /></button>
+            <button className="quiet" onClick={() => decide('skip')}>{t('add.reviewRemove')}</button>
+            <button className="primary" onClick={() => decide('keep')}>{t('add.reviewKeep')} <Glyph name="check" size={14} /></button>
           </div>
         </div>
       </div>
@@ -2098,7 +2091,7 @@ function ReviewDraftsScreen({ onApprove, onCancel, onShowSource }) {
 
   return (
     <div className="stage-inner">
-      <div className="eyebrow">Card {idx + 1} of {DRAFT_QUEUE.length}<span className="dot" />Drafted from source</div>
+      <div className="eyebrow">{t('add.reviewCardCounter', { idx: idx + 1, total: DRAFT_QUEUE.length })}<span className="dot" />{t('add.reviewDraftedFromSource')}</div>
 
       {editing ? (
         <>
@@ -2123,25 +2116,25 @@ function ReviewDraftsScreen({ onApprove, onCancel, onShowSource }) {
       <div className="card-foot">
         {!revealed && !editing && (
           <div className="reveal-wrap" style={{ marginTop: 24 }}>
-            <button className="reveal-btn" onClick={() => setRevealed(true)}><Glyph name="eye" size={15} /> Show answer</button>
+            <button className="reveal-btn" onClick={() => setRevealed(true)}><Glyph name="eye" size={15} /> {t('add.reviewShowAnswer')}</button>
           </div>
         )}
 
         {(revealed || editing) && (
           <div className="card-foot-row">
             <div className="card-meta">
-              <button onClick={onShowSource}><Glyph name="book" size={13} /> Source</button>
+              <button onClick={onShowSource}><Glyph name="book" size={13} /> {t('add.reviewSource')}</button>
             </div>
             {editing ? (
               <div className="row-tight">
-                <button className="quiet" onClick={() => setEditing(false)}>Cancel</button>
-                <button className="primary" onClick={() => { setEditing(false); decide('keep', { q: editQ, a: editA }); }}>Save & keep <Glyph name="check" size={14} /></button>
+                <button className="quiet" onClick={() => setEditing(false)}>{t('add.reviewCancel')}</button>
+                <button className="primary" onClick={() => { setEditing(false); decide('keep', { q: editQ, a: editA }); }}>{t('add.reviewSaveAndKeep')} <Glyph name="check" size={14} /></button>
               </div>
             ) : (
               <div className="row-tight">
-                <button className="quiet" onClick={() => decide('skip')}>Remove</button>
-                <button className="quiet" onClick={() => { setEditQ(card.q); setEditA(card.a); setEditing(true); }}>Edit</button>
-                <button className="primary" onClick={() => decide('keep')}>Keep <Glyph name="check" size={14} /></button>
+                <button className="quiet" onClick={() => decide('skip')}>{t('add.reviewRemove')}</button>
+                <button className="quiet" onClick={() => { setEditQ(card.q); setEditA(card.a); setEditing(true); }}>{t('add.reviewEdit')}</button>
+                <button className="primary" onClick={() => decide('keep')}>{t('add.reviewKeep')} <Glyph name="check" size={14} /></button>
               </div>
             )}
           </div>
@@ -2155,15 +2148,15 @@ function ApprovedScreen({ keptCount, onHome, onViewCards, topicLabel }) {
   return (
     <div className="stage-inner">
       <div className="done-mark"><Glyph name="check" size={28} /></div>
-      <div className="lede center">{keptCount} cards added{topicLabel ? <> to <b style={{ fontWeight: 600 }}>{topicLabel}</b></> : ''}.</div>
-      <p className="copy center">They’re in the topic now and ready to practice.</p>
+      <div className="lede center">{tp('common.approved.title', keptCount, { n: keptCount, topic: topicLabel || '' })}</div>
+      <p className="copy center">{t('common.approved.sub')}</p>
       <div className="home-actions">
         {onViewCards && (
           <button className="primary" onClick={onViewCards}>
-            <Glyph name="folders" size={15} /> View cards
+            <Glyph name="folders" size={15} /> {t('common.approved.viewCards')}
           </button>
         )}
-        <button className="quiet" onClick={onHome}>Back home</button>
+        <button className="quiet" onClick={onHome}>{t('common.done.backHome')}</button>
       </div>
     </div>
   );
@@ -2174,27 +2167,27 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, onDo
   // never translated (see appearance-settings spec). Shown in each
   // locale's own script.
   const LANGUAGES = [
-    { code: 'en',    label: 'English',              native: 'English' },
-    { code: 'pt-BR', label: 'Portuguese (Brazil)',  native: 'Português (Brasil)' },
-    { code: 'pt-PT', label: 'Portuguese (Portugal)', native: 'Português (Portugal)' },
-    { code: 'es',    label: 'Spanish',              native: 'Español' },
-    { code: 'ru',    label: 'Russian',              native: 'Русский' },
-    { code: 'it',    label: 'Italian',              native: 'Italiano' },
-    { code: 'zh',    label: 'Chinese',              native: '中文' },
+    { code: 'en',    label: t('settings.langEnglish'),            native: 'English' },
+    { code: 'pt-BR', label: t('settings.langPortugueseBrazil'),   native: 'Português (Brasil)' },
+    { code: 'pt-PT', label: t('settings.langPortuguesePortugal'), native: 'Português (Portugal)' },
+    { code: 'es',    label: t('settings.langSpanish'),            native: 'Español' },
+    { code: 'ru',    label: t('settings.langRussian'),            native: 'Русский' },
+    { code: 'it',    label: t('settings.langItalian'),            native: 'Italiano' },
+    { code: 'zh',    label: t('settings.langChinese'),            native: '中文' },
   ];
   return (
     <div className="stage-inner">
-      <div className="eyebrow">Settings</div>
-      <div className="lede center" style={{ marginBottom: 32 }}>How you’d like Runico to work.</div>
+      <div className="eyebrow">{t('settings.title')}</div>
+      <div className="lede center" style={{ marginBottom: 32 }}>{t('settings.lede')}</div>
 
       <div className="settings-section">
-        <div className="settings-section-label">Appearance</div>
-        <div className="settings-section-help">Pick a canvas color to learn against.</div>
+        <div className="settings-section-label">{t('settings.appearanceLabel')}</div>
+        <div className="settings-section-help">{t('settings.appearanceHelp')}</div>
         <div className="theme-list">
           {[
-            { code: 'light', label: 'Light',  swatch: '#FFFFFF', text: '#141920', sub: 'White, calm' },
-            { code: 'warm',  label: 'Warm',   swatch: '#FBFAF7', text: '#1A1714', sub: 'Off-white, easy on the eye' },
-            { code: 'dark',  label: 'Dark',   swatch: '#141920', text: '#FBFCFD', sub: 'Near-black, low-light study' },
+            { code: 'light', label: t('settings.themeLightLabel'),  swatch: '#FFFFFF', text: '#141920', sub: t('settings.themeLightSub') },
+            { code: 'warm',  label: t('settings.themeWarmLabel'),   swatch: '#FBFAF7', text: '#1A1714', sub: t('settings.themeWarmSub') },
+            { code: 'dark',  label: t('settings.themeDarkLabel'),   swatch: '#141920', text: '#FBFCFD', sub: t('settings.themeDarkSub') },
           ].map(T => (
             <button key={T.code}
                     className={`theme-row ${theme === T.code ? 'is-selected' : ''}`}
@@ -2216,8 +2209,8 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, onDo
       </div>
 
       <div className="settings-section">
-        <div className="settings-section-label">Language</div>
-        <div className="settings-section-help">The interface renders in this language. Your cards stay in the language you wrote them.</div>
+        <div className="settings-section-label">{t('settings.languageLabel')}</div>
+        <div className="settings-section-help">{t('settings.languageHelp')}</div>
         <div className="lang-list">
           {LANGUAGES.map(L => (
             <button key={L.code}
@@ -2234,7 +2227,7 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, onDo
       </div>
 
       <div className="home-actions" style={{ marginTop: 32 }}>
-        <button className="primary" onClick={onDone}>Done</button>
+        <button className="primary" onClick={onDone}>{t('settings.doneButton')}</button>
       </div>
     </div>
   );
@@ -2330,6 +2323,8 @@ function App() {
   const [overlayRegion, setOverlayRegion] = useState(undefined);
   const [perfReturn, setPerfReturn] = useState('folder');
   const [tweaks, setTweaks] = usePersistentState('settings', TWEAK_DEFAULTS);
+  // Sync the interface language before children render (switching is live).
+  setRunicoLocale(tweaks.language || 'en');
 
   // Source card store — keyed by scope id (only leaf sources have cards)
   const [sourceCards, setSourceCards] = usePersistentState('sourceCards', () => ({ ...SOURCE_CARDS_SEED }));
@@ -2570,8 +2565,8 @@ function App() {
         </div>
         <div className="nav-right">
           {(screen === 'folder' || screen === 'source' || screen === 'done') && (
-            <button className="nav-btn" onClick={() => setScreen('settings')} title="Settings">
-              <Glyph name="gear" size={14} /> Settings
+            <button className="nav-btn" onClick={() => setScreen('settings')} title={t('common.nav.settings')}>
+              <Glyph name="gear" size={14} /> {t('common.nav.settings')}
             </button>
           )}
         </div>
@@ -2580,7 +2575,7 @@ function App() {
       {(screen === 'add' || screen === 'processing' || screen === 'processedNotice' || screen === 'reviewDrafts' || screen === 'settings') && (
         <div className="back-bar">
           <button className="nav-btn" onClick={() => setScreen('folder')}>
-            <Glyph name="back" size={14} /> Back
+            <Glyph name="back" size={14} /> {t('common.nav.back')}
           </button>
         </div>
       )}
@@ -2700,7 +2695,7 @@ function App() {
             crumbs.unshift(cur.label);
             cur = scopes.find(s => s.id === cur.parent);
           }
-          if (crumbs.length === 0) crumbs.push('All folders');
+          if (crumbs.length === 0) crumbs.push(t('common.breadcrumb.allFolders'));
           return (
             <AddScreen
               targetPath={crumbs}
@@ -2719,11 +2714,11 @@ function App() {
         {screen === 'processedNotice' && (
           <div className="stage-inner">
             <div className="done-mark"><Glyph name="spark" size={26} /></div>
-            <div className="lede center">{DRAFT_QUEUE.length} new cards drafted.</div>
-            <p className="copy center">Take a look when you have a minute.</p>
+            <div className="lede center">{tp('common.processedNotice.title', DRAFT_QUEUE.length, { n: DRAFT_QUEUE.length })}</div>
+            <p className="copy center">{t('common.processedNotice.sub')}</p>
             <div className="home-actions">
-              <button className="primary" onClick={reviewDrafts}>Review now</button>
-              <button className="quiet" onClick={() => setScreen('folder')}>Later</button>
+              <button className="primary" onClick={reviewDrafts}>{t('common.processedNotice.reviewNow')}</button>
+              <button className="quiet" onClick={() => setScreen('folder')}>{t('common.processedNotice.later')}</button>
             </div>
           </div>
         )}
