@@ -231,12 +231,16 @@ function parseOcclusionResult(responseText) {
     try { obj = JSON.parse(t.slice(s, e2 + 1)); } catch (e3) { return null; }
   }
   if (!obj || typeof obj !== 'object') return null;
+  // Detect the coordinate scale ONCE across the whole response — the model uses
+  // either 0..1 or 0..100, and deciding per box would let a small label stay on a
+  // different scale than the figure, misplacing every mask.
+  const raw = [obj.figure, ...(Array.isArray(obj.labels) ? obj.labels : [])].filter(b => b && typeof b === 'object');
+  const vals = raw.flatMap(b => [+b.x, +b.y, +b.w, +b.h]).filter(n => Number.isFinite(n));
+  const scale = vals.some(v => v > 1.5) ? 100 : 1;
   const norm = (b) => {
     if (!b || typeof b !== 'object') return null;
-    let x = +b.x, y = +b.y, w = +b.w, h = +b.h;
-    if (![x, y, w, h].every(n => Number.isFinite(n))) return null;
-    if (x > 1 || y > 1 || w > 1 || h > 1) { x /= 100; y /= 100; w /= 100; h /= 100; } // tolerate 0..100
-    if (w <= 0 || h <= 0) return null;
+    const x = +b.x / scale, y = +b.y / scale, w = +b.w / scale, h = +b.h / scale;
+    if (![x, y, w, h].every(n => Number.isFinite(n)) || w <= 0 || h <= 0) return null;
     return { x, y, w, h };
   };
   const figure = norm(obj.figure);
@@ -296,9 +300,15 @@ async function generateOcclusionCard({ apiKey, model, imageDataUrl }) {
   catch (e) { return null; }
   const data = parseOcclusionResult(text);
   if (!data || !data.figure || !data.labels.length) return null;
-  const cropped = await cropImageToBox(imageDataUrl, data.figure);
+  // One canonical, in-bounds figure used for BOTH the crop and the label re-map,
+  // so the masks line up exactly with what was actually cropped.
+  const f = data.figure;
+  const cf = { x: Math.max(0, Math.min(1, f.x)), y: Math.max(0, Math.min(1, f.y)) };
+  cf.w = Math.max(0.02, Math.min(1 - cf.x, f.w));
+  cf.h = Math.max(0.02, Math.min(1 - cf.y, f.h));
+  const cropped = await cropImageToBox(imageDataUrl, cf);
   if (!cropped) return null;
-  const boxes = remapLabelsToCrop(data.labels, data.figure);
+  const boxes = remapLabelsToCrop(data.labels, cf);
   if (!boxes.length) return null;
   const q = (typeof t === 'function' ? t('add.occlusionCardPrompt') : '') || 'Identify each labeled part.';
   return { id: genId('g'), kind: 'occlusion', q, a: null, boxes, image: cropped };
@@ -2429,8 +2439,11 @@ function ProcessingScreen({ phase, onDone }) {
   );
 }
 
-function OcclusionEditor({ card, onBoxesChange }) {
+function OcclusionEditor({ card, onBoxesChange, onImageChange }) {
   const wrapRef = useRef(null);
+  const [img, setImg] = useState(card.image || null);   // working image; cropping replaces it
+  const [mode, setMode] = useState('mask');              // 'mask' (draw masks) | 'crop'
+  const [cropSel, setCropSel] = useState(null);          // {x,y,w,h} percent, the crop rectangle
   const [boxes, setBoxes] = useState(() =>
     // Generated/edited occlusion carries percent boxes directly; the seeded demo
     // carries region keys resolved through REGIONS (px → percent).
@@ -2449,8 +2462,10 @@ function OcclusionEditor({ card, onBoxesChange }) {
   const [selId, setSelId] = useState(null);
   const drag = useRef(null);
 
-  // Surface the current boxes to the parent so a kept card stores them.
+  // Surface the current boxes + image to the parent so a kept card stores them.
+  // (img fires on mount too, which resets the parent's value when the draft changes.)
   useEffect(() => { if (onBoxesChange) onBoxesChange(boxes); }, [boxes]);
+  useEffect(() => { if (onImageChange) onImageChange(img); }, [img]);
 
   function getPct(e) {
     const rect = wrapRef.current.getBoundingClientRect();
@@ -2464,7 +2479,11 @@ function OcclusionEditor({ card, onBoxesChange }) {
     function move(e) {
       const d = drag.current; if (!d) return;
       const p = getPct(e);
-      if (d.mode === 'create') {
+      if (d.mode === 'crop-create') {
+        const x = Math.min(d.startX, p.x), y = Math.min(d.startY, p.y);
+        const w = Math.abs(p.x - d.startX), h = Math.abs(p.y - d.startY);
+        setCropSel({ x, y, w, h });
+      } else if (d.mode === 'create') {
         const x = Math.min(d.startX, p.x), y = Math.min(d.startY, p.y);
         const w = Math.abs(p.x - d.startX), h = Math.abs(p.y - d.startY);
         setBoxes(bs => bs.map(b => b.id === d.id ? { ...b, x, y, w, h } : b));
@@ -2491,6 +2510,15 @@ function OcclusionEditor({ card, onBoxesChange }) {
     return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
   }, []);
 
+  function startSurface(e) {
+    if (mode === 'crop') {
+      const p = getPct(e);
+      setCropSel({ x: p.x, y: p.y, w: 0, h: 0 });
+      drag.current = { mode: 'crop-create', startX: p.x, startY: p.y };
+      return;
+    }
+    startCreate(e);
+  }
   function startCreate(e) {
     const p = getPct(e);
     const id = 'b' + Date.now();
@@ -2499,6 +2527,7 @@ function OcclusionEditor({ card, onBoxesChange }) {
     drag.current = { mode: 'create', id, startX: p.x, startY: p.y };
   }
   function startMove(e, b) {
+    if (mode === 'crop') return;
     e.stopPropagation();
     const p = getPct(e);
     setSelId(b.id);
@@ -2515,15 +2544,36 @@ function OcclusionEditor({ card, onBoxesChange }) {
     setBoxes(bs => bs.filter(b => b.id !== id));
     if (selId === id) setSelId(null);
   }
+  function cancelCrop() { setMode('mask'); setCropSel(null); }
+  async function applyCrop() {
+    if (!img || !cropSel || cropSel.w < 3 || cropSel.h < 3) { cancelCrop(); return; }
+    const cropped = await cropImageToBox(img, { x: cropSel.x / 100, y: cropSel.y / 100, w: cropSel.w / 100, h: cropSel.h / 100 });
+    if (!cropped) { cancelCrop(); return; }
+    // Re-map masks into the new crop's coordinate space; drop any that don't overlap it.
+    const remapped = boxes.map(b => ({
+      ...b,
+      x: (b.x - cropSel.x) / cropSel.w * 100,
+      y: (b.y - cropSel.y) / cropSel.h * 100,
+      w: b.w / cropSel.w * 100,
+      h: b.h / cropSel.h * 100,
+    })).filter(b => b.x + b.w > 1 && b.y + b.h > 1 && b.x < 99 && b.y < 99)
+      .map(b => {
+        const x = Math.max(0, Math.min(98, b.x)), y = Math.max(0, Math.min(98, b.y));
+        return { ...b, x, y, w: Math.max(2, Math.min(100 - x, b.w)), h: Math.max(2, Math.min(100 - y, b.h)) };
+      });
+    setImg(cropped);
+    setBoxes(remapped);
+    cancelCrop();
+  }
 
   return (
     <>
-      <div className="figure-wrap occ-editor" ref={wrapRef} style={card.image ? { marginBottom: 12 } : { aspectRatio: '600 / 400', marginBottom: 12 }}>
-        {card.image
-          ? <img src={card.image} alt="" style={{ width: '100%', height: 'auto', display: 'block' }} />
+      <div className={`figure-wrap occ-editor ${mode === 'crop' ? 'is-cropping' : ''}`} ref={wrapRef} style={img ? { marginBottom: 12 } : { aspectRatio: '600 / 400', marginBottom: 12 }}>
+        {img
+          ? <img src={img} alt="" style={{ width: '100%', height: 'auto', display: 'block' }} />
           : card.regions ? <CellFigure /> : null}
-        <div className="occ-edit-surface" onPointerDown={startCreate} />
-        {boxes.map(b => (
+        <div className="occ-edit-surface" onPointerDown={startSurface} />
+        {mode !== 'crop' && boxes.map(b => (
           <div key={b.id}
                className={`occ-edit-box ${selId === b.id ? 'is-sel' : ''}`}
                style={{ left: `${b.x}%`, top: `${b.y}%`, width: `${b.w}%`, height: `${b.h}%` }}
@@ -2543,10 +2593,25 @@ function OcclusionEditor({ card, onBoxesChange }) {
             <span className="occ-edit-handle" onPointerDown={e => startResize(e, b)} />
           </div>
         ))}
+        {mode === 'crop' && cropSel && (
+          <div className="occ-crop-sel" style={{ left: `${cropSel.x}%`, top: `${cropSel.y}%`, width: `${cropSel.w}%`, height: `${cropSel.h}%` }} />
+        )}
       </div>
-      <div className="occ-edit-hint">
-        <Glyph name="plus" size={12} /> {t('occ.dragHint')}
-        <span className="occ-edit-count">{tp('occ.regionCount', boxes.length, { n: boxes.length })}</span>
+      <div className="occ-edit-hint" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        {mode === 'crop' ? (
+          <>
+            <span>{t('occ.cropHint')}</span>
+            <span className="row-tight">
+              <button className="quiet" onClick={cancelCrop}>{t('add.cancel')}</button>
+              <button className="primary" onClick={applyCrop} disabled={!cropSel || cropSel.w < 3 || cropSel.h < 3}>{t('occ.cropApply')}</button>
+            </span>
+          </>
+        ) : (
+          <>
+            <span><Glyph name="plus" size={12} /> {t('occ.dragHint')} · {tp('occ.regionCount', boxes.length, { n: boxes.length })}</span>
+            {img && <button className="quiet" onClick={() => { setMode('crop'); setCropSel(null); }}>{t('occ.crop')}</button>}
+          </>
+        )}
       </div>
     </>
   );
@@ -2557,6 +2622,7 @@ function ReviewDraftsScreen({ drafts, onApprove, onCancel, onShowSource }) {
   const [decisions, setDecisions] = useState({}); // id -> 'keep' | 'skip'
   const [edits, setEdits] = useState({}); // id -> { q, a } for edited drafts
   const [occBoxes, setOccBoxes] = useState(null); // live boxes for the current occlusion draft
+  const [occImage, setOccImage] = useState(null); // live (possibly cropped) image for the current occlusion draft
   const [revealed, setRevealed] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editQ, setEditQ] = useState('');
@@ -2585,14 +2651,14 @@ function ReviewDraftsScreen({ drafts, onApprove, onCancel, onShowSource }) {
       <div className="stage-inner wide">
         <div className="eyebrow">{t('add.reviewCardCounter', { idx: idx + 1, total: drafts.length })}<span className="dot" />{t('add.reviewOcclusionTag')}</div>
 
-        <OcclusionEditor key={card.id} card={card} onBoxesChange={setOccBoxes} />
+        <OcclusionEditor key={card.id} card={card} onBoxesChange={setOccBoxes} onImageChange={setOccImage} />
 
         <div className="card-question smaller">{card.q}</div>
 
         <div className="card-foot">
           <div className="row">
             <button className="quiet" onClick={() => decide('skip')}>{t('add.reviewRemove')}</button>
-            <button className="primary" onClick={() => decide('keep', occBoxes ? { boxes: occBoxes } : undefined)}>{t('add.reviewKeep')} <Glyph name="check" size={14} /></button>
+            <button className="primary" onClick={() => decide('keep', { boxes: occBoxes || undefined, image: occImage || undefined })}>{t('add.reviewKeep')} <Glyph name="check" size={14} /></button>
           </div>
         </div>
       </div>
@@ -3241,7 +3307,7 @@ function App() {
           ...(c.kind === 'occlusion'
             ? {
                 ...(e.boxes && e.boxes.length ? { boxes: e.boxes } : (c.boxes && c.boxes.length ? { boxes: c.boxes } : (c.regions ? { regions: c.regions } : {}))),
-                ...(c.image ? { image: c.image } : {}),
+                ...((e.image || c.image) ? { image: e.image || c.image } : {}),  // prefer the cropped image
               }
             : {}),
         };

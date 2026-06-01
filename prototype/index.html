@@ -1767,6 +1767,16 @@
 
   /* ─── Occlusion editor (draw / drag / resize) ─── */
   .figure-wrap.occ-editor { touch-action: none; user-select: none; }
+  .figure-wrap.occ-editor.is-cropping .occ-edit-surface { cursor: crosshair; }
+  /* Crop selection: a clear rectangle with everything outside it dimmed. */
+  .occ-crop-sel {
+    position: absolute;
+    z-index: 4;
+    border: 2px solid #FFFFFF;
+    border-radius: 2px;
+    box-shadow: 0 0 0 9999px rgba(20,25,32,0.50);
+    pointer-events: none;
+  }
   .occ-edit-surface {
     position: absolute; inset: 0;
     cursor: crosshair;

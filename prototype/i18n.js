@@ -249,7 +249,10 @@ const RUNICO_STRINGS = {
     "study.flipDefinition": "Definition",
     "study.flipQuestion": "Question",
     "study.flipAnswer": "Answer",
-    "add.occlusionCardPrompt": "Identify each labeled part."
+    "add.occlusionCardPrompt": "Identify each labeled part.",
+    "occ.crop": "Crop the figure",
+    "occ.cropApply": "Apply crop",
+    "occ.cropHint": "Drag a box around just the figure to keep, then apply."
   },
   "pt-BR": {
     "common.nav.settings": "Configurações",
@@ -496,7 +499,10 @@ const RUNICO_STRINGS = {
     "study.flipDefinition": "Definição",
     "study.flipQuestion": "Pergunta",
     "study.flipAnswer": "Resposta",
-    "add.occlusionCardPrompt": "Identifique cada parte rotulada."
+    "add.occlusionCardPrompt": "Identifique cada parte rotulada.",
+    "occ.crop": "Recortar a figura",
+    "occ.cropApply": "Aplicar recorte",
+    "occ.cropHint": "Arraste uma caixa em volta apenas da figura a manter e aplique."
   },
   "pt-PT": {
     "common.nav.settings": "Definições",
@@ -743,7 +749,10 @@ const RUNICO_STRINGS = {
     "study.flipDefinition": "Definição",
     "study.flipQuestion": "Pergunta",
     "study.flipAnswer": "Resposta",
-    "add.occlusionCardPrompt": "Identifique cada parte rotulada."
+    "add.occlusionCardPrompt": "Identifique cada parte rotulada.",
+    "occ.crop": "Recortar a figura",
+    "occ.cropApply": "Aplicar recorte",
+    "occ.cropHint": "Arraste uma caixa à volta apenas da figura a manter e aplique."
   },
   "es": {
     "common.nav.settings": "Ajustes",
@@ -990,7 +999,10 @@ const RUNICO_STRINGS = {
     "study.flipDefinition": "Definición",
     "study.flipQuestion": "Pregunta",
     "study.flipAnswer": "Respuesta",
-    "add.occlusionCardPrompt": "Identifica cada parte etiquetada."
+    "add.occlusionCardPrompt": "Identifica cada parte etiquetada.",
+    "occ.crop": "Recortar la figura",
+    "occ.cropApply": "Aplicar recorte",
+    "occ.cropHint": "Arrastra un recuadro alrededor solo de la figura que quieres conservar y aplica."
   },
   "ru": {
     "common.nav.settings": "Настройки",
@@ -1237,7 +1249,10 @@ const RUNICO_STRINGS = {
     "study.flipDefinition": "Определение",
     "study.flipQuestion": "Вопрос",
     "study.flipAnswer": "Ответ",
-    "add.occlusionCardPrompt": "Определите каждую подписанную часть."
+    "add.occlusionCardPrompt": "Определите каждую подписанную часть.",
+    "occ.crop": "Обрезать рисунок",
+    "occ.cropApply": "Применить обрезку",
+    "occ.cropHint": "Обведите рамкой только нужный рисунок и примените."
   },
   "it": {
     "common.nav.settings": "Impostazioni",
@@ -1484,7 +1499,10 @@ const RUNICO_STRINGS = {
     "study.flipDefinition": "Definizione",
     "study.flipQuestion": "Domanda",
     "study.flipAnswer": "Risposta",
-    "add.occlusionCardPrompt": "Identifica ogni parte etichettata."
+    "add.occlusionCardPrompt": "Identifica ogni parte etichettata.",
+    "occ.crop": "Ritaglia la figura",
+    "occ.cropApply": "Applica ritaglio",
+    "occ.cropHint": "Trascina un riquadro attorno alla sola figura da tenere e applica."
   },
   "zh": {
     "common.nav.settings": "设置",
@@ -1731,7 +1749,10 @@ const RUNICO_STRINGS = {
     "study.flipDefinition": "定义",
     "study.flipQuestion": "问题",
     "study.flipAnswer": "答案",
-    "add.occlusionCardPrompt": "识别每个标注的部分。"
+    "add.occlusionCardPrompt": "识别每个标注的部分。",
+    "occ.crop": "裁剪图形",
+    "occ.cropApply": "应用裁剪",
+    "occ.cropHint": "仅在要保留的图形周围拖出方框，然后应用。"
   }
 };
 
