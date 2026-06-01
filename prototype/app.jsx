@@ -3295,6 +3295,32 @@ function App() {
     });
   }, []);
 
+  // One-time heal: earlier id bugs (since fixed) could file a leaf's cards under a
+  // stale key, leaving the scope showing 0 cards while its cards sit orphaned in
+  // the save file. Re-attach an orphaned card-set to a leaf ONLY when that leaf
+  // has total>0, currently has no cards, and EXACTLY ONE unreferenced card-set
+  // matches its total — an unambiguous, safe match (never a guess).
+  useEffect(() => {
+    const scopeIds = new Set(scopes.map(s => s.id));
+    const orphanKeys = Object.keys(sourceCards).filter(k => !scopeIds.has(k) && (sourceCards[k] || []).length);
+    if (!orphanKeys.length) return;
+    const used = new Set();
+    const moves = [];
+    scopes.forEach(s => {
+      if (!s.isLeaf || (s.total || 0) <= 0) return;
+      if (sourceCards[s.id] && sourceCards[s.id].length) return;       // already has cards
+      const matches = orphanKeys.filter(k => !used.has(k) && (sourceCards[k] || []).length === s.total);
+      if (matches.length === 1) { used.add(matches[0]); moves.push([matches[0], s.id]); }
+    });
+    if (moves.length) {
+      setSourceCards(prev => {
+        const n = { ...prev };
+        moves.forEach(([from, to]) => { if (n[from] && !(n[to] && n[to].length)) { n[to] = n[from]; delete n[from]; } });
+        return n;
+      });
+    }
+  }, []);
+
   // If a generation was interrupted by a page reload, return the user to the Add
   // screen with their input restored (the network request can't be resumed).
   useEffect(() => {
@@ -3385,27 +3411,28 @@ function App() {
   }
 
   function deleteFolder(id) {
-    // Remove the folder + everything inside it
-    setScopes(prev => {
-      const removed = new Set([id]);
-      // sweep through; if a row's parent is removed, remove the row too
-      let added = true;
-      while (added) {
-        added = false;
-        for (const s of prev) {
-          if (!removed.has(s.id) && removed.has(s.parent)) {
-            removed.add(s.id);
-            added = true;
-          }
-        }
+    // The folder + all its descendants.
+    const removed = new Set([id]);
+    let added = true;
+    while (added) {
+      added = false;
+      for (const s of scopes) {
+        if (!removed.has(s.id) && removed.has(s.parent)) { removed.add(s.id); added = true; }
       }
-      return prev.filter(s => !removed.has(s.id));
-    });
-    // If the currently-selected scope got deleted, fall back to root
-    setScopeId(prev => {
-      // Use a check via current state
-      return prev;
-    });
+    }
+    setScopes(prev => prev.filter(s => !removed.has(s.id)));
+    // Also prune the removed scopes' cards / drafts / history / label overrides,
+    // so a delete can't leave orphaned card-sets behind (which bloat the save file
+    // and can resurface as topics with no cards).
+    const prune = (obj) => {
+      let changed = false; const n = { ...obj };
+      for (const k of Object.keys(n)) if (removed.has(k)) { delete n[k]; changed = true; }
+      return changed ? n : obj;
+    };
+    setSourceCards(prune);
+    setPendingDrafts(prune);
+    setHistory(prune);
+    setScopeLabelOverrides(prune);
   }
 
   // The demo deck (the fixed QUEUE) drives the session. v1 has no
