@@ -11,6 +11,10 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 
+// Name the app "Runico" (the dev Electron binary is otherwise called "Electron"
+// in the menu bar / About panel). Must be set before the app is ready.
+app.setName('Runico');
+
 const dataFile = () => path.join(app.getPath('userData'), 'data.json');
 const keyFile = () => path.join(app.getPath('userData'), 'openrouter.key'); // safeStorage ciphertext
 
@@ -171,6 +175,7 @@ app.whenReady().then(() => {
   // Use the Runico ring as the dock icon (macOS dev run shows the default Electron
   // icon otherwise); packaged builds use build.icon from package.json.
   if (process.platform === 'darwin' && app.dock) { try { app.dock.setIcon(ICON); } catch (e) {} }
+  try { app.setAboutPanelOptions({ applicationName: 'Runico', applicationVersion: app.getVersion() }); } catch (e) {}
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });

@@ -814,18 +814,21 @@ function QuickResume({ lastSession, scopes, onResume, hasStudyCards }) {
   if (hasStudyCards && !hasStudyCards(lastSession.scopeId)) return null;
 
   const remaining = Math.max(0, lastSession.total - lastSession.position);
+  // The root scope's label is a localized system label ("Everything"/"Tudo"…);
+  // user-created topic labels are shown as-is.
+  const targetLabel = target.id === 'all' ? t('browse.columnHeadEverything') : target.label;
   let label, sub, icon;
   if (lastSession.status === 'finished') {
     label = t('common.quickResume.restart');
-    sub = target.label;
+    sub = targetLabel;
     icon = 'restart';
   } else if (lastSession.status === 'paused') {
     label = t('common.quickResume.continue');
-    sub = tp('common.quickResume.cardsRemaining', remaining, { label: target.label, n: remaining });
+    sub = tp('common.quickResume.cardsRemaining', remaining, { label: targetLabel, n: remaining });
     icon = 'pause';
   } else {
     label = t('common.quickResume.begin');
-    sub = target.label;
+    sub = targetLabel;
     icon = 'play';
   }
 
@@ -3683,9 +3686,15 @@ function App() {
         </div>
       </div>
 
-      {(screen === 'add' || screen === 'processing' || screen === 'processedNotice' || screen === 'manualGen' || screen === 'reviewDrafts' || screen === 'settings') && (
+      {(screen === 'add' || screen === 'processing' || screen === 'processedNotice' || screen === 'manualGen' || screen === 'reviewDrafts' || screen === 'settings' || screen === 'study' || screen === 'performance') && (
         <div className="back-bar">
-          <button className="nav-btn" onClick={() => { setGenDraftBackup(null); setRestoreDraft(null); setScreen('folder'); }}>
+          <button className="nav-btn" onClick={() => {
+            // Performance returns to where it was opened from; study pauses (saving
+            // the spot so it's resumable); everything else goes home.
+            if (screen === 'performance') { setScreen(perfReturn || 'folder'); return; }
+            if (screen === 'study') { pauseSession(); return; }
+            setGenDraftBackup(null); setRestoreDraft(null); setScreen('folder');
+          }}>
             <Glyph name="back" size={14} /> {t('common.nav.back')}
           </button>
         </div>
