@@ -121,7 +121,13 @@ function buildGenPrompt(sourceText) {
 }
 
 // Monotonic id counter so generated cards are unique regardless of timing.
+// Ids for generated cards/sources/scopes must stay unique ACROSS reloads — they
+// are persisted (in scopes/sources/pendingDrafts/sourceCards) and a bare counter
+// reset to 0 on reload would re-mint ids that collide with stored ones (merging
+// unrelated sources, duplicate React keys, lost cards). Combine the wall clock
+// (differs across reloads) with a per-load counter (differs within a batch).
 let GEN_ID = 0;
+function genId(prefix) { return prefix + '-' + Date.now().toString(36) + '-' + (++GEN_ID).toString(36); }
 
 // Tolerant parse: strip fences/prose, extract the JSON array, validate, and map
 // to Runico card shapes. Used by BOTH transports so they produce identical cards.
@@ -148,7 +154,7 @@ function parseGenCards(responseText) {
     if (!q) return;
     if (kind === 'cloze' && !/\{\{.+?\}\}/.test(q)) kind = 'qa';
     if (kind !== 'cloze' && !a) return;
-    out.push({ id: 'g-' + (++GEN_ID), kind, q, a });
+    out.push({ id: genId('g'), kind, q, a });
   });
   return out;
 }
@@ -2001,14 +2007,19 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCa
   const fileInputRef = useRef(null);
   const readToken = useRef(0);
   const aliveRef = useRef(true);
-  useEffect(() => () => { aliveRef.current = false; }, []);
+  const objectUrlRef = useRef(null); // current preview blob URL, revoked when replaced/cleared
+  function clearObjectUrl() { if (objectUrlRef.current) { URL.revokeObjectURL(objectUrlRef.current); objectUrlRef.current = null; } }
+  useEffect(() => () => { aliveRef.current = false; clearObjectUrl(); }, []);
 
   function acceptFile(f) {
     if (!f) return;
     const token = ++readToken.current;
     const isImage = (f.type || '').indexOf('image/') === 0;
     const isText = (f.type || '').indexOf('text/') === 0 || /\.(txt|md|markdown|csv)$/i.test(f.name || '');
-    setFile({ name: f.name, size: f.size, isImage, url: isImage ? URL.createObjectURL(f) : null, dataUrl: null, text: null, _ready: false });
+    clearObjectUrl();
+    const url = isImage ? URL.createObjectURL(f) : null;
+    objectUrlRef.current = url;
+    setFile({ name: f.name, size: f.size, isImage, url, dataUrl: null, text: null, _ready: false });
     if (isImage || isText) {
       const reader = new FileReader();
       if (isImage) {
@@ -2030,12 +2041,15 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCa
   // user's typed source and any in-flight result can't yank them off-screen.
   async function doGenerate() {
     setLocalErr(''); setBusy(true);
+    // Snapshot the source ONCE: the cards and the stored source must come from the
+    // same payload, even if the user edits a field during the in-flight request.
+    const p = payload();
     let cards = null, err = '';
-    try { cards = await onGenerateCards(payload()); }
+    try { cards = await onGenerateCards(p); }
     catch (e) { err = (e && e.message) || 'http'; }
     if (!aliveRef.current) return; // user left mid-flight — drop the result
     setBusy(false);
-    if (err) setLocalErr(err); else onGenerated(cards, name.trim(), payload());
+    if (err) setLocalErr(err); else onGenerated(cards, p.name, p);
   }
   function onPickFile(e) { acceptFile(e.target.files && e.target.files[0]); }
   function onDropFile(e) {
@@ -2064,11 +2078,23 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCa
     setDragIdx(null);
   }
 
+  // An image needs a vision model — switch a text-only pick to a vision one when
+  // an image is attached, so the image is never sent to a text-only endpoint.
+  useEffect(() => {
+    if (file && file.isImage && !(modelById(model) || {}).vision) {
+      setModel((modelById(defaultModel) || {}).vision ? defaultModel : DEFAULT_GEN_MODEL);
+    }
+  }, [file, model, defaultModel]);
+
   const combinedSource = [sourceText, file && file.text].filter(Boolean).join('\n\n');
-  const ready = !!(combinedSource.trim() || (file && file._ready)); // real readable content present
+  const fileLoading = !!(file && !file._ready);                       // attached but still reading/downscaling
+  const ready = !!(combinedSource.trim() || (file && file._ready)) && !fileLoading;
   const canGenerate = (isExistingSource || !!name.trim()) && ready && !busy;
   function payload() {
-    return { name: name.trim(), sourceText: combinedSource, imageDataUrl: file && file.isImage ? file.dataUrl : null, model };
+    // Only attach the image for a vision model (the effect above keeps `model` a
+    // vision one whenever an image is present; this is the defensive backstop).
+    const useImage = file && file.isImage && file._ready && (modelById(model) || {}).vision;
+    return { name: name.trim(), sourceText: combinedSource, imageDataUrl: useImage ? file.dataUrl : null, model };
   }
   const errMsg = localErr && ({
     key: t('add.genErrorKey'), rate: t('add.genErrorRate'), network: t('add.genErrorNetwork'),
@@ -2119,7 +2145,7 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCa
             <div style={{ fontSize: 13, color: '#7A8696', marginTop: 2 }}>{fmtFileSize(file.size)} · {t('add.fileReady')}</div>
           </div>
           <button className="nav-btn" title={t('add.fileRemoveTitle')}
-                  onClick={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                  onClick={() => { clearObjectUrl(); setFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
                   style={{ flex: 'none' }}><Glyph name="close" size={14} /></button>
         </div>
       ) : (
@@ -2163,7 +2189,9 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, onCa
         <select className="scope-search" style={{ width: '100%', fontSize: 15 }}
                 value={model} onChange={e => setModel(e.target.value)}>
           {GEN_MODELS.map(m => (
-            <option key={m.id} value={m.id}>{m.label} — {modelPrice(m)}{m.vision ? '' : ' · text only'}</option>
+            <option key={m.id} value={m.id} disabled={!m.vision && !!(file && file.isImage)}>
+              {m.label} — {modelPrice(m)}{m.vision ? '' : ' · text only'}
+            </option>
           ))}
         </select>
       </div>
@@ -2739,8 +2767,17 @@ function App() {
     // ALWAYS record a source (even title-only) so every generated card keeps a
     // working "See the source" link; the overlay shows a note if there's nothing
     // storable to preview.
-    const srcId = 'usrc-' + (++GEN_ID);
-    setSources(prev => ({ ...prev, [srcId]: { text, imageDataUrl, title: (name || '').trim() } }));
+    const srcId = genId('usrc');
+    // Cap the stored sources so the map can't grow without bound and blow quota;
+    // evict the oldest (insertion-ordered keys). An evicted source just shows the
+    // graceful "unavailable" note in its cards — no crash, no desync.
+    const SOURCES_CAP = 40;
+    setSources(prev => {
+      const next = { ...prev, [srcId]: { text, imageDataUrl, title: (name || '').trim() } };
+      const keys = Object.keys(next);
+      if (keys.length > SOURCES_CAP) for (const k of keys.slice(0, keys.length - SOURCES_CAP)) delete next[k];
+      return next;
+    });
     return cards.map(c => ({ ...c, sourceId: srcId }));
   }
   const [perfReturn, setPerfReturn] = useState('folder');
@@ -2976,7 +3013,7 @@ function App() {
     let targetId = addTargetScope;
     const target = scopes.find(s => s.id === addTargetScope);
     if (target && !target.isLeaf) {
-      targetId = 'src-' + (++GEN_ID);
+      targetId = genId('src');
       const depth = (target.depth || 1) + 1;
       const newScope = { id: targetId, label: (name && name.trim()) || 'New source', parent: target.id, depth, total: 0, last: 'never', isLeaf: true };
       setScopes(prev => {
