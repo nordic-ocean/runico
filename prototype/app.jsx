@@ -15,7 +15,7 @@ const STORE_PREFIX = 'runico:v3:';
 
 // App version shown in the bottom-left build badge. Keep in sync with
 // package.json "version" — electron-builder names the installers from that.
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.0.0';
 
 // ── Native (desktop) backend ─────────────────────────────
 // In the Electron build, window.runico (preload.js) exposes the OS keychain, the
@@ -3348,6 +3348,10 @@ function TrashScreen({ trash, onRestore, onDeleteForever, onEmpty, onDone }) {
 function AboutScreen() {
   const about = (typeof window !== 'undefined' && window.RUNICO_ABOUT) || {};
   const releases = (typeof window !== 'undefined' && window.RUNICO_CHANGELOG) || [];
+  // Release-note content can be a per-locale map { en, "pt-BR", ... } (or a plain
+  // string for older content); resolve it to the current language, falling back to English.
+  const L = getRunicoLocale();
+  const loc = (f) => (f && typeof f === 'object' && !Array.isArray(f)) ? (f[L] || f.en || '') : (f || '');
   return (
     <div className="stage-inner">
       <div className="eyebrow">{t('about.title')}</div>
@@ -3356,11 +3360,11 @@ function AboutScreen() {
         <img className="about-mark" src="assets/runico-ring.png" alt="" />
         <div className="about-name">Runico</div>
         <div className="about-version">v{APP_VERSION}</div>
-        {about.tagline && <div className="about-tagline">{about.tagline}</div>}
+        {about.tagline && <div className="about-tagline">{loc(about.tagline)}</div>}
       </div>
 
       {(about.description || []).map((para, i) => (
-        <p key={i} className="about-desc">{para}</p>
+        <p key={i} className="about-desc">{loc(para)}</p>
       ))}
 
       <div className="settings-section-label" style={{ marginTop: 28 }}>{t('about.changelogTitle')}</div>
@@ -3371,14 +3375,14 @@ function AboutScreen() {
               <span className="cl-version">v{rel.version}</span>
               {rel.date && <span className="cl-date">{rel.date}</span>}
             </div>
-            {rel.summary && <div className="cl-summary">{rel.summary}</div>}
+            {rel.summary && <div className="cl-summary">{loc(rel.summary)}</div>}
             <ul className="cl-entries">
               {(rel.entries || []).map((e, ei) => {
                 const cat = CHANGELOG_CATEGORIES[e.type] || CHANGELOG_CATEGORIES.feature;
                 return (
                   <li key={ei} className="cl-entry">
                     <span className={`cl-tag ${cat.cls}`}>{t(cat.key) === cat.key ? cat.fallback : t(cat.key)}</span>
-                    <span className="cl-text">{e.text}</span>
+                    <span className="cl-text">{loc(e.text)}</span>
                   </li>
                 );
               })}
