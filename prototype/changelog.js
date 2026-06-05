@@ -22,6 +22,16 @@ window.RUNICO_ABOUT = {
 
 window.RUNICO_CHANGELOG = [
   {
+    version: '1.2.0',
+    date: '2026-06-05',
+    summary: 'Runico now works with files: open a library to start, and every change is saved to it.',
+    entries: [
+      { type: 'feature', text: 'Open a library file to start working, or create a new (empty) one — your folders, cards, and pictures all live in that file.' },
+      { type: 'feature', text: 'Every change is saved straight to the open file; the toolbar shows the file name and save status.' },
+      { type: 'enhancement', text: 'Works on the desktop app and in Chrome/Edge (File System Access); other browsers open by upload and save by download.' },
+    ],
+  },
+  {
     version: '1.1.0',
     date: '2026-06-05',
     summary: 'Adds a trash bin so deleted folders, topics, and cards can be recovered.',

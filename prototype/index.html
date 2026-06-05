@@ -150,6 +150,35 @@
   }
   .nav-btn:hover { color: #141920; background: rgba(0,0,0,0.04); }
 
+  /* ── File workspace ──────────────────────────────────────────── */
+  .file-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-left: 10px; padding: 4px 10px;
+    border: 1px solid #EBEEF2; border-radius: 999px;
+    color: #5C6878; font-size: 12px;
+  }
+  .app.theme-dark .file-chip { border-color: #2A323F; color: #BCC5D0; }
+  .app.theme-warm .file-chip { border-color: #EAE5DC; color: #5C5147; }
+  .file-chip-name { font-weight: 500; color: #141920; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+  .app.theme-dark .file-chip-name { color: #FBFCFD; }
+  .app.theme-warm .file-chip-name { color: #1A1714; }
+  .file-status { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.02em; }
+  .file-status-saved { color: #16A34A; }
+  .file-status-saving { color: #7A8696; }
+  .file-status-unsaved { color: #DC2626; }
+  .start-card {
+    margin: auto; max-width: 440px; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    padding: 40px 28px;
+  }
+  .start-mark { width: 64px; height: 64px; }
+  .start-title { font-size: 30px; font-weight: 400; letter-spacing: -0.02em; color: #141920; }
+  .app.theme-dark .start-title { color: #FBFCFD; }
+  .app.theme-warm .start-title { color: #1A1714; }
+  .start-lead { font-size: 15px; color: #5C6878; line-height: 1.5; margin: 0; max-width: 360px; }
+  .start-actions { display: flex; gap: 12px; margin-top: 6px; flex-wrap: wrap; justify-content: center; }
+  .start-note { max-width: 360px; margin-top: 8px; }
+
   .stage {
     flex: 1;
     display: flex; align-items: center; justify-content: center;
