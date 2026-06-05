@@ -22,6 +22,15 @@ window.RUNICO_ABOUT = {
 
 window.RUNICO_CHANGELOG = [
   {
+    version: '1.1.0',
+    date: '2026-06-05',
+    summary: 'Adds a trash bin so deleted folders, topics, and cards can be recovered.',
+    entries: [
+      { type: 'feature', text: 'Deleting a folder, topic, or card now moves it to a trash bin instead of removing it for good.' },
+      { type: 'feature', text: 'Open the trash from the toolbar to restore an item to where it was, delete it forever, or empty the trash.' },
+    ],
+  },
+  {
     version: '1.0.0',
     date: '2026-06-05',
     summary: 'The first stable release — the full Runico feature set as a local-first desktop app and a web build.',

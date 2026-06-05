@@ -1603,6 +1603,34 @@
   }
   .app.theme-dark .src-action { color: #BCC5D0; }
   .app.theme-dark .src-action:hover { background: rgba(255,255,255,0.06); color: #fff; }
+  .src-action.src-action-danger { color: #DC2626; }
+  .src-action.src-action-danger:hover { background: rgba(220,38,38,0.09); color: #B91C1C; }
+
+  /* ── Trash bin ───────────────────────────────────────────────── */
+  .trash-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 18px; flex-wrap: wrap;
+  }
+  .trash-empty-confirm { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .trash-none { text-align: center; color: #6B7686; font-size: 14px; padding: 48px 16px; }
+  .app.theme-dark .trash-none { color: #8A93A1; }
+  .trash-list { display: flex; flex-direction: column; gap: 6px; }
+  .trash-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px; border: 1px solid #F0F2F5; border-radius: 10px; background: #FBFCFD;
+  }
+  .app.theme-dark .trash-row { background: #1A1F26; border-color: #2A323F; }
+  .app.theme-warm .trash-row { background: #FBFAF7; border-color: #EAE5DC; }
+  .trash-row-glyph { color: #7A8696; display: flex; flex: none; }
+  .trash-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .trash-row-label {
+    font-size: 14px; color: #141920; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .app.theme-dark .trash-row-label { color: #FBFCFD; }
+  .app.theme-warm .trash-row-label { color: #1A1714; }
+  .trash-row-meta { font-size: 12px; color: #6B7686; font-family: var(--font-mono); letter-spacing: 0.02em; }
+  .trash-row-actions { display: inline-flex; gap: 4px; flex: none; }
 
   /* Editor */
   .card-editor {
@@ -2118,6 +2146,16 @@
     transition: all 150ms;
   }
   .overlay-close:hover { background: #F7F8FA; color: #141920; }
+  /* Confirmation modal (trash delete-forever / empty) */
+  .confirm-card { max-width: 420px; padding: 28px; }
+  .confirm-title { font-size: 19px; font-weight: 600; color: #141920; letter-spacing: -0.01em; }
+  .app.theme-dark .confirm-title { color: #FBFCFD; }
+  .app.theme-warm .confirm-title { color: #1A1714; }
+  .confirm-message { font-size: 14px; color: #5C6878; line-height: 1.5; margin: 10px 0 0; }
+  .app.theme-dark .confirm-message { color: #9BA5B3; }
+  .confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+  .confirm-danger { background: #DC2626 !important; border-color: #DC2626 !important; color: #fff !important; }
+  .confirm-danger:hover { background: #B91C1C !important; border-color: #B91C1C !important; }
 
   /* ─── Source as a book page ─── */
   .source-page { padding: 36px 40px 40px; }
