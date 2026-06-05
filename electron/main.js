@@ -99,6 +99,38 @@ async function importData() {
   } catch (e) { return { ok: false, error: 'invalid' }; }
 }
 
+// ── Library files (the file-workspace document): open / new / save-to-path ──
+const EMPTY_LIBRARY = { format: 'runico-library', version: 1, library: { scopes: [{ id: 'all', label: 'Everything', parent: null, depth: 0, isLeaf: false }], sourceCards: {}, scopeLabels: {}, folderSort: {}, history: {}, trash: [], pendingDrafts: {}, sources: {}, lastSession: null } };
+async function openLibrary() {
+  const r = await dialog.showOpenDialog(win || undefined, {
+    title: 'Open Runico library', properties: ['openFile'],
+    filters: [{ name: 'Runico library', extensions: ['runico', 'json'] }],
+  });
+  if (r.canceled || !r.filePaths || !r.filePaths[0]) return { canceled: true };
+  const fp = r.filePaths[0];
+  try { const data = JSON.parse(fs.readFileSync(fp, 'utf8')); return { ok: true, path: fp, name: path.basename(fp), data }; }
+  catch (e) { return { ok: false, error: 'invalid' }; }
+}
+async function newLibrary() {
+  const r = await dialog.showSaveDialog(win || undefined, {
+    title: 'New Runico library', defaultPath: 'library.runico',
+    filters: [{ name: 'Runico library', extensions: ['runico', 'json'] }],
+  });
+  if (r.canceled || !r.filePath) return { canceled: true };
+  try { fs.writeFileSync(r.filePath, JSON.stringify(EMPTY_LIBRARY)); return { ok: true, path: r.filePath, name: path.basename(r.filePath) }; }
+  catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+}
+// Atomic write (temp then rename) so an interrupted save never corrupts the file.
+function saveLibrary(fp, lib) {
+  if (!fp) return { ok: false };
+  try {
+    const tmp = fp + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify({ format: 'runico-library', version: 1, library: lib || {} }));
+    fs.renameSync(tmp, fp);
+    return { ok: true };
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+}
+
 async function openRouterValidate() {
   const key = readKey();
   if (!key) return 'invalid';
@@ -146,6 +178,10 @@ ipcMain.handle('runico:validate', () => openRouterValidate());
 ipcMain.handle('runico:generate', (e, body) => openRouterGenerate(body));
 ipcMain.handle('runico:export', (e, payload) => exportData(payload && payload.data, payload && payload.name));
 ipcMain.handle('runico:import', () => importData());
+ipcMain.handle('runico:openLibrary', () => openLibrary());
+ipcMain.handle('runico:newLibrary', () => newLibrary());
+ipcMain.handle('runico:saveLibrary', (e, p) => saveLibrary(p && p.path, p && p.lib));
+ipcMain.on('runico:saveLibrarySync', (e, p) => { e.returnValue = saveLibrary(p && p.path, p && p.lib); });
 
 const ICON = path.join(__dirname, '..', 'prototype', 'assets', 'runico-ring.png');
 

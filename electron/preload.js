@@ -27,4 +27,10 @@ contextBridge.exposeInMainWorld('runico', {
   // Export to / import from a user-chosen backup file (native dialogs in main).
   exportData: (data, name) => ipcRenderer.invoke('runico:export', { data, name }),
   importData: () => ipcRenderer.invoke('runico:import'),
+  // File-workspace document: open an existing library, create a new (empty) one,
+  // and write the current library to its path (async + a sync flush on close).
+  openLibrary: () => ipcRenderer.invoke('runico:openLibrary'),
+  newLibrary: () => ipcRenderer.invoke('runico:newLibrary'),
+  saveLibrary: (path, lib) => ipcRenderer.invoke('runico:saveLibrary', { path, lib }),
+  saveLibrarySync: (path, lib) => { try { return ipcRenderer.sendSync('runico:saveLibrarySync', { path, lib }); } catch (e) { return { ok: false }; } },
 });

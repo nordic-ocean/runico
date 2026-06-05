@@ -15,7 +15,7 @@ const STORE_PREFIX = 'runico:v3:';
 
 // App version shown in the bottom-left build badge. Keep in sync with
 // package.json "version" — electron-builder names the installers from that.
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 
 // ── Native (desktop) backend ─────────────────────────────
 // In the Electron build, window.runico (preload.js) exposes the OS keychain, the
@@ -173,8 +173,15 @@ function notifyStorageFull() {
   try { alert(t('nav.storageFull')); } catch (e) {}
 }
 
+// Library keys live in the user's open file (see the file-workspace flow), not in
+// localStorage / the native store — only app SETTINGS persist locally. So these
+// keys never auto-restore on launch; they are seeded from the opened file.
+const LIBRARY_KEYS = new Set(['scopes', 'sourceCards', 'scopeLabels', 'folderSort', 'history', 'trash', 'pendingDrafts', 'sources', 'lastSession']);
+
 function usePersistentState(key, initial) {
+  const isLibrary = LIBRARY_KEYS.has(key);
   const [val, setVal] = useState(() => {
+    if (isLibrary) return typeof initial === 'function' ? initial() : initial;   // comes from the open file, not storage
     try {
       if (IS_DESKTOP) {
         if (Object.prototype.hasOwnProperty.call(NATIVE_STORE, STORE_PREFIX + key)) return NATIVE_STORE[STORE_PREFIX + key];
@@ -186,6 +193,7 @@ function usePersistentState(key, initial) {
     return typeof initial === 'function' ? initial() : initial;
   });
   useEffect(() => {
+    if (isLibrary) return;   // library is written to the open file, not localStorage / native store
     try {
       if (IS_DESKTOP) { NATIVE_STORE[STORE_PREFIX + key] = val; nativeSaveSoon(); }
       else { localStorage.setItem(STORE_PREFIX + key, JSON.stringify(val)); }
@@ -193,6 +201,23 @@ function usePersistentState(key, initial) {
   }, [key, val]);
   return [val, setVal];
 }
+
+// ── File-workspace helpers ───────────────────────────────────
+// The library is a self-describing document; app settings are NOT part of it.
+const ROOT_SCOPE = { id: 'all', label: 'Everything', parent: null, depth: 0, isLeaf: false };
+function emptyLibrary() {
+  return { scopes: [{ ...ROOT_SCOPE }], sourceCards: {}, scopeLabels: {}, folderSort: {}, history: {}, trash: [], pendingDrafts: {}, sources: {}, lastSession: null };
+}
+function libraryEnvelopeText(lib) { return JSON.stringify({ format: 'runico-library', version: 1, library: lib || {} }); }
+function parseLibrary(textOrObj) {
+  let o = textOrObj;
+  if (typeof o === 'string') { try { o = JSON.parse(o); } catch (e) { return null; } }
+  if (!o || typeof o !== 'object' || !o.library || typeof o.library !== 'object' || Array.isArray(o.library)) return null;
+  return o.library;
+}
+// File System Access API (Chrome/Edge); else we fall back to upload/download.
+const FS_ACCESS = (typeof window !== 'undefined') && typeof window.showOpenFilePicker === 'function' && typeof window.showSaveFilePicker === 'function';
+const FILE_PICKER_TYPES = [{ description: 'Runico library', accept: { 'application/json': ['.runico', '.json'] } }];
 
 // ── Sample content ───────────────────────────────────────────
 const REGIONS = {
@@ -3473,6 +3498,24 @@ const TWEAK_DEFAULTS = {
   language: 'en',
 };
 
+// Start screen shown until the user opens or creates a library file.
+function StartScreen({ onOpen, onNew, fsSupported }) {
+  return (
+    <div className="stage">
+      <div className="start-card">
+        <img className="start-mark" src="assets/runico-ring.png" alt="" />
+        <div className="start-title">Runico</div>
+        <p className="start-lead">{t('file.startLead')}</p>
+        <div className="start-actions">
+          <button className="primary" onClick={onOpen}><Glyph name="upload" size={16} /> {t('file.open')}</button>
+          <button className="quiet" onClick={onNew}><Glyph name="plus" size={16} /> {t('file.new')}</button>
+        </div>
+        {!fsSupported && <p className="start-note small">{t('file.fallbackNote')}</p>}
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [screen, setScreen] = useState('folder');
   // Mirror of `screen` readable inside async callbacks (to decide, at completion
@@ -3616,6 +3659,135 @@ function App() {
   const [restoreDraft, setRestoreDraft] = useState(null);     // one-shot seed for a restored Add screen
   // Stored source documents (the material cards were generated from), keyed by id.
   const [sources, setSources] = usePersistentState('sources', () => ({}));
+
+  // ── File workspace: open a file to work; auto-save every change to it ──
+  const [libraryLoaded, setLibraryLoaded] = useState(false);
+  const [currentFile, setCurrentFile] = useState(null);   // { kind:'desktop'|'fsapi'|'upload', name, path?, handle? }
+  const [saveState, setSaveState] = useState('saved');    // 'saved' | 'saving' | 'unsaved'
+  const saveTimer = useRef(null);
+
+  function applyLibrary(lib) {
+    lib = lib || {};
+    setScopes(Array.isArray(lib.scopes) && lib.scopes.length ? lib.scopes : [{ ...ROOT_SCOPE }]);
+    setSourceCards(lib.sourceCards || {});
+    setScopeLabelOverrides(lib.scopeLabels || {});
+    setFolderSort(lib.folderSort || {});
+    setHistory(lib.history || {});
+    setTrash(Array.isArray(lib.trash) ? lib.trash : []);
+    setPendingDrafts(lib.pendingDrafts || {});
+    setSources(lib.sources || {});
+    setLastSession(lib.lastSession || null);
+  }
+  function currentLibrary() {
+    return { scopes, sourceCards, scopeLabels: scopeLabelOverrides, folderSort, history, trash, pendingDrafts, sources, lastSession };
+  }
+
+  // Write the current library to the open file (auto-save / manual flush).
+  async function flushLibrary() {
+    if (!libraryLoaded || !currentFile) return;
+    const lib = currentLibrary();
+    if (currentFile.kind === 'desktop') {
+      try { const r = await RUNICO.saveLibrary(currentFile.path, lib); setSaveState(r && r.ok ? 'saved' : 'unsaved'); } catch (e) { setSaveState('unsaved'); }
+    } else if (currentFile.kind === 'fsapi' && currentFile.handle) {
+      try { const w = await currentFile.handle.createWritable(); await w.write(libraryEnvelopeText(lib)); await w.close(); setSaveState('saved'); } catch (e) { setSaveState('unsaved'); }
+    } else { setSaveState('unsaved'); }   // upload fallback: needs a manual download
+  }
+
+  // Manual save: fallback download (or "save a copy" anywhere).
+  function downloadLibrary() {
+    try {
+      const name = (currentFile && currentFile.name) || 'library.runico';
+      const blob = new Blob([libraryEnvelopeText(currentLibrary())], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = /\.(runico|json)$/i.test(name) ? name : name + '.runico';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+      setSaveState('saved');
+    } catch (e) {}
+  }
+
+  // Upload helper (fallback open).
+  function pickUploadLibrary(onLoaded) {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.runico,.json,application/json'; input.style.display = 'none';
+    document.body.appendChild(input);
+    input.onchange = () => {
+      const f = input.files && input.files[0]; input.remove();
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => { const lib = parseLibrary(String(reader.result || '')); if (!lib) { try { alert(t('file.invalid')); } catch (e) {} return; } onLoaded(f, lib); };
+      reader.readAsText(f);
+    };
+    input.click();
+  }
+
+  async function openLibraryFile() {
+    if (IS_DESKTOP) {
+      let r; try { r = await RUNICO.openLibrary(); } catch (e) { return; }
+      if (!r || r.canceled) return;
+      const lib = r.ok ? parseLibrary(r.data) : null;
+      if (!lib) { try { alert(t('file.invalid')); } catch (e) {} return; }
+      applyLibrary(lib); setCurrentFile({ kind: 'desktop', name: r.name, path: r.path }); setSaveState('saved'); setLibraryLoaded(true);
+      return;
+    }
+    if (FS_ACCESS) {
+      let handle; try { [handle] = await window.showOpenFilePicker({ types: FILE_PICKER_TYPES, multiple: false }); } catch (e) { return; }
+      try {
+        const file = await handle.getFile();
+        const lib = parseLibrary(await file.text());
+        if (!lib) { try { alert(t('file.invalid')); } catch (e) {} return; }
+        applyLibrary(lib); setCurrentFile({ kind: 'fsapi', name: file.name, handle }); setSaveState('saved'); setLibraryLoaded(true);
+      } catch (e) {}
+      return;
+    }
+    pickUploadLibrary((file, lib) => { applyLibrary(lib); setCurrentFile({ kind: 'upload', name: file.name }); setSaveState('unsaved'); setLibraryLoaded(true); });
+  }
+
+  async function newLibraryFile() {
+    const lib = emptyLibrary();
+    if (IS_DESKTOP) {
+      let r; try { r = await RUNICO.newLibrary(); } catch (e) { return; }
+      if (!r || r.canceled || !r.ok) return;
+      applyLibrary(lib); setCurrentFile({ kind: 'desktop', name: r.name, path: r.path }); setSaveState('saved'); setLibraryLoaded(true);
+      return;
+    }
+    if (FS_ACCESS) {
+      let handle; try { handle = await window.showSaveFilePicker({ suggestedName: 'library.runico', types: FILE_PICKER_TYPES }); } catch (e) { return; }
+      try { const w = await handle.createWritable(); await w.write(libraryEnvelopeText(lib)); await w.close(); } catch (e) { return; }
+      applyLibrary(lib); setCurrentFile({ kind: 'fsapi', name: handle.name, handle }); setSaveState('saved'); setLibraryLoaded(true);
+      return;
+    }
+    applyLibrary(lib); setCurrentFile({ kind: 'upload', name: t('file.untitled') }); setSaveState('unsaved'); setLibraryLoaded(true);
+  }
+
+  // Debounced auto-save whenever the library changes.
+  useEffect(() => {
+    if (!libraryLoaded || !currentFile) return;
+    if (currentFile.kind === 'upload') { setSaveState('unsaved'); return; }   // can't write silently
+    setSaveState('saving');
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => { flushLibrary(); }, 600);
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [libraryLoaded, currentFile, scopes, sourceCards, scopeLabelOverrides, folderSort, history, trash, pendingDrafts, sources, lastSession]);
+
+  // Flush synchronously on close (desktop) so the last change isn't lost.
+  const libRef = useRef(null);
+  useEffect(() => { libRef.current = { loaded: libraryLoaded, file: currentFile, lib: currentLibrary() }; });
+  useEffect(() => {
+    function onHide() {
+      const s = libRef.current; if (!s || !s.loaded || !s.file) return;
+      if (s.file.kind === 'desktop' && RUNICO && RUNICO.saveLibrarySync) { try { RUNICO.saveLibrarySync(s.file.path, s.lib); } catch (e) {} }
+    }
+    window.addEventListener('pagehide', onHide);
+    return () => window.removeEventListener('pagehide', onHide);
+  }, []);
+
+  // Warn before leaving with unsaved changes (fallback browsers only).
+  useEffect(() => {
+    if (saveState !== 'unsaved') return;
+    function warn(e) { e.preventDefault(); e.returnValue = ''; }
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [saveState]);
   const pendingFor = (id) => (pendingDrafts[id] || []);
   // The topic the global "new cards ready" banner points at: the most recent
   // generation if it still has pending, else the first topic with any.
@@ -4165,6 +4337,15 @@ function App() {
   // Inline size scaling via CSS variable (small/normal/large)
   const sizeMul = tweaks.size === 'small' ? 0.9 : tweaks.size === 'large' ? 1.12 : 1;
 
+  // Until a library file is opened/created, show the start screen — no auto-restore.
+  if (!libraryLoaded) {
+    return (
+      <div className={`app theme-${tweaks.theme}`} style={{ ['--size-mul']: sizeMul }}>
+        <StartScreen onOpen={openLibraryFile} onNew={newLibraryFile} fsSupported={IS_DESKTOP || FS_ACCESS} />
+      </div>
+    );
+  }
+
   return (
     <div className={`app theme-${tweaks.theme}`} style={{ ['--size-mul']: sizeMul }}>
       <div className="sr-only" aria-live="polite" role="status">{announce}</div>
@@ -4174,16 +4355,28 @@ function App() {
             <img className="mark-logo" src="assets/runico-ring.png" alt="" />
             <img className="mark-wordmark" src="assets/runico-wordmark.png" alt="Runico" />
           </button>
+          {currentFile && (
+            <span className="file-chip" title={currentFile.name}>
+              <Glyph name="book" size={13} />
+              <span className="file-chip-name">{currentFile.name}</span>
+              <span className={`file-status file-status-${saveState}`}>{t('file.' + saveState)}</span>
+            </span>
+          )}
         </div>
         <div className="nav-right">
           {(screen === 'folder' || screen === 'source' || screen === 'done') && (
             <>
-              <button className="nav-btn" onClick={exportSaveFile} title={t('nav.saveFile')}>
-                <Glyph name="download" size={14} /> {t('nav.saveFile')}
+              <button className="nav-btn" onClick={newLibraryFile} title={t('file.new')}>
+                <Glyph name="plus" size={14} /> {t('file.new')}
               </button>
-              <button className="nav-btn" onClick={importSaveFile} title={t('nav.loadFile')}>
-                <Glyph name="upload" size={14} /> {t('nav.loadFile')}
+              <button className="nav-btn" onClick={openLibraryFile} title={t('file.open')}>
+                <Glyph name="folders" size={14} /> {t('file.open')}
               </button>
+              {currentFile && currentFile.kind === 'upload' && (
+                <button className="nav-btn" onClick={downloadLibrary} title={t('file.save')}>
+                  <Glyph name="download" size={14} /> {t('file.save')}
+                </button>
+              )}
               <button className="nav-btn" onClick={() => { setGenDraftBackup(null); setRestoreDraft(null); setScreen('trash'); }} title={t('trash.title')}>
                 <Glyph name="trash" size={14} /> {t('trash.title')}
               </button>
