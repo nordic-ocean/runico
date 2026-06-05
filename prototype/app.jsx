@@ -204,41 +204,6 @@ const REGIONS = {
   lysosome:     { x: 460, y: 270, w: 32, h: 32, label: 'Lysosome' },
 };
 
-const QUEUE = [
-  {
-    id: 1, kind: 'cloze',
-    q: 'The {{nucleus}} contains the cell’s genetic material.',
-    a: 'nucleus',
-    intervals: { again: '< 10m', hard: '6d', good: '14d', easy: '32d' },
-    sourceLabel: 'Cell Biology · Ch. 4 figure',
-    region: 'nucleus',
-  },
-  {
-    id: 2, kind: 'qa',
-    q: 'What name is given to the infolded inner-membrane projections of a mitochondrion?',
-    a: 'Cristae.',
-    intervals: { again: '< 10m', hard: '8d', good: '21d', easy: '45d' },
-    sourceLabel: 'Cell Biology · Ch. 4 figure',
-    region: 'mitochondria',
-  },
-  {
-    id: 3, kind: 'qa',
-    q: 'Which two organelles are the primary sites of ribosomes in a eukaryotic cell?',
-    a: 'The cytosol (free) and the rough endoplasmic reticulum (bound).',
-    intervals: { again: '< 10m', hard: '4d', good: '12d', easy: '30d' },
-    sourceLabel: 'Cell Biology · Ch. 4 figure',
-    region: 'ribosome',
-  },
-  {
-    id: 4, kind: 'occlusion',
-    q: 'Identify each region.',
-    a: null,
-    regions: ['nucleus', 'mitochondria', 'ribosome', 'golgi', 'er', 'lysosome'],
-    intervals: { again: '< 10m', hard: '6d', good: '14d', easy: '32d' },
-    sourceLabel: 'Cell Biology · Ch. 4 figure',
-  },
-];
-
 // ── AI card generation (OpenRouter) ──────────────────────────
 // One generation *contract* (a canonical prompt + the expected output shape +
 // one parser) feeds two *transports*: the app calling OpenRouter with the
@@ -727,20 +692,17 @@ async function validateOpenRouterKey(apiKey) {
 // Practice scopes — sources, sub-sections, all-the-way-up-to "everything".
 // `isLeaf` marks an ingested source (where cards live). Folders can nest
 // to any depth; the `depth` field is just bookkeeping for display.
+// Seed library — only scopes that actually hold cards, so a fresh install has no
+// empty folders. Counts are derived from sourceCards at render time; total/due
+// here are kept consistent with the real cards (18 total, 11 due) for the few
+// places that read total (e.g. orphan recovery).
 const SCOPES = [
-  { id: 'all',       label: 'Everything',                    parent: null,         depth: 0, due: 29, total: 318, last: 'today', isLeaf: false },
-  { id: 'bio',       label: 'Biology',                       parent: 'all',        depth: 1, due: 19, total: 184, last: 'today', isLeaf: false },
-  { id: 'bio-cell',  label: 'Cell Biology',                  parent: 'bio',        depth: 2, due: 11, total: 64,  last: 'today', isLeaf: false },
-  { id: 'bio-cell-organelles', label: 'Organelles · Ch. 4',  parent: 'bio-cell',   depth: 3, due: 4,  total: 8,   last: '7d ago', isLeaf: true },
-  { id: 'bio-cell-membrane',   label: 'Membrane transport',  parent: 'bio-cell',   depth: 3, due: 3,  total: 4,   last: '3d ago', isLeaf: true },
-  { id: 'bio-cell-mitosis',    label: 'Mitosis · five phases', parent: 'bio-cell', depth: 3, due: 0,  total: 0,   last: 'never', isLeaf: true },
-  { id: 'bio-cell-photo',      label: 'Photosynthesis',      parent: 'bio-cell',   depth: 3, due: 4,  total: 6,   last: '9d ago', isLeaf: true },
-  { id: 'bio-genetics',        label: 'Genetics',            parent: 'bio',        depth: 2, due: 7,  total: 72,  last: '2d ago', isLeaf: false },
-  { id: 'bio-ecology',         label: 'Ecology',             parent: 'bio',        depth: 2, due: 1,  total: 48,  last: '11d ago', isLeaf: false },
-  { id: 'chem',                label: 'Chemistry',           parent: 'all',        depth: 1, due: 8,  total: 96,  last: '5d ago', isLeaf: false },
-  { id: 'chem-organic',        label: 'Organic',             parent: 'chem',       depth: 2, due: 5,  total: 54,  last: '5d ago', isLeaf: false },
-  { id: 'chem-inorganic',      label: 'Inorganic',           parent: 'chem',       depth: 2, due: 3,  total: 42,  last: '8d ago', isLeaf: false },
-  { id: 'hist',                label: 'History · Modern Era', parent: 'all',       depth: 1, due: 2,  total: 38,  last: '4d ago', isLeaf: false },
+  { id: 'all',       label: 'Everything',                    parent: null,         depth: 0, due: 11, total: 18, last: 'today', isLeaf: false },
+  { id: 'bio',       label: 'Biology',                       parent: 'all',        depth: 1, due: 11, total: 18, last: 'today', isLeaf: false },
+  { id: 'bio-cell',  label: 'Cell Biology',                  parent: 'bio',        depth: 2, due: 11, total: 18, last: 'today', isLeaf: false },
+  { id: 'bio-cell-organelles', label: 'Organelles · Ch. 4',  parent: 'bio-cell',   depth: 3, due: 4,  total: 8,  last: '7d ago', isLeaf: true },
+  { id: 'bio-cell-membrane',   label: 'Membrane transport',  parent: 'bio-cell',   depth: 3, due: 3,  total: 4,  last: '3d ago', isLeaf: true },
+  { id: 'bio-cell-photo',      label: 'Photosynthesis',      parent: 'bio-cell',   depth: 3, due: 4,  total: 6,  last: '9d ago', isLeaf: true },
 ];
 
 const DEFAULT_SCOPE = 'bio-cell-organelles';
@@ -3759,9 +3721,8 @@ function App() {
     if (ok) setClipboard(null);  // clear after ANY successful paste — clears every paste affordance
   }
 
-  // The demo deck (the fixed QUEUE) drives the session. v1 has no
-  // spaced-repetition schedule, so the user practices the deck in their
-  // own time; session size is simply the deck length.
+  // v1 has no spaced-repetition schedule, so the user practices a topic's deck
+  // in their own time; session size is simply the deck length.
   function setTweak(k, v) {
     setTweaks(prev => ({ ...prev, [k]: v }));
   }
