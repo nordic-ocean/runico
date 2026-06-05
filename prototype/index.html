@@ -788,6 +788,9 @@
     overflow-x: auto;
     padding-bottom: 12px;
     scroll-behavior: smooth;
+    /* Fixed folder-column height, so columns don't grow/shrink as you navigate.
+       Fuller folders scroll within it. */
+    --card-h: 495px;
   }
   .columns::-webkit-scrollbar { height: 6px; }
   .columns::-webkit-scrollbar-thumb { background: #D6DCE3; border-radius: 3px; }
@@ -801,8 +804,7 @@
     border: 1px solid #F0F2F5;
     border-radius: 12px;
     display: flex; flex-direction: column;
-    max-height: 540px;
-    min-height: 320px;
+    height: var(--card-h);
   }
   .app.theme-dark .column { background: #1A1F26; border-color: #2A323F; }
   .app.theme-warm .column { background: #FBFAF7; border-color: #EAE5DC; }
