@@ -31,6 +31,14 @@
     "appId": "com.runico.app",
     "productName": "Runico",
     "icon": "prototype/assets/runico-ring.png",
+    "fileAssociations": [
+      {
+        "ext": "runico",
+        "name": "Runico library",
+        "role": "Editor",
+        "rank": "Owner"
+      }
+    ],
     "files": [
       "electron/**/*",
       "prototype/**/*"
