@@ -22,9 +22,9 @@ window.RUNICO_ABOUT = {
 
 window.RUNICO_CHANGELOG = [
   {
-    version: '1.0.0-alpha.1',
-    date: '2026-06-01',
-    summary: 'First public alpha — the full Runico feature set, in both a desktop and a web build.',
+    version: '1.0.0',
+    date: '2026-06-05',
+    summary: 'The first stable release — the full Runico feature set as a local-first desktop app and a web build.',
     entries: [
       { type: 'feature', text: 'Study sessions with a reveal-then-Continue/Pause flow and no grading scales.' },
       { type: 'feature', text: 'Pick up where you left off: the home view remembers your last session and cards remaining.' },

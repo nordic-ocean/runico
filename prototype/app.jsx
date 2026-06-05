@@ -15,7 +15,7 @@ const STORE_PREFIX = 'runico:v3:';
 
 // App version shown in the bottom-left build badge. Keep in sync with
 // package.json "version" — electron-builder names the installers from that.
-const APP_VERSION = '1.0.0-alpha.1';
+const APP_VERSION = '1.0.0';
 
 // ── Native (desktop) backend ─────────────────────────────
 // In the Electron build, window.runico (preload.js) exposes the OS keychain, the
@@ -101,6 +101,10 @@ async function exportSaveFile() {
 }
 function applyImportedData(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) { try { alert(t('nav.loadError')); } catch (e) {} return; }
+  // Shape guard: a real Runico export is a map of STORE_PREFIX-prefixed keys. Any
+  // other .json (a package.json, another app's export, {}) would otherwise pass the
+  // type check and then irreversibly wipe and replace the user's entire library.
+  if (!Object.keys(data).some(k => k.indexOf(STORE_PREFIX) === 0)) { try { alert(t('nav.loadError')); } catch (e) {} return; }
   if (!window.confirm(t('nav.loadConfirm'))) return;
   if (IS_DESKTOP) {
     // Sync the in-memory store to the imported data IN PLACE before reloading, so
@@ -153,6 +157,22 @@ async function importSaveFile() {
   input.click();
 }
 
+// localStorage has a hard ~5MB cap in the browser. usePersistentState's write
+// used to swallow QuotaExceededError silently, so a just-approved batch (esp.
+// image-occlusion cards, which embed a base64 image) could fail to persist and
+// vanish on the next reload with zero feedback. Detect the quota error and warn
+// the user ONCE per session so they can export and free space instead of losing
+// work silently. (Desktop is file-backed and unaffected.)
+function isQuotaError(e) {
+  return !!e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22 || e.code === 1014);
+}
+let _storageFullWarned = false;
+function notifyStorageFull() {
+  if (_storageFullWarned) return;
+  _storageFullWarned = true;
+  try { alert(t('nav.storageFull')); } catch (e) {}
+}
+
 function usePersistentState(key, initial) {
   const [val, setVal] = useState(() => {
     try {
@@ -169,7 +189,7 @@ function usePersistentState(key, initial) {
     try {
       if (IS_DESKTOP) { NATIVE_STORE[STORE_PREFIX + key] = val; nativeSaveSoon(); }
       else { localStorage.setItem(STORE_PREFIX + key, JSON.stringify(val)); }
-    } catch (e) { /* ignore quota / serialization errors */ }
+    } catch (e) { if (isQuotaError(e)) notifyStorageFull(); /* else ignore serialization errors */ }
   }, [key, val]);
   return [val, setVal];
 }
@@ -183,50 +203,6 @@ const REGIONS = {
   er:           { x: 410, y: 110, w: 100, h: 55, label: 'Rough ER' },
   lysosome:     { x: 460, y: 270, w: 32, h: 32, label: 'Lysosome' },
 };
-
-const QUEUE = [
-  {
-    id: 1, kind: 'cloze',
-    q: 'The {{nucleus}} contains the cell’s genetic material.',
-    a: 'nucleus',
-    intervals: { again: '< 10m', hard: '6d', good: '14d', easy: '32d' },
-    sourceLabel: 'Cell Biology · Ch. 4 figure',
-    region: 'nucleus',
-  },
-  {
-    id: 2, kind: 'qa',
-    q: 'What name is given to the infolded inner-membrane projections of a mitochondrion?',
-    a: 'Cristae.',
-    intervals: { again: '< 10m', hard: '8d', good: '21d', easy: '45d' },
-    sourceLabel: 'Cell Biology · Ch. 4 figure',
-    region: 'mitochondria',
-  },
-  {
-    id: 3, kind: 'qa',
-    q: 'Which two organelles are the primary sites of ribosomes in a eukaryotic cell?',
-    a: 'The cytosol (free) and the rough endoplasmic reticulum (bound).',
-    intervals: { again: '< 10m', hard: '4d', good: '12d', easy: '30d' },
-    sourceLabel: 'Cell Biology · Ch. 4 figure',
-    region: 'ribosome',
-  },
-  {
-    id: 4, kind: 'occlusion',
-    q: 'Identify each region.',
-    a: null,
-    regions: ['nucleus', 'mitochondria', 'ribosome', 'golgi', 'er', 'lysosome'],
-    intervals: { again: '< 10m', hard: '6d', good: '14d', easy: '32d' },
-    sourceLabel: 'Cell Biology · Ch. 4 figure',
-  },
-];
-
-const DRAFT_QUEUE = [
-  { id: 'd1', kind: 'cloze', q: 'The {{nucleus}} contains the cell’s genetic material.', a: 'nucleus', region: 'nucleus' },
-  { id: 'd2', kind: 'qa', q: 'Which organelle is the site of aerobic respiration?', a: 'Mitochondrion.', region: 'mitochondria' },
-  { id: 'd3', kind: 'qa', q: 'What name is given to the infolded inner-membrane projections of a mitochondrion?', a: 'Cristae.', region: 'mitochondria' },
-  { id: 'd4', kind: 'cloze', q: 'Rough ER is studded with {{ribosomes}}, giving it its name.', a: 'ribosomes', region: 'er' },
-  { id: 'd5', kind: 'qa', q: 'What is the primary function of the Golgi apparatus?', a: 'Modifies, sorts, and packages proteins for transport.', region: 'golgi' },
-  { id: 'd6', kind: 'occlusion', q: 'Identify each region of the eukaryotic cell.', a: null, regions: ['nucleus', 'mitochondria', 'ribosome', 'golgi', 'er', 'lysosome'] },
-];
 
 // ── AI card generation (OpenRouter) ──────────────────────────
 // One generation *contract* (a canonical prompt + the expected output shape +
@@ -242,7 +218,7 @@ const GEN_MODELS = [
   { id: 'qwen/qwen3.5-35b-a3b',         label: 'Qwen 3.5 35B',          vision: true,  in: 0.14, out: 1.00 },
   { id: 'google/gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite', vision: true,  in: 0.25, out: 1.50 },
   { id: 'openai/gpt-5.4-mini',          label: 'GPT-5.4 Mini',          vision: true,  in: 0.75, out: 4.50 },
-  { id: 'mistralai/mistral-medium-3.5', label: 'Mistral Medium 3.5',    vision: true,  in: 1.50, out: 7.50 },
+  { id: 'mistralai/mistral-medium-3-5', label: 'Mistral Medium 3.5',    vision: true,  in: 1.50, out: 7.50 },
   { id: 'google/gemini-3.5-flash',      label: 'Gemini 3.5 Flash',      vision: true,  in: 1.50, out: 9.00 },
   { id: 'openai/gpt-5.4',               label: 'GPT-5.4 · flagship',    vision: true,  in: 2.50, out: 15.00 },
 ];
@@ -716,20 +692,17 @@ async function validateOpenRouterKey(apiKey) {
 // Practice scopes — sources, sub-sections, all-the-way-up-to "everything".
 // `isLeaf` marks an ingested source (where cards live). Folders can nest
 // to any depth; the `depth` field is just bookkeeping for display.
+// Seed library — only scopes that actually hold cards, so a fresh install has no
+// empty folders. Counts are derived from sourceCards at render time; total/due
+// here are kept consistent with the real cards (18 total, 11 due) for the few
+// places that read total (e.g. orphan recovery).
 const SCOPES = [
-  { id: 'all',       label: 'Everything',                    parent: null,         depth: 0, due: 29, total: 318, last: 'today', isLeaf: false },
-  { id: 'bio',       label: 'Biology',                       parent: 'all',        depth: 1, due: 19, total: 184, last: 'today', isLeaf: false },
-  { id: 'bio-cell',  label: 'Cell Biology',                  parent: 'bio',        depth: 2, due: 11, total: 64,  last: 'today', isLeaf: false },
-  { id: 'bio-cell-organelles', label: 'Organelles · Ch. 4',  parent: 'bio-cell',   depth: 3, due: 4,  total: 8,   last: '7d ago', isLeaf: true },
-  { id: 'bio-cell-membrane',   label: 'Membrane transport',  parent: 'bio-cell',   depth: 3, due: 3,  total: 4,   last: '3d ago', isLeaf: true },
-  { id: 'bio-cell-mitosis',    label: 'Mitosis · five phases', parent: 'bio-cell', depth: 3, due: 0,  total: 0,   last: 'never', isLeaf: true },
-  { id: 'bio-cell-photo',      label: 'Photosynthesis',      parent: 'bio-cell',   depth: 3, due: 4,  total: 6,   last: '9d ago', isLeaf: true, paused: { at: 2, remaining: 3 } },
-  { id: 'bio-genetics',        label: 'Genetics',            parent: 'bio',        depth: 2, due: 7,  total: 72,  last: '2d ago', isLeaf: false },
-  { id: 'bio-ecology',         label: 'Ecology',             parent: 'bio',        depth: 2, due: 1,  total: 48,  last: '11d ago', isLeaf: false },
-  { id: 'chem',                label: 'Chemistry',           parent: 'all',        depth: 1, due: 8,  total: 96,  last: '5d ago', isLeaf: false },
-  { id: 'chem-organic',        label: 'Organic',             parent: 'chem',       depth: 2, due: 5,  total: 54,  last: '5d ago', isLeaf: false },
-  { id: 'chem-inorganic',      label: 'Inorganic',           parent: 'chem',       depth: 2, due: 3,  total: 42,  last: '8d ago', isLeaf: false },
-  { id: 'hist',                label: 'History · Modern Era', parent: 'all',       depth: 1, due: 2,  total: 38,  last: '4d ago', isLeaf: false },
+  { id: 'all',       label: 'Everything',                    parent: null,         depth: 0, due: 11, total: 18, last: 'today', isLeaf: false },
+  { id: 'bio',       label: 'Biology',                       parent: 'all',        depth: 1, due: 11, total: 18, last: 'today', isLeaf: false },
+  { id: 'bio-cell',  label: 'Cell Biology',                  parent: 'bio',        depth: 2, due: 11, total: 18, last: 'today', isLeaf: false },
+  { id: 'bio-cell-organelles', label: 'Organelles · Ch. 4',  parent: 'bio-cell',   depth: 3, due: 4,  total: 8,  last: '7d ago', isLeaf: true },
+  { id: 'bio-cell-membrane',   label: 'Membrane transport',  parent: 'bio-cell',   depth: 3, due: 3,  total: 4,  last: '3d ago', isLeaf: true },
+  { id: 'bio-cell-photo',      label: 'Photosynthesis',      parent: 'bio-cell',   depth: 3, due: 4,  total: 6,  last: '9d ago', isLeaf: true },
 ];
 
 const DEFAULT_SCOPE = 'bio-cell-organelles';
@@ -856,7 +829,7 @@ const REVIEW_HISTORY = {
 };
 
 function fmtDay(ts) {
-  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return new Date(ts).toLocaleDateString(getRunicoLocale(), { month: 'short', day: 'numeric' });
 }
 function acc(passed, reviewed) {
   return reviewed > 0 ? Math.round((passed / reviewed) * 100) : 0;
@@ -891,7 +864,7 @@ function Glyph({ name, size = 16 }) {
     more:   <><circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none" /></>,
   };
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <svg aria-hidden="true" focusable="false" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
       {paths[name]}
     </svg>
   );
@@ -979,45 +952,11 @@ function CellFigure({ overlay = null }) {
 
 // ── Screens ──────────────────────────────────────────────────
 
-function HomeScreen({ scope, dueCount, isLeafSource, onBegin, onAdd, onChooseScope, onEditSource, draftCount, onReviewDrafts }) {
-  // ─── Deprecated by folder-first navigation. Kept as a placeholder
-  // so the file remains valid; not rendered from App.
-  return null;
-}
-
 // ── Folder navigation ─────────────────────────────────────────
 // Folders are the primary surface. Every level of the hierarchy uses
 // the same view — root, intermediate spaces, and leaf sources.
 // FolderView renders root + intermediate. SourceView renders a leaf
 // source (where actual cards live).
-
-function pathFor(scopes, scopeId) {
-  // Build the chain from root → current (excludes 'all')
-  const path = [];
-  let cur = scopes.find(s => s.id === scopeId);
-  while (cur && cur.id !== 'all') {
-    path.unshift(cur);
-    cur = scopes.find(s => s.id === cur.parent);
-  }
-  return path;
-}
-
-function Breadcrumb({ scopes, scope, onNavigate }) {
-  const parentId = scope.parent || 'all';
-  const parent = scopes.find(s => s.id === parentId);
-  const label = parent && parent.id !== 'all' ? parent.label : t('common.breadcrumb.allFolders');
-  return (
-    <button className="breadcrumb" onClick={() => onNavigate(parentId)}>
-      <Glyph name="back" size={14} /> {label}
-    </button>
-  );
-}
-
-const CARD_KIND_GLYPH = { cloze: 'book', qa: 'spark', rev: 'restart', occlusion: 'eye' };
-function cardPreviewText(c) {
-  if (c.kind === 'cloze') return c.q.replace(/\{\{(.+?)\}\}/g, '____');
-  return c.q;
-}
 
 function QuickResume({ lastSession, scopes, onResume, hasStudyCards }) {
   if (!lastSession) return null;
@@ -1087,12 +1026,21 @@ function FolderView({
   const [menu, setMenu] = useState(null);
   const columnsRef = useRef(null);
 
-  // Close the action menu on Escape.
+  // Close the action menu on Escape, or on scroll/resize: it is fixed-positioned
+  // to a captured button rect, so any layout shift would leave it floating at a
+  // stale position.
   useEffect(() => {
     if (!menu) return;
     const onKey = (e) => { if (e.key === 'Escape') setMenu(null); };
+    const close = () => setMenu(null);
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, true);   // capture: also catch scrolls on inner containers
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close, true);
+    };
   }, [menu]);
 
   const selectedId = path[path.length - 1];
@@ -1363,6 +1311,12 @@ function FolderView({
                   );
                 })}
 
+                {!children.length && creatingIn !== parentId && (
+                  <div className="column-empty">
+                    {t('browse.emptyColumn', { newFolder: t('browse.newFolder'), addCards: t('browse.addAICards') })}
+                  </div>
+                )}
+
                 {creatingIn === parentId && (
                   <div className="column-item is-creating">
                     <span className="column-glyph"><Glyph name="folders" size={13} /></span>
@@ -1593,294 +1547,6 @@ function ActionCard({
   );
 }
 
-function CreateInlineRow({ placeholder, name, setName, onSubmit, onCancel }) {
-  return (
-    <div className="child-row child-row-create">
-      <span className="child-glyph"><Glyph name="folders" size={14} /></span>
-      <input
-        className="folder-rename"
-        value={name}
-        autoFocus
-        placeholder={placeholder}
-        onChange={e => setName(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter') onSubmit();
-          if (e.key === 'Escape') onCancel();
-        }}
-      />
-      <div className="child-actions" style={{ opacity: 1 }}>
-        <button className="src-action" onClick={onCancel}>{t('browse.cancel')}</button>
-        <button className="src-action src-action-primary" onClick={onSubmit} disabled={!name.trim()}>
-          {t('browse.create')}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ScopeScreen({ currentScopeId, scopes, onPick, onEdit, onCreate, onCancel }) {
-  const [query, setQuery] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newParent, setNewParent] = useState('all');
-  const q = query.trim().toLowerCase();
-  const visible = q
-    ? scopes.filter(s => s.label.toLowerCase().includes(q))
-    : scopes;
-
-  // Possible parents = everything except leaf sources (depth 3+)
-  const parentChoices = scopes.filter(s => s.depth < 3);
-
-  function submitCreate() {
-    const name = newName.trim();
-    if (!name) return;
-    onCreate({ label: name, parent: newParent });
-    setCreating(false);
-    setNewName('');
-  }
-
-  return (
-    <div className="stage-inner">
-      <div className="eyebrow">{t('browse.scopeEyebrow')}</div>
-
-      <input
-        className="scope-search"
-        placeholder={t('browse.scopeSearchPlaceholder')}
-        value={query}
-        onChange={e => setQuery(e.target.value)}
-        autoFocus
-      />
-
-      <div className="scope-list">
-        {visible.map(s => {
-          const isSelected = s.id === currentScopeId;
-          const isLeaf = s.isLeaf;
-          return (
-            <div key={s.id}
-                 className={`scope-item ${isSelected ? 'is-selected' : ''}`}
-                 data-depth={s.depth}>
-              <button className="scope-item-tap" onClick={() => onPick(s.id)}>
-                <div className="scope-item-body">
-                  <div className={`scope-item-label ${s.depth <= 1 ? 'is-section' : ''}`}>{s.label}</div>
-                  <div className="scope-item-meta">
-                    {t('browse.scopeItemMeta', { total: s.total, last: s.last })}
-                  </div>
-                </div>
-                <div className="scope-check">
-                  {isSelected && <Glyph name="check" size={16} />}
-                </div>
-              </button>
-              {isLeaf && (
-                <button className="scope-edit"
-                        onClick={(e) => { e.stopPropagation(); onEdit(s.id); }}
-                        title={t('browse.editSourceTitle')}>
-                  {t('browse.edit')}
-                </button>
-              )}
-            </div>
-          );
-        })}
-        {visible.length === 0 && (
-          <div style={{ padding: '60px 0', textAlign: 'center', color: '#9BA5B3' }}>
-            {t('browse.noMatches', { query })}
-          </div>
-        )}
-      </div>
-
-      {creating ? (
-        <div className="scope-create">
-          <input
-            className="scope-search"
-            style={{ fontSize: 18, marginBottom: 14 }}
-            placeholder={t('browse.newFolderNamePlaceholder')}
-            value={newName}
-            autoFocus
-            onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') submitCreate(); }}
-          />
-          <div className="scope-create-row">
-            <label className="scope-create-label">{t('browse.createInsideLabel')}</label>
-            <select className="scope-create-select"
-                    value={newParent}
-                    onChange={e => setNewParent(e.target.value)}>
-              {parentChoices.map(p => (
-                <option key={p.id} value={p.id}>
-                  {'   '.repeat(p.depth)}{p.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="scope-create-actions">
-            <button className="quiet" onClick={() => { setCreating(false); setNewName(''); }}>{t('browse.cancel')}</button>
-            <button className="primary" onClick={submitCreate} disabled={!newName.trim()}>
-              <Glyph name="check" size={14} /> {t('browse.createFolder')}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button className="scope-new-btn" onClick={() => setCreating(true)}>
-          <Glyph name="plus" size={14} /> {t('browse.newFolder')}
-        </button>
-      )}
-
-      <div className="home-actions" style={{ marginTop: 32 }}>
-        <button className="quiet" onClick={onCancel}>{t('browse.cancel')}</button>
-      </div>
-    </div>
-  );
-}
-
-// ── Folders management ───────────────────────────────────────
-function FoldersScreen({ scopes, onRename, onDelete, onCreate, onOpenSource, onDone }) {
-  const [creatingUnder, setCreatingUnder] = useState(null); // parent id or 'root'
-  const [newName, setNewName] = useState('');
-  const [editingId, setEditingId] = useState(null);
-  const [editName, setEditName] = useState('');
-  const [pendingDeleteId, setPendingDeleteId] = useState(null);
-
-  function startCreate(parent) {
-    setCreatingUnder(parent);
-    setNewName('');
-    setEditingId(null);
-  }
-  function submitCreate() {
-    if (!newName.trim()) return;
-    onCreate({ label: newName.trim(), parent: creatingUnder });
-    setCreatingUnder(null);
-    setNewName('');
-  }
-  function startRename(scope) {
-    setEditingId(scope.id);
-    setEditName(scope.label);
-    setCreatingUnder(null);
-  }
-  function submitRename(id) {
-    onRename(id, editName.trim() || t('browse.untitledFolder'));
-    setEditingId(null);
-  }
-
-  return (
-    <div className="stage-inner">
-      <div className="eyebrow">{t('browse.foldersEyebrow')}</div>
-      <div className="lede center" style={{ marginBottom: 12 }}>{t('browse.foldersLede')}</div>
-      <p className="copy center" style={{ marginTop: 0, marginBottom: 28 }}>
-        {t('browse.foldersCopy')}
-      </p>
-
-      <button className="scope-new-btn" onClick={() => startCreate('all')}
-              style={{ marginTop: 0, marginBottom: 20 }}>
-        <Glyph name="plus" size={14} /> {t('browse.newFolderAtRoot')}
-      </button>
-
-      {creatingUnder === 'all' && (
-        <CreateFolderRow
-          name={newName} setName={setNewName}
-          onSubmit={submitCreate}
-          onCancel={() => setCreatingUnder(null)}
-        />
-      )}
-
-      <div className="folders-list">
-        {scopes.filter(s => s.id !== 'all').map(s => {
-          const isEditing = editingId === s.id;
-          const isDeleting = pendingDeleteId === s.id;
-          const isLeaf = s.isLeaf;
-          return (
-            <React.Fragment key={s.id}>
-              <div className={`folder-row ${isDeleting ? 'is-deleting' : ''}`} data-depth={s.depth}>
-                <span className="folder-glyph">
-                  <Glyph name={isLeaf ? 'spark' : 'folders'} size={14} />
-                </span>
-                {isEditing ? (
-                  <input
-                    className="folder-rename"
-                    value={editName}
-                    autoFocus
-                    onChange={e => setEditName(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') submitRename(s.id);
-                      if (e.key === 'Escape') setEditingId(null);
-                    }}
-                    onBlur={() => submitRename(s.id)}
-                  />
-                ) : (
-                  <span className="folder-name">{s.label}</span>
-                )}
-                <span className="folder-meta">
-                  {tp('browse.cardCount', s.total, { n: s.total })}
-                </span>
-                <div className="folder-actions">
-                  {isDeleting ? (
-                    <>
-                      <button className="src-action" onClick={() => setPendingDeleteId(null)}>{t('browse.cancel')}</button>
-                      <button className="src-action src-action-destructive"
-                              onClick={() => { onDelete(s.id); setPendingDeleteId(null); }}>
-                        {t('browse.delete')}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      {isLeaf
-                        ? <button className="src-action" onClick={() => onOpenSource(s.id)}>{t('browse.open')}</button>
-                        : <button className="src-action" title={t('browse.addSubfolderTitle')}
-                                  onClick={() => startCreate(s.id)}>
-                            <Glyph name="plus" size={13} /> {t('browse.subfolder')}
-                          </button>}
-                      <button className="src-action" onClick={() => startRename(s)}>
-                        <Glyph name="pencil" size={13} />
-                      </button>
-                      <button className="src-action src-action-quiet"
-                              onClick={() => setPendingDeleteId(s.id)}>
-                        <Glyph name="close" size={14} />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-              {creatingUnder === s.id && (
-                <CreateFolderRow
-                  depth={s.depth + 1}
-                  name={newName} setName={setNewName}
-                  onSubmit={submitCreate}
-                  onCancel={() => setCreatingUnder(null)}
-                />
-              )}
-            </React.Fragment>
-          );
-        })}
-      </div>
-
-      <div className="home-actions" style={{ marginTop: 32 }}>
-        <button className="primary" onClick={onDone}>{t('browse.done')}</button>
-      </div>
-    </div>
-  );
-}
-
-function CreateFolderRow({ depth = 1, name, setName, onSubmit, onCancel }) {
-  return (
-    <div className="folder-row folder-create-row" data-depth={depth}>
-      <span className="folder-glyph"><Glyph name="folders" size={14} /></span>
-      <input
-        className="folder-rename"
-        value={name}
-        autoFocus
-        placeholder={t('browse.folderNamePlaceholder')}
-        onChange={e => setName(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter') onSubmit();
-          if (e.key === 'Escape') onCancel();
-        }}
-      />
-      <div className="folder-actions" style={{ opacity: 1 }}>
-        <button className="src-action" onClick={onCancel}>{t('browse.cancel')}</button>
-        <button className="src-action src-action-primary" onClick={onSubmit} disabled={!name.trim()}>
-          {t('browse.create')}
-        </button>
-      </div>
-    </div>
-  );
-}
 function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSaveCard, onDeleteCard, onAddManual, onAddFromFile, onBegin, onBack, draftCount, onReviewDrafts, onViewProgress }) {
   const [name, setName] = useState(scope.label);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -1913,7 +1579,7 @@ function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSav
     setEditDraft({ kind: 'qa', q: '', a: '' });
   }
   function saveAdd() {
-    const id = 'sc-' + Math.random().toString(36).slice(2, 7);
+    const id = genId('sc');
     onAddManual({ id, ...editDraft });
     setAddingNew(false);
   }
@@ -2551,9 +2217,9 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
           <div style={{ marginTop: 36 }}>
             <div className="eyebrow">
               {t('study.occlusionScore', { correct: occState.marks.filter(m => m === 'right').length, total: items.length })}
-              {' · '}{items.length > 0 && occState.marks.every(m => m === 'right') ? t('study.resultGotIt') : t('study.resultMissed')}
+              {' · '}{items.length === 0 || occState.marks.every(m => m === 'right') ? t('study.resultGotIt') : t('study.resultMissed')}
             </div>
-            <GradeRow continueLabel={t('study.done')} onContinue={() => onGrade(items.length > 0 && occState.marks.every(m => m === 'right') ? 'good' : 'miss')} onPause={onExit} />
+            <GradeRow continueLabel={t('study.done')} onContinue={() => onGrade(items.length === 0 || occState.marks.every(m => m === 'right') ? 'good' : 'miss')} onPause={onExit} />
           </div>
         )}
       </div>
@@ -2812,6 +2478,17 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, init
     });
     setDragIdx(null);
   }
+  // Touch/keyboard-friendly reorder (the drag handle is pointer-only): swap a row
+  // with its neighbour via the up/down buttons.
+  function movePriority(i, dir) {
+    setPriorities(p => {
+      const j = i + dir;
+      if (j < 0 || j >= p.length) return p;
+      const next = [...p];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }
 
   // An image needs a vision model — switch a text-only pick to a vision one when
   // an image is attached, so the image is never sent to a text-only endpoint.
@@ -2918,6 +2595,12 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, init
             <span className="priority-rank">{i + 1}</span>
             <span className="priority-handle"><Glyph name="drag" /></span>
             <span className="priority-label">{t(PRIORITY_KEY[p])}</span>
+            <span className="priority-move">
+              <button type="button" className="priority-move-btn priority-move-up" aria-label={t('add.moveUp')} disabled={i === 0}
+                      onClick={() => movePriority(i, -1)}><Glyph name="caret" size={14} /></button>
+              <button type="button" className="priority-move-btn" aria-label={t('add.moveDown')} disabled={i === priorities.length - 1}
+                      onClick={() => movePriority(i, 1)}><Glyph name="caret" size={14} /></button>
+            </span>
           </div>
         ))}
       </div>
@@ -3044,32 +2727,6 @@ function ManualGenScreen({ source, onApply, onCancel }) {
           {busy ? <><span className="gen-spinner" />{t('add.generating')}</> : <>{t('manual.useResponse')} <Glyph name="arrow" size={18} /></>}
         </button>
         <button className="quiet" onClick={onCancel}>{t('manual.cancel')}</button>
-      </div>
-    </div>
-  );
-}
-
-function ProcessingScreen({ phase, onDone }) {
-  // phase: 0..4
-  const phases = [t('add.phaseReading'), t('add.phaseUnderstanding'), t('add.phaseDrafting'), t('add.phaseChoosing'), t('add.phaseReady')];
-  const message = phase < phases.length ? phases[phase] : t('add.phaseReady');
-  return (
-    <div className="stage-inner">
-      <div className="eyebrow">{t('add.processingEyebrow')}</div>
-      <div className="lede center" style={{ marginBottom: 8 }}>{message}.</div>
-      <p className="copy center">{t('add.processingHint')}</p>
-
-      {/* Subtle progress band */}
-      <div style={{ margin: '40px auto 0', width: 240, height: 2, background: '#EBEEF2', borderRadius: 2, overflow: 'hidden' }}>
-        <div style={{
-          width: `${(phase / (phases.length - 1)) * 100}%`,
-          height: '100%',
-          background: '#141920',
-          transition: 'width 700ms cubic-bezier(0.16, 1, 0.3, 1)',
-        }} />
-      </div>
-      <div className="home-actions" style={{ marginTop: 36 }}>
-        <button className="quiet" onClick={onDone}>{t('add.backHome')}</button>
       </div>
     </div>
   );
@@ -3430,7 +3087,7 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiK
       <div className="settings-section">
         <div className="settings-section-label">{t('settings.appearanceLabel')}</div>
         <div className="settings-section-help">{t('settings.appearanceHelp')}</div>
-        <div className="theme-list">
+        <div className="theme-list" role="radiogroup" aria-label={t('settings.appearanceLabel')}>
           {[
             { code: 'light', label: t('settings.themeLightLabel'),  swatch: '#FFFFFF', text: '#141920', sub: t('settings.themeLightSub') },
             { code: 'warm',  label: t('settings.themeWarmLabel'),   swatch: '#FBFAF7', text: '#1A1714', sub: t('settings.themeWarmSub') },
@@ -3438,6 +3095,7 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiK
           ].map(T => (
             <button key={T.code}
                     className={`theme-row ${theme === T.code ? 'is-selected' : ''}`}
+                    role="radio" aria-checked={theme === T.code}
                     onClick={() => onThemeChange(T.code)}>
               <span className="theme-swatch"
                     style={{ background: T.swatch, color: T.text }}>
@@ -3458,10 +3116,11 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiK
       <div className="settings-section">
         <div className="settings-section-label">{t('settings.languageLabel')}</div>
         <div className="settings-section-help">{t('settings.languageHelp')}</div>
-        <div className="lang-list">
+        <div className="lang-list" role="radiogroup" aria-label={t('settings.languageLabel')}>
           {LANGUAGES.map(L => (
             <button key={L.code}
                     className={`lang-row ${language === L.code ? 'is-selected' : ''}`}
+                    role="radio" aria-checked={language === L.code}
                     onClick={() => onLanguageChange(L.code)}>
               <span className="lang-row-native" {...(L.rtl ? { dir: 'rtl' } : {})}>{L.native}</span>
               <span className="lang-row-label">{L.label}</span>
@@ -3489,24 +3148,33 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiK
           />
         </div>
         <div className="row-tight" style={{ marginTop: 10, alignItems: 'center', gap: 10 }}>
-          <button className="primary" onClick={() => { onApiKeyChange(keyInput.trim()); if (IS_DESKTOP) setKeyInput(''); setKeyStatus(''); }}>{t('settings.apiKeySave')}</button>
+          <button className="primary" onClick={() => {
+            const entered = keyInput.trim();
+            setKeyStatus('');
+            Promise.resolve(onApiKeyChange(entered)).then(r => {
+              if (r && r.ok) { if (IS_DESKTOP) setKeyInput(''); }
+              else { setKeyStatus('savefailed'); }
+            });
+          }}>{t('settings.apiKeySave')}</button>
           <button className="quiet" onClick={() => { setKeyInput(''); onApiKeyChange(''); setKeyStatus(''); }}>{t('settings.apiKeyClear')}</button>
           {/* Desktop validates the SAVED keychain key (the renderer never holds the raw key),
               so Test only makes sense once a key is saved and the input is empty. */}
           <button className="quiet" onClick={testKey} disabled={IS_DESKTOP ? (!apiKey || !!keyInput.trim()) : !(keyInput.trim() || apiKey)}>{t('settings.apiKeyTest')}</button>
-          <span className="small" style={{ color: keyStatus === 'valid' ? 'var(--success-500)' : keyStatus === 'invalid' ? 'var(--error-500)' : '#7A8696' }}>
+          <span className="small" style={{ color: keyStatus === 'valid' ? 'var(--success-500)' : (keyStatus === 'invalid' || keyStatus === 'savefailed') ? 'var(--error-500)' : '#7A8696' }}>
             {keyStatus === 'testing' && t('settings.apiKeyTesting')}
             {keyStatus === 'valid' && t('settings.apiKeyValid')}
             {keyStatus === 'invalid' && t('settings.apiKeyInvalid')}
             {keyStatus === 'untested' && t('settings.apiKeyUntested')}
+            {keyStatus === 'savefailed' && t('settings.apiKeySaveFailed')}
             {keyStatus === '' && apiKey && t('settings.apiKeySavedHint')}
           </span>
         </div>
         <div className="settings-section-label" style={{ marginTop: 18 }}>{t('settings.modelLabel')}</div>
-        <div className="lang-list">
+        <div className="lang-list" role="radiogroup" aria-label={t('settings.modelLabel')}>
           {GEN_MODELS.map(m => (
             <button key={m.id}
                     className={`lang-row ${genModel === m.id ? 'is-selected' : ''}`}
+                    role="radio" aria-checked={genModel === m.id}
                     onClick={() => onGenModelChange(m.id)}>
               <span className="lang-row-label">{m.label}{m.vision ? '' : ' · text only'}</span>
               <span className="lang-row-native" style={{ fontSize: 12, color: '#7A8696' }}>{modelPrice(m)} · {t('settings.modelCardsShort', { cards: modelCardEstimate(m).cardsPerDollar.toLocaleString() })}</span>
@@ -3604,15 +3272,37 @@ function PageTerm({ id, region, children }) {
 
 function SourceOverlay({ region, source, onClose }) {
   const hasSource = source && (source.text || source.imageDataUrl);
+  const cardRef = useRef(null);
+  const closeRef = useRef(null);
+  // Modal a11y: close on Escape, trap Tab inside the dialog, move focus in on
+  // open and restore it to the previously-focused element on close.
+  useEffect(() => {
+    const prevFocus = (typeof document !== 'undefined') ? document.activeElement : null;
+    if (closeRef.current) closeRef.current.focus();
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); return; }
+      if (e.key !== 'Tab' || !cardRef.current) return;
+      const f = cardRef.current.querySelectorAll('a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])');
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      try { if (prevFocus && prevFocus.focus) prevFocus.focus(); } catch (e) {}
+    };
+  }, []);
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="overlay-card source-page" onClick={e => e.stopPropagation()}>
+      <div className="overlay-card source-page" ref={cardRef} role="dialog" aria-modal="true" aria-label={t('source.fromThisSource')} onClick={e => e.stopPropagation()}>
         <div className="source-page-head">
           <div>
             <div className="eyebrow" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Glyph name="book" size={13} /> {t('source.fromThisSource')}</div>
             <div className="source-page-title">{source ? (source.title || t('source.fromThisSource')) : (region ? 'Eukaryotic cell · Ch. 4' : t('source.fromThisSource'))}</div>
           </div>
-          <button className="overlay-close" onClick={onClose}><Glyph name="close" /></button>
+          <button className="overlay-close" ref={closeRef} aria-label={t('common.nav.close')} onClick={onClose}><Glyph name="close" /></button>
         </div>
 
         {hasSource ? (
@@ -3690,6 +3380,10 @@ function App() {
   // time, whether the user is still waiting on the Add/manual screen).
   const screenRef = useRef('folder');
   useEffect(() => { screenRef.current = screen; }, [screen]);
+  // Tracks a leaf source created on-the-fly by storeDraftsAndReview for a folder
+  // target, so approveDrafts can delete it again if the user keeps zero cards
+  // (otherwise an empty orphan topic is left cluttering Browse).
+  const freshSourceRef = useRef(null);
   const [scopeId, setScopeId] = useState('all');
   const [addTargetScope, setAddTargetScope] = useState('bio-cell');
   // When adding a brand-new source (vs. adding to an existing leaf), holds { parentId, name }
@@ -3697,10 +3391,9 @@ function App() {
   // Tracks the last practice the user engaged with, for the quick-resume action.
   // status: 'open' (started, no progress) | 'paused' (mid-session) | 'finished'
   const [lastSession, setLastSession] = usePersistentState('lastSession', {
-    scopeId: 'bio-cell-photo', status: 'paused', position: 1, total: 4,
+    scopeId: 'bio-cell-photo', status: 'paused', position: 3, total: 6,
   });
   const [keptCount, setKeptCount] = useState(0);
-  const [processingPhase, setProcessingPhase] = useState(0);
   const [overlay, setOverlay] = useState(null); // null = closed; else { region, source }
   // Open the source view for a card: its stored source document if it has one,
   // else (for the seeded cell cards) the canned figure page via its region.
@@ -3755,6 +3448,14 @@ function App() {
   // Ephemeral cut/copy clipboard for reorganizing scopes — intentionally NOT
   // persisted, so it clears on reload. Shape: { mode:'cut'|'copy', scopeId }.
   const [clipboard, setClipboard] = useState(null);
+  // Screen-reader announcement for clipboard actions — cut/copy/paste are
+  // otherwise conveyed only visually. Surfaced via a hidden aria-live region.
+  const [announce, setAnnounce] = useState('');
+  useEffect(() => {
+    if (!clipboard) { setAnnounce(''); return; }
+    const sc = scopes.find(s => s.id === clipboard.scopeId);
+    if (sc) setAnnounce(t(clipboard.mode === 'cut' ? 'browse.clipboardCut' : 'browse.clipboardCopy', { label: sc.label }));
+  }, [clipboard]);
   // How the column browser orders each folder's children. Persisted so it sticks.
   // 'name-asc' | 'name-desc' | 'cards-desc' | 'manual' (manual = insertion order).
   // Per-folder sort: a { [folderId]: 'name-asc'|'name-desc'|'cards-desc'|'manual' }
@@ -3787,11 +3488,16 @@ function App() {
   function changeApiKey(newKey) {
     if (IS_DESKTOP) {
       const k = (newKey || '').trim();
-      if (!k) { try { RUNICO.clearKey(); } catch (e) {} setApiKey(''); return; }
-      Promise.resolve(RUNICO.saveKey(k)).then(r => { if (r && r.ok) setApiKey('saved'); }).catch(() => {});
-      return;
+      if (!k) { try { RUNICO.clearKey(); } catch (e) {} setApiKey(''); return Promise.resolve({ ok: true }); }
+      // Surface a failed save (e.g. the OS keychain / safeStorage is unavailable,
+      // common on Linux with no keyring) instead of silently doing nothing —
+      // otherwise generation later fails with an unexplained 'key' error.
+      return Promise.resolve(RUNICO.saveKey(k))
+        .then(r => { if (r && r.ok) { setApiKey('saved'); return { ok: true }; } return { ok: false, reason: (r && r.reason) || 'error' }; })
+        .catch(() => ({ ok: false, reason: 'error' }));
     }
     setApiKey(newKey);
+    return Promise.resolve({ ok: true });
   }
   const [genModel, setGenModel] = usePersistentState('genModel', DEFAULT_GEN_MODEL);
   // Unreviewed draft cards, persisted PER TOPIC so they survive navigation and
@@ -3931,7 +3637,7 @@ function App() {
 
   function createFolder({ label, parent }) {
     const parentScope = scopes.find(s => s.id === parent) || scopes[0];
-    const id = 'folder-' + Math.random().toString(36).slice(2, 7);
+    const id = genId('folder');
     const depth = parentScope.depth + 1;
     const newScope = {
       id, label, parent, depth,
@@ -4021,9 +3727,8 @@ function App() {
     if (ok) setClipboard(null);  // clear after ANY successful paste — clears every paste affordance
   }
 
-  // The demo deck (the fixed QUEUE) drives the session. v1 has no
-  // spaced-repetition schedule, so the user practices the deck in their
-  // own time; session size is simply the deck length.
+  // v1 has no spaced-repetition schedule, so the user practices a topic's deck
+  // in their own time; session size is simply the deck length.
   function setTweak(k, v) {
     setTweaks(prev => ({ ...prev, [k]: v }));
   }
@@ -4100,8 +3805,10 @@ function App() {
   function storeDraftsAndReview(cards, src, name) {
     let targetId = addTargetScope;
     const target = scopes.find(s => s.id === addTargetScope);
+    freshSourceRef.current = null;   // only set below when we mint a brand-new leaf
     if (target && !target.isLeaf) {
       targetId = genId('src');
+      freshSourceRef.current = targetId;   // mark as freshly-created so an all-skip review can remove it
       const depth = (target.depth || 1) + 1;
       const newScope = { id: targetId, label: (name && name.trim()) || 'New source', parent: target.id, depth, total: 0, last: 'never', isLeaf: true };
       setScopes(prev => {
@@ -4120,7 +3827,7 @@ function App() {
     setGenDraftBackup(null);   // generation finished — clear the refresh-recovery backup
     // Only pull the user into review if they're still waiting on the Add/manual
     // screen; if they navigated away, leave them put and surface the pending badge.
-    if (screenRef.current === 'add' || screenRef.current === 'manualGen' || screenRef.current === 'processing') {
+    if (screenRef.current === 'add' || screenRef.current === 'manualGen') {
       setScreen('reviewDrafts');
     }
   }
@@ -4142,10 +3849,12 @@ function App() {
       try { text = await callOpenRouter({ apiKey, model: model || genModel, sourceText, imageDataUrl }); }
       catch (e) { const c = e && e.message; throw new Error(['key', 'rate', 'network', 'http'].indexOf(c) >= 0 ? c : 'http'); }
       const cards = parseGenCards(text);
-      if (!cards.length) throw new Error('empty');
       // When a source image is attached, also try to build ONE image-occlusion card
       // from the figure in it (best-effort; a failure here never affects the text
-      // cards already produced).
+      // cards already produced). Run this BEFORE the empty check: a pure labeled
+      // diagram legitimately yields zero text cards (the prompt returns []), and the
+      // occlusion card is the whole point of that source — so it must count toward
+      // "did we produce anything?" or the one good card gets discarded as 'empty'.
       if (imageDataUrl) {
         try {
           // Always use the most capable vision model for occlusion (it both detects
@@ -4155,6 +3864,7 @@ function App() {
           if (occ) cards.push(occ);
         } catch (e) { /* occlusion is optional */ }
       }
+      if (!cards.length) throw new Error('empty');
       return cards;
     } catch (e) {
       setGenDraftBackup(null);   // failed — drop the backup (success clears it in storeDraftsAndReview)
@@ -4224,11 +3934,11 @@ function App() {
                     : e.image ? {}
                     : (c.boxes && c.boxes.length ? { boxes: c.boxes } : (c.regions ? { regions: c.regions } : {}))),
                 ...((e.image || c.image) ? { image: e.image || c.image } : {}),  // prefer the cropped image
-                // Keep the full original + crop box so "Use original" works on the saved
-                // card too — but ONLY when it wasn't re-cropped here (a re-crop, e.image
-                // !== c.image, would leave cropBox describing the wrong region).
-                ...((c.fullImage && c.cropBox && (!e.image || e.image === c.image))
-                    ? { fullImage: c.fullImage, cropBox: c.cropBox } : {}),
+                // Persist ONLY the cropped image actually studied — never the full
+                // original. fullImage/cropBox stay on the draft for re-cropping during
+                // review, but keeping a base64 copy of every source image on every saved
+                // card is the main cause of localStorage quota overflow, so it is
+                // intentionally dropped on approve.
               }
             : {}),
         };
@@ -4242,7 +3952,13 @@ function App() {
       setScopes(prev => prev.map(s => s.id === targetId
         ? { ...s, total: newTotal, last: 'today' }
         : s));
+    } else if (kept === 0 && targetId && freshSourceRef.current === targetId && !(sourceCards[targetId] || []).length) {
+      // The user skipped every draft into a source we created on-the-fly for this
+      // batch that never held any cards — remove it so it doesn't linger as an empty
+      // orphan topic in Browse (and so "View cards" can't open an empty source).
+      setScopes(prev => prev.filter(s => s.id !== targetId));
     }
+    freshSourceRef.current = null;
     // Clear this topic's pending drafts (reviewed).
     setPendingDrafts(prev => { const n = { ...prev }; delete n[targetId]; return n; });
     setKeptCount(kept);
@@ -4257,6 +3973,7 @@ function App() {
 
   return (
     <div className={`app theme-${tweaks.theme}`} style={{ ['--size-mul']: sizeMul }}>
+      <div className="sr-only" aria-live="polite" role="status">{announce}</div>
       <div className="nav">
         <div className="nav-left">
           <button className="nav-mark" onClick={() => { setGenDraftBackup(null); setRestoreDraft(null); setScopeId('all'); setScreen('folder'); }}>
@@ -4281,7 +3998,7 @@ function App() {
         </div>
       </div>
 
-      {(screen === 'add' || screen === 'processing' || screen === 'processedNotice' || screen === 'manualGen' || screen === 'reviewDrafts' || screen === 'settings' || screen === 'study' || screen === 'performance' || screen === 'about' || screen === 'source') && (
+      {(screen === 'add' || screen === 'manualGen' || screen === 'reviewDrafts' || screen === 'settings' || screen === 'study' || screen === 'performance' || screen === 'about' || screen === 'source') && (
         <div className="back-bar">
           <button className="nav-btn" onClick={() => {
             // Performance returns to where it was opened from; study pauses (saving
@@ -4446,23 +4163,6 @@ function App() {
             />
           );
         })()}
-        {screen === 'processing' && (
-          <ProcessingScreen
-            phase={processingPhase}
-            onDone={() => setScreen('folder')}
-          />
-        )}
-        {screen === 'processedNotice' && (
-          <div className="stage-inner">
-            <div className="done-mark"><Glyph name="spark" size={26} /></div>
-            <div className="lede center">{tp('common.processedNotice.title', DRAFT_QUEUE.length, { n: DRAFT_QUEUE.length })}</div>
-            <p className="copy center">{t('common.processedNotice.sub')}</p>
-            <div className="home-actions">
-              <button className="primary" onClick={reviewDrafts}>{t('common.processedNotice.reviewNow')}</button>
-              <button className="quiet" onClick={() => setScreen('folder')}>{t('common.processedNotice.later')}</button>
-            </div>
-          </div>
-        )}
         {screen === 'manualGen' && (
           <ManualGenScreen
             source={genSource}

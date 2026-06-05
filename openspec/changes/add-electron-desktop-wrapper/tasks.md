@@ -67,4 +67,4 @@
 
 - [ ] 8.1 Document code signing / notarization and installer distribution as a follow-up (not in this change)
 - [ ] 8.2 Cloud sync across devices (out of scope; users can sync the save file themselves)
-- [ ] 8.3 Vendor React + Babel locally so the desktop app launches offline (currently loads them from the CDN)
+- [x] 8.3 Vendor React + Babel locally so the desktop app launches offline (done in 1.0.0 prep: production React/ReactDOM/Babel vendored into prototype/vendor/, loaded via local <script> tags)
