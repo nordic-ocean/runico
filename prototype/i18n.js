@@ -10,6 +10,10 @@ const RUNICO_STRINGS = {
     "about.title": "About",
     "about.changelogTitle": "What's new",
     "about.settingsRow": "About Runico & what's new",
+    "common.nav.close": "Close",
+    "add.moveUp": "Move up",
+    "add.moveDown": "Move down",
+    "settings.apiKeySaveFailed": "Couldn't save your key — your system's secure storage may be unavailable.",
     "about.catFeature": "Feature",
     "about.catEnhancement": "Enhancement",
     "about.catFix": "Fix",
@@ -298,6 +302,10 @@ const RUNICO_STRINGS = {
     "about.title": "Sobre",
     "about.changelogTitle": "Novidades",
     "about.settingsRow": "Sobre o Runico e novidades",
+    "common.nav.close": "Fechar",
+    "add.moveUp": "Mover para cima",
+    "add.moveDown": "Mover para baixo",
+    "settings.apiKeySaveFailed": "Não foi possível salvar sua chave — o armazenamento seguro do sistema pode estar indisponível.",
     "about.catFeature": "Recurso",
     "about.catEnhancement": "Melhoria",
     "about.catFix": "Correção",
@@ -587,6 +595,10 @@ const RUNICO_STRINGS = {
     "about.title": "Acerca",
     "about.changelogTitle": "Novidades",
     "about.settingsRow": "Acerca do Runico e novidades",
+    "common.nav.close": "Fechar",
+    "add.moveUp": "Mover para cima",
+    "add.moveDown": "Mover para baixo",
+    "settings.apiKeySaveFailed": "Não foi possível guardar a sua chave — o armazenamento seguro do sistema pode estar indisponível.",
     "about.catFeature": "Funcionalidade",
     "about.catEnhancement": "Melhoria",
     "about.catFix": "Correção",
@@ -876,6 +888,10 @@ const RUNICO_STRINGS = {
     "about.title": "Acerca de",
     "about.changelogTitle": "Novedades",
     "about.settingsRow": "Acerca de Runico y novedades",
+    "common.nav.close": "Cerrar",
+    "add.moveUp": "Subir",
+    "add.moveDown": "Bajar",
+    "settings.apiKeySaveFailed": "No se pudo guardar tu clave: el almacenamiento seguro del sistema puede no estar disponible.",
     "about.catFeature": "Función",
     "about.catEnhancement": "Mejora",
     "about.catFix": "Corrección",
@@ -1165,6 +1181,10 @@ const RUNICO_STRINGS = {
     "about.title": "О приложении",
     "about.changelogTitle": "Что нового",
     "about.settingsRow": "О Runico и что нового",
+    "common.nav.close": "Закрыть",
+    "add.moveUp": "Вверх",
+    "add.moveDown": "Вниз",
+    "settings.apiKeySaveFailed": "Не удалось сохранить ключ — защищённое хранилище системы может быть недоступно.",
     "about.catFeature": "Функция",
     "about.catEnhancement": "Улучшение",
     "about.catFix": "Исправление",
@@ -1454,6 +1474,10 @@ const RUNICO_STRINGS = {
     "about.title": "Informazioni",
     "about.changelogTitle": "Novità",
     "about.settingsRow": "Informazioni su Runico e novità",
+    "common.nav.close": "Chiudi",
+    "add.moveUp": "Sposta su",
+    "add.moveDown": "Sposta giù",
+    "settings.apiKeySaveFailed": "Impossibile salvare la chiave — l'archivio sicuro del sistema potrebbe non essere disponibile.",
     "about.catFeature": "Funzionalità",
     "about.catEnhancement": "Miglioramento",
     "about.catFix": "Correzione",
@@ -1743,6 +1767,10 @@ const RUNICO_STRINGS = {
     "about.title": "关于",
     "about.changelogTitle": "新功能",
     "about.settingsRow": "关于 Runico 及新功能",
+    "common.nav.close": "关闭",
+    "add.moveUp": "上移",
+    "add.moveDown": "下移",
+    "settings.apiKeySaveFailed": "无法保存你的密钥——系统的安全存储可能不可用。",
     "about.catFeature": "功能",
     "about.catEnhancement": "增强",
     "about.catFix": "修复",
@@ -2032,6 +2060,9 @@ const RUNICO_STRINGS = {
 let RUNICO_LOCALE = 'en';
 function setRunicoLocale(code) {
   RUNICO_LOCALE = (code && RUNICO_STRINGS[code]) ? code : 'en';
+  // Keep the document language in sync so screen readers use the right voice and
+  // :lang()/hyphenation apply. The locale codes are valid BCP-47 tags.
+  try { if (typeof document !== 'undefined' && document.documentElement) document.documentElement.lang = RUNICO_LOCALE; } catch (e) {}
 }
 function getRunicoLocale() { return RUNICO_LOCALE; }
 function t(key, vars) {

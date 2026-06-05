@@ -218,7 +218,7 @@
   .copy.center { text-align: center; }
 
   .small {
-    font-size: 13px; color: #7A8696;
+    font-size: 13px; color: #5C6878;
   }
 
   /* Big quiet primary button */
@@ -282,7 +282,7 @@
     margin-top: 32px;
     text-align: center;
     font-size: 12px;
-    color: #9BA5B3;
+    color: #6B7686;
     font-family: var(--font-mono);
     letter-spacing: 0.02em;
   }
@@ -815,7 +815,19 @@
   .columns::-webkit-scrollbar { height: 6px; }
   .columns::-webkit-scrollbar-thumb { background: #D6DCE3; border-radius: 3px; }
   .columns::-webkit-scrollbar-track { background: transparent; }
-  @media (prefers-reduced-motion: reduce) { .columns { scroll-behavior: auto; } }
+  /* Respect prefers-reduced-motion: near-instant transitions/animations, stop the
+     infinite occlusion pulse and the loading spinner's spin, and disable smooth
+     scroll. Helps vestibular/attention-sensitive users without removing feedback. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+    .columns { scroll-behavior: auto; }
+    .occ-region.is-current { animation: none !important; }
+  }
 
   .column {
     flex: none;
@@ -1516,7 +1528,7 @@
     font-family: var(--font-mono);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #9BA5B3;
+    color: #6B7686;
     margin-bottom: 6px;
   }
   .src-card-q {
@@ -1741,7 +1753,7 @@
   }
   .card-foot-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   .card-meta {
-    font-size: 12px; color: #9BA5B3;
+    font-size: 12px; color: #6B7686;
     display: flex; align-items: center; gap: 10px;
     font-family: var(--font-mono);
     letter-spacing: 0.02em;
@@ -1882,6 +1894,14 @@
   }
   .priority-handle { color: #BCC5D0; display: flex; }
   .priority-label { flex: 1; font-size: 15px; color: #141920; }
+  .priority-move { display: inline-flex; gap: 2px; }
+  .priority-move-btn {
+    width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+    border: none; background: transparent; color: #7A8696; cursor: pointer; border-radius: 6px;
+  }
+  .priority-move-btn:hover:not(:disabled) { background: rgba(0,0,0,0.05); color: #141920; }
+  .priority-move-btn:disabled { opacity: 0.3; cursor: default; }
+  .priority-move-up svg { transform: rotate(180deg); }
 
   /* ─── Source figure (cell diagram, used in both review + occlusion) ─── */
   .figure-wrap {

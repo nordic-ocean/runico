@@ -911,7 +911,7 @@ function Glyph({ name, size = 16 }) {
     more:   <><circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none" /></>,
   };
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <svg aria-hidden="true" focusable="false" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
       {paths[name]}
     </svg>
   );
@@ -1933,7 +1933,7 @@ function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSav
     setEditDraft({ kind: 'qa', q: '', a: '' });
   }
   function saveAdd() {
-    const id = 'sc-' + Math.random().toString(36).slice(2, 7);
+    const id = genId('sc');
     onAddManual({ id, ...editDraft });
     setAddingNew(false);
   }
@@ -2832,6 +2832,17 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, init
     });
     setDragIdx(null);
   }
+  // Touch/keyboard-friendly reorder (the drag handle is pointer-only): swap a row
+  // with its neighbour via the up/down buttons.
+  function movePriority(i, dir) {
+    setPriorities(p => {
+      const j = i + dir;
+      if (j < 0 || j >= p.length) return p;
+      const next = [...p];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }
 
   // An image needs a vision model — switch a text-only pick to a vision one when
   // an image is attached, so the image is never sent to a text-only endpoint.
@@ -2938,6 +2949,12 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, init
             <span className="priority-rank">{i + 1}</span>
             <span className="priority-handle"><Glyph name="drag" /></span>
             <span className="priority-label">{t(PRIORITY_KEY[p])}</span>
+            <span className="priority-move">
+              <button type="button" className="priority-move-btn priority-move-up" aria-label={t('add.moveUp')} disabled={i === 0}
+                      onClick={() => movePriority(i, -1)}><Glyph name="caret" size={14} /></button>
+              <button type="button" className="priority-move-btn" aria-label={t('add.moveDown')} disabled={i === priorities.length - 1}
+                      onClick={() => movePriority(i, 1)}><Glyph name="caret" size={14} /></button>
+            </span>
           </div>
         ))}
       </div>
@@ -3450,7 +3467,7 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiK
       <div className="settings-section">
         <div className="settings-section-label">{t('settings.appearanceLabel')}</div>
         <div className="settings-section-help">{t('settings.appearanceHelp')}</div>
-        <div className="theme-list">
+        <div className="theme-list" role="radiogroup" aria-label={t('settings.appearanceLabel')}>
           {[
             { code: 'light', label: t('settings.themeLightLabel'),  swatch: '#FFFFFF', text: '#141920', sub: t('settings.themeLightSub') },
             { code: 'warm',  label: t('settings.themeWarmLabel'),   swatch: '#FBFAF7', text: '#1A1714', sub: t('settings.themeWarmSub') },
@@ -3458,6 +3475,7 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiK
           ].map(T => (
             <button key={T.code}
                     className={`theme-row ${theme === T.code ? 'is-selected' : ''}`}
+                    role="radio" aria-checked={theme === T.code}
                     onClick={() => onThemeChange(T.code)}>
               <span className="theme-swatch"
                     style={{ background: T.swatch, color: T.text }}>
@@ -3478,10 +3496,11 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiK
       <div className="settings-section">
         <div className="settings-section-label">{t('settings.languageLabel')}</div>
         <div className="settings-section-help">{t('settings.languageHelp')}</div>
-        <div className="lang-list">
+        <div className="lang-list" role="radiogroup" aria-label={t('settings.languageLabel')}>
           {LANGUAGES.map(L => (
             <button key={L.code}
                     className={`lang-row ${language === L.code ? 'is-selected' : ''}`}
+                    role="radio" aria-checked={language === L.code}
                     onClick={() => onLanguageChange(L.code)}>
               <span className="lang-row-native" {...(L.rtl ? { dir: 'rtl' } : {})}>{L.native}</span>
               <span className="lang-row-label">{L.label}</span>
@@ -3509,24 +3528,33 @@ function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiK
           />
         </div>
         <div className="row-tight" style={{ marginTop: 10, alignItems: 'center', gap: 10 }}>
-          <button className="primary" onClick={() => { onApiKeyChange(keyInput.trim()); if (IS_DESKTOP) setKeyInput(''); setKeyStatus(''); }}>{t('settings.apiKeySave')}</button>
+          <button className="primary" onClick={() => {
+            const entered = keyInput.trim();
+            setKeyStatus('');
+            Promise.resolve(onApiKeyChange(entered)).then(r => {
+              if (r && r.ok) { if (IS_DESKTOP) setKeyInput(''); }
+              else { setKeyStatus('savefailed'); }
+            });
+          }}>{t('settings.apiKeySave')}</button>
           <button className="quiet" onClick={() => { setKeyInput(''); onApiKeyChange(''); setKeyStatus(''); }}>{t('settings.apiKeyClear')}</button>
           {/* Desktop validates the SAVED keychain key (the renderer never holds the raw key),
               so Test only makes sense once a key is saved and the input is empty. */}
           <button className="quiet" onClick={testKey} disabled={IS_DESKTOP ? (!apiKey || !!keyInput.trim()) : !(keyInput.trim() || apiKey)}>{t('settings.apiKeyTest')}</button>
-          <span className="small" style={{ color: keyStatus === 'valid' ? 'var(--success-500)' : keyStatus === 'invalid' ? 'var(--error-500)' : '#7A8696' }}>
+          <span className="small" style={{ color: keyStatus === 'valid' ? 'var(--success-500)' : (keyStatus === 'invalid' || keyStatus === 'savefailed') ? 'var(--error-500)' : '#7A8696' }}>
             {keyStatus === 'testing' && t('settings.apiKeyTesting')}
             {keyStatus === 'valid' && t('settings.apiKeyValid')}
             {keyStatus === 'invalid' && t('settings.apiKeyInvalid')}
             {keyStatus === 'untested' && t('settings.apiKeyUntested')}
+            {keyStatus === 'savefailed' && t('settings.apiKeySaveFailed')}
             {keyStatus === '' && apiKey && t('settings.apiKeySavedHint')}
           </span>
         </div>
         <div className="settings-section-label" style={{ marginTop: 18 }}>{t('settings.modelLabel')}</div>
-        <div className="lang-list">
+        <div className="lang-list" role="radiogroup" aria-label={t('settings.modelLabel')}>
           {GEN_MODELS.map(m => (
             <button key={m.id}
                     className={`lang-row ${genModel === m.id ? 'is-selected' : ''}`}
+                    role="radio" aria-checked={genModel === m.id}
                     onClick={() => onGenModelChange(m.id)}>
               <span className="lang-row-label">{m.label}{m.vision ? '' : ' · text only'}</span>
               <span className="lang-row-native" style={{ fontSize: 12, color: '#7A8696' }}>{modelPrice(m)} · {t('settings.modelCardsShort', { cards: modelCardEstimate(m).cardsPerDollar.toLocaleString() })}</span>
@@ -3624,15 +3652,37 @@ function PageTerm({ id, region, children }) {
 
 function SourceOverlay({ region, source, onClose }) {
   const hasSource = source && (source.text || source.imageDataUrl);
+  const cardRef = useRef(null);
+  const closeRef = useRef(null);
+  // Modal a11y: close on Escape, trap Tab inside the dialog, move focus in on
+  // open and restore it to the previously-focused element on close.
+  useEffect(() => {
+    const prevFocus = (typeof document !== 'undefined') ? document.activeElement : null;
+    if (closeRef.current) closeRef.current.focus();
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); return; }
+      if (e.key !== 'Tab' || !cardRef.current) return;
+      const f = cardRef.current.querySelectorAll('a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])');
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      try { if (prevFocus && prevFocus.focus) prevFocus.focus(); } catch (e) {}
+    };
+  }, []);
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="overlay-card source-page" onClick={e => e.stopPropagation()}>
+      <div className="overlay-card source-page" ref={cardRef} role="dialog" aria-modal="true" aria-label={t('source.fromThisSource')} onClick={e => e.stopPropagation()}>
         <div className="source-page-head">
           <div>
             <div className="eyebrow" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}><Glyph name="book" size={13} /> {t('source.fromThisSource')}</div>
             <div className="source-page-title">{source ? (source.title || t('source.fromThisSource')) : (region ? 'Eukaryotic cell · Ch. 4' : t('source.fromThisSource'))}</div>
           </div>
-          <button className="overlay-close" onClick={onClose}><Glyph name="close" /></button>
+          <button className="overlay-close" ref={closeRef} aria-label={t('common.nav.close')} onClick={onClose}><Glyph name="close" /></button>
         </div>
 
         {hasSource ? (
@@ -3811,11 +3861,16 @@ function App() {
   function changeApiKey(newKey) {
     if (IS_DESKTOP) {
       const k = (newKey || '').trim();
-      if (!k) { try { RUNICO.clearKey(); } catch (e) {} setApiKey(''); return; }
-      Promise.resolve(RUNICO.saveKey(k)).then(r => { if (r && r.ok) setApiKey('saved'); }).catch(() => {});
-      return;
+      if (!k) { try { RUNICO.clearKey(); } catch (e) {} setApiKey(''); return Promise.resolve({ ok: true }); }
+      // Surface a failed save (e.g. the OS keychain / safeStorage is unavailable,
+      // common on Linux with no keyring) instead of silently doing nothing —
+      // otherwise generation later fails with an unexplained 'key' error.
+      return Promise.resolve(RUNICO.saveKey(k))
+        .then(r => { if (r && r.ok) { setApiKey('saved'); return { ok: true }; } return { ok: false, reason: (r && r.reason) || 'error' }; })
+        .catch(() => ({ ok: false, reason: 'error' }));
     }
     setApiKey(newKey);
+    return Promise.resolve({ ok: true });
   }
   const [genModel, setGenModel] = usePersistentState('genModel', DEFAULT_GEN_MODEL);
   // Unreviewed draft cards, persisted PER TOPIC so they survive navigation and
@@ -3955,7 +4010,7 @@ function App() {
 
   function createFolder({ label, parent }) {
     const parentScope = scopes.find(s => s.id === parent) || scopes[0];
-    const id = 'folder-' + Math.random().toString(36).slice(2, 7);
+    const id = genId('folder');
     const depth = parentScope.depth + 1;
     const newScope = {
       id, label, parent, depth,
