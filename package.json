@@ -1,0 +1,53 @@
+{
+  "name": "runico",
+  "version": "1.0.0",
+  "description": "Runico — a local-first flashcard study app. Desktop wrapper around the prototype renderer.",
+  "keywords": ["flashcards", "spaced-repetition", "study", "learning", "electron", "local-first", "image-occlusion", "openrouter"],
+  "homepage": "https://nordic-ocean.github.io/runico/prototype/",
+  "bugs": { "url": "https://github.com/nordic-ocean/runico/issues" },
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "Nordic Ocean",
+  "repository": { "type": "git", "url": "git+https://github.com/nordic-ocean/runico.git" },
+  "main": "electron/main.js",
+  "scripts": {
+    "predev": "node electron/patch-dev-name.js",
+    "dev": "electron .",
+    "prestart": "node electron/patch-dev-name.js",
+    "start": "electron .",
+    "build": "electron-builder --publish never",
+    "build:mac": "electron-builder --mac --publish never",
+    "build:win": "electron-builder --win --publish never",
+    "build:linux": "electron-builder --linux --publish never",
+    "build:all": "electron-builder -mwl --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "build": {
+    "appId": "com.runico.app",
+    "productName": "Runico",
+    "icon": "prototype/assets/runico-ring.png",
+    "fileAssociations": [
+      {
+        "ext": "runico",
+        "name": "Runico library",
+        "role": "Editor",
+        "rank": "Owner"
+      }
+    ],
+    "files": [
+      "electron/**/*",
+      "prototype/**/*"
+    ],
+    "directories": {
+      "output": "dist-electron"
+    },
+    "mac": { "category": "public.app-category.education" },
+    "win": { "target": "nsis" },
+    "linux": { "target": "AppImage", "category": "Education" }
+  }
+}

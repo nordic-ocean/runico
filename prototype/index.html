@@ -26,6 +26,26 @@
   }
   button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
 
+  /* ── Keyboard focus indicator (a11y) ─────────────────────────────
+     Many controls below set `outline: none` with no replacement, leaving
+     keyboard/switch users with no visible focus — the single biggest a11y gap
+     in a keyboard-driven flashcard app. :focus-visible fires only for keyboard
+     / assistive-tech navigation (never plain mouse clicks), so this adds a
+     consistent, theme-aware ring (var(--focus-ring)) everywhere without
+     affecting pointer interaction. Controls with their own stronger :focus
+     box-shadow keep it on keyboard focus; the bare buttons get the ring. */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [role="button"]:focus-visible,
+  [role="radio"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+
   /* App shell — vertically centered single column */
   .app {
     min-height: 100vh;
@@ -34,6 +54,49 @@
   }
   .app.theme-warm { background: #FBFAF7; }
   .app.theme-warm body { color: #1F1B17; }
+
+  /* Build version — faint, fixed in the bottom-left; opens the About page.
+     Colors inherit the theme base and dim via opacity, so it stays legible
+     on light, warm, and dark without per-theme overrides. */
+  .version-badge {
+    position: fixed; bottom: 14px; left: 16px;
+    font-family: inherit; font-size: 11px; line-height: 1; letter-spacing: 0.02em;
+    color: inherit; opacity: 0.45;
+    background: none; border: none; padding: 4px; margin: 0;
+    cursor: pointer; user-select: none;
+    z-index: 80;
+    transition: opacity 150ms;
+  }
+  .version-badge:hover { opacity: 0.9; text-decoration: underline; }
+
+  /* About + changelog page */
+  .about-hero { text-align: center; margin: 4px 0 20px; }
+  .about-mark { width: 56px; height: 56px; }
+  .about-name { font-size: 22px; font-weight: 600; margin-top: 10px; letter-spacing: -0.01em; }
+  .about-version { font-size: 13px; margin-top: 3px; opacity: 0.55; }
+  .about-tagline { font-size: 15px; margin-top: 8px; opacity: 0.8; font-style: italic; }
+  .about-desc { line-height: 1.65; margin: 12px 0; opacity: 0.92; }
+  .changelog { margin-top: 14px; display: flex; flex-direction: column; gap: 26px; }
+  .cl-release-head { display: flex; align-items: baseline; gap: 10px; }
+  .cl-version { font-size: 16px; font-weight: 600; }
+  .cl-date { font-size: 12px; opacity: 0.55; }
+  .cl-summary { margin-top: 5px; opacity: 0.7; line-height: 1.5; }
+  .cl-entries { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 9px; }
+  .cl-entry { display: flex; align-items: flex-start; gap: 10px; }
+  .cl-text { line-height: 1.5; opacity: 0.92; }
+  .cl-tag {
+    flex: none; margin-top: 2px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  }
+  .cl-feature     { background: rgba(34,197,94,0.15);  color: #15803d; }
+  .cl-enhancement { background: rgba(59,130,246,0.15); color: #1d4ed8; }
+  .cl-fix         { background: rgba(245,158,11,0.18); color: #b45309; }
+  .cl-security    { background: rgba(239,68,68,0.15);  color: #b91c1c; }
+  .app.theme-dark .cl-feature     { color: #4ade80; }
+  .app.theme-dark .cl-enhancement { color: #7aa7ff; }
+  .app.theme-dark .cl-fix         { color: #fbbf24; }
+  .app.theme-dark .cl-security    { color: #f87171; }
 
   /* Wordmark + tiny top bar */
   .nav {
@@ -86,6 +149,35 @@
     display: inline-flex; align-items: center; gap: 6px;
   }
   .nav-btn:hover { color: #141920; background: rgba(0,0,0,0.04); }
+
+  /* ── File workspace ──────────────────────────────────────────── */
+  .file-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-left: 10px; padding: 4px 10px;
+    border: 1px solid #EBEEF2; border-radius: 999px;
+    color: #5C6878; font-size: 12px;
+  }
+  .app.theme-dark .file-chip { border-color: #2A323F; color: #BCC5D0; }
+  .app.theme-warm .file-chip { border-color: #EAE5DC; color: #5C5147; }
+  .file-chip-name { font-weight: 500; color: #141920; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+  .app.theme-dark .file-chip-name { color: #FBFCFD; }
+  .app.theme-warm .file-chip-name { color: #1A1714; }
+  .file-status { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.02em; }
+  .file-status-saved { color: #16A34A; }
+  .file-status-saving { color: #7A8696; }
+  .file-status-unsaved { color: #DC2626; }
+  .start-card {
+    margin: auto; max-width: 440px; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    padding: 40px 28px;
+  }
+  .start-mark { width: 64px; height: 64px; }
+  .start-title { font-size: 30px; font-weight: 400; letter-spacing: -0.02em; color: #141920; }
+  .app.theme-dark .start-title { color: #FBFCFD; }
+  .app.theme-warm .start-title { color: #1A1714; }
+  .start-lead { font-size: 15px; color: #5C6878; line-height: 1.5; margin: 0; max-width: 360px; }
+  .start-actions { display: flex; gap: 12px; margin-top: 6px; flex-wrap: wrap; justify-content: center; }
+  .start-note { max-width: 360px; margin-top: 8px; }
 
   .stage {
     flex: 1;
@@ -155,7 +247,7 @@
   .copy.center { text-align: center; }
 
   .small {
-    font-size: 13px; color: #7A8696;
+    font-size: 13px; color: #5C6878;
   }
 
   /* Big quiet primary button */
@@ -219,7 +311,7 @@
     margin-top: 32px;
     text-align: center;
     font-size: 12px;
-    color: #9BA5B3;
+    color: #6B7686;
     font-family: var(--font-mono);
     letter-spacing: 0.02em;
   }
@@ -722,6 +814,21 @@
   }
   .app.theme-dark .columns-header-title { color: #FBFCFD; }
   .app.theme-warm .columns-header-title { color: #1A1714; }
+  /* Per-column sort control — a quiet, right-aligned affordance inside each card */
+  .column-sort {
+    display: flex; align-items: center; justify-content: flex-end; gap: 3px;
+    padding: 2px 8px 6px;
+    color: #97A2B0;
+  }
+  .column-sort-select {
+    font-family: inherit; font-size: 11.5px; color: #5C6878;
+    background: transparent; border: none; cursor: pointer;
+    padding: 2px; border-radius: 6px;
+  }
+  .column-sort-select:hover { color: #141920; }
+  .app.theme-dark .column-sort-select { color: #9AA7B5; }
+  .app.theme-dark .column-sort-select:hover { color: #FBFCFD; }
+  .app.theme-dark .column-sort-select option { color: #141920; }
 
   .columns {
     display: flex;
@@ -730,11 +837,26 @@
     overflow-x: auto;
     padding-bottom: 12px;
     scroll-behavior: smooth;
+    /* Fixed folder-column height, so columns don't grow/shrink as you navigate.
+       Fuller folders scroll within it. */
+    --card-h: 495px;
   }
   .columns::-webkit-scrollbar { height: 6px; }
   .columns::-webkit-scrollbar-thumb { background: #D6DCE3; border-radius: 3px; }
   .columns::-webkit-scrollbar-track { background: transparent; }
-  @media (prefers-reduced-motion: reduce) { .columns { scroll-behavior: auto; } }
+  /* Respect prefers-reduced-motion: near-instant transitions/animations, stop the
+     infinite occlusion pulse and the loading spinner's spin, and disable smooth
+     scroll. Helps vestibular/attention-sensitive users without removing feedback. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+    .columns { scroll-behavior: auto; }
+    .occ-region.is-current { animation: none !important; }
+  }
 
   .column {
     flex: none;
@@ -743,11 +865,16 @@
     border: 1px solid #F0F2F5;
     border-radius: 12px;
     display: flex; flex-direction: column;
-    max-height: 540px;
-    min-height: 320px;
+    height: var(--card-h);
   }
   .app.theme-dark .column { background: #1A1F26; border-color: #2A323F; }
   .app.theme-warm .column { background: #FBFAF7; border-color: #EAE5DC; }
+  /* The whole card lights up when a dragged folder can be dropped into its folder. */
+  .column.is-col-drop-target {
+    outline: 2px dashed var(--primary-500); outline-offset: -2px;
+    background: rgba(0,118,180,0.05);
+  }
+  .app.theme-dark .column.is-col-drop-target { background: rgba(0,118,180,0.13); }
 
   .column-head {
     padding: 14px 16px 12px;
@@ -802,6 +929,15 @@
   .column-list::-webkit-scrollbar { width: 4px; }
   .column-list::-webkit-scrollbar-thumb { background: #D6DCE3; border-radius: 2px; }
   .column-list::-webkit-scrollbar-track { background: transparent; }
+  /* Centered guidance shown in a column that has no folders or topics yet. */
+  .column-empty {
+    min-height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center; box-sizing: border-box;
+    padding: 24px 18px;
+    color: #6B7686; font-size: 13px; line-height: 1.55;
+  }
+  .app.theme-dark .column-empty { color: #8A93A1; }
 
   .column-item {
     display: flex; align-items: stretch;
@@ -870,17 +1006,82 @@
 
   .column-item-actions {
     display: flex; gap: 2px; align-items: center; flex: none;
-    padding-right: 4px;
+    /* Reserve NO width when hidden so folder names keep the full column; the
+       actions slide in on hover (and while confirming a delete). */
+    max-width: 0; overflow: hidden;
     opacity: 0;
-    transition: opacity 100ms;
+    transition: max-width 150ms ease, opacity 100ms;
   }
-  .column-item:hover .column-item-actions { opacity: 1; }
-  .column-item.is-selected .column-item-actions { opacity: 1; }
-  .column-item.is-deleting .column-item-actions { opacity: 1; }
+  .column-item:hover .column-item-actions,
+  .column-item.is-deleting .column-item-actions,
+  .column-item.is-menu-open .column-item-actions,
+  .column-item.is-paste-target .column-item-actions { max-width: 340px; opacity: 1; padding-right: 4px; }
+  .column-item.is-menu-open { background: rgba(0,0,0,0.04); }
+  .app.theme-dark .column-item.is-menu-open { background: rgba(255,255,255,0.05); }
   .column-item .src-action {
     padding: 5px;
     font-size: 11px;
   }
+
+  /* Move / copy reorganization (drag-and-drop + cut/copy/paste) */
+  /* Dim only the cut item's CONTENT (not its actions, so the cancel button
+     stays at full strength), and keep its actions visible without hover. */
+  .column-item.is-cut .column-item-tap { opacity: 0.45; }
+  .column-item.is-cut .column-item-actions { max-width: 340px; opacity: 1; padding-right: 4px; }
+  .src-action.src-action-cancelcut {
+    color: var(--error-500);
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; white-space: nowrap;
+  }
+  .column-item.is-drop-target {
+    outline: 2px dashed var(--primary-500);
+    outline-offset: -2px;
+    background: rgba(0,118,180,0.08);
+  }
+  .app.theme-dark .column-item.is-drop-target { background: rgba(0,118,180,0.18); }
+  .column-item .src-action.src-action-paste {
+    color: var(--primary-500); font-weight: 600;
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; white-space: nowrap;
+  }
+  .column-item.is-paste-target { background: rgba(0,118,180,0.06); }
+  .app.theme-dark .column-item.is-paste-target { background: rgba(0,118,180,0.14); }
+  .column-foot-btn.column-foot-paste { color: var(--primary-500); font-weight: 600; }
+  .clipboard-banner {
+    margin-top: 12px;
+    display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 6px 12px; border-radius: 999px;
+    background: rgba(0,118,180,0.10);
+    color: var(--primary-500);
+    font-size: 12.5px;
+  }
+  .app.theme-dark .clipboard-banner { background: rgba(0,118,180,0.20); }
+
+  /* Per-item ⋯ action menu */
+  .column-menu-overlay { position: fixed; inset: 0; z-index: 60; }
+  .column-menu {
+    position: fixed; z-index: 61;
+    min-width: 156px;
+    background: #fff;
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(20,25,32,0.18);
+    padding: 4px;
+    display: flex; flex-direction: column;
+  }
+  .app.theme-dark .column-menu { background: #1B2230; border-color: #2A323F; }
+  .app.theme-warm .column-menu { background: #FFFDF8; }
+  .column-menu-item {
+    text-align: left; background: transparent; border: none; cursor: pointer;
+    font-family: inherit; font-size: 13px; line-height: 1.2;
+    padding: 8px 12px; border-radius: 7px; color: #1F2937; white-space: nowrap;
+    transition: background 100ms;
+  }
+  .column-menu-item:hover { background: rgba(0,0,0,0.06); }
+  .app.theme-dark .column-menu-item { color: #E7EBF0; }
+  .app.theme-dark .column-menu-item:hover { background: rgba(255,255,255,0.08); }
+  .column-menu-item.is-destructive { color: var(--error-500); }
+  .column-menu-item.is-primary { color: var(--primary-500); font-weight: 600; }
 
   .column-foot {
     padding: 8px 10px 10px;
@@ -918,7 +1119,7 @@
     border-radius: 12px;
     padding: 18px;
     display: flex; flex-direction: column; gap: 10px;
-    align-self: flex-start;
+    height: var(--card-h);
     box-shadow: 0 8px 16px rgba(0,0,0,0.04);
     animation: scene-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -1365,7 +1566,7 @@
     font-family: var(--font-mono);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #9BA5B3;
+    color: #6B7686;
     margin-bottom: 6px;
   }
   .src-card-q {
@@ -1386,6 +1587,14 @@
   .app.theme-dark .src-card-a { color: #9BA5B3; }
   .app.theme-warm .src-card-q { color: #1A1714; }
   .app.theme-warm .src-card-a { color: #5C5147; }
+
+  /* Occlusion card row: figure thumbnail + mask count */
+  .src-card-occ { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .src-card-thumb {
+    max-height: 64px; max-width: 120px; height: auto; width: auto;
+    border-radius: 6px; border: 1px solid var(--border-subtle); display: block;
+  }
+  .src-card-occ-meta { font-size: 13px; color: #5C6878; }
 
   .src-card-actions {
     display: flex; gap: 4px; align-items: center; flex: none;
@@ -1423,6 +1632,34 @@
   }
   .app.theme-dark .src-action { color: #BCC5D0; }
   .app.theme-dark .src-action:hover { background: rgba(255,255,255,0.06); color: #fff; }
+  .src-action.src-action-danger { color: #DC2626; }
+  .src-action.src-action-danger:hover { background: rgba(220,38,38,0.09); color: #B91C1C; }
+
+  /* ── Trash bin ───────────────────────────────────────────────── */
+  .trash-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 18px; flex-wrap: wrap;
+  }
+  .trash-empty-confirm { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .trash-none { text-align: center; color: #6B7686; font-size: 14px; padding: 48px 16px; }
+  .app.theme-dark .trash-none { color: #8A93A1; }
+  .trash-list { display: flex; flex-direction: column; gap: 6px; }
+  .trash-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px; border: 1px solid #F0F2F5; border-radius: 10px; background: #FBFCFD;
+  }
+  .app.theme-dark .trash-row { background: #1A1F26; border-color: #2A323F; }
+  .app.theme-warm .trash-row { background: #FBFAF7; border-color: #EAE5DC; }
+  .trash-row-glyph { color: #7A8696; display: flex; flex: none; }
+  .trash-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .trash-row-label {
+    font-size: 14px; color: #141920; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .app.theme-dark .trash-row-label { color: #FBFCFD; }
+  .app.theme-warm .trash-row-label { color: #1A1714; }
+  .trash-row-meta { font-size: 12px; color: #6B7686; font-family: var(--font-mono); letter-spacing: 0.02em; }
+  .trash-row-actions { display: inline-flex; gap: 4px; flex: none; }
 
   /* Editor */
   .card-editor {
@@ -1507,6 +1744,59 @@
     font-weight: 400;
   }
 
+  /* Study cards render on a real flashcard surface so a reversible card can flip
+     over convincingly and the kinds look consistent. */
+  .study-card, .flip-face {
+    background: #FFFFFF;
+    border: 1px solid #ECEFF3;
+    border-radius: 20px;
+    box-shadow: 0 18px 40px -20px rgba(20,25,32,0.22), 0 3px 10px -4px rgba(20,25,32,0.08);
+    padding: 44px 40px;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .app.theme-warm .study-card, .app.theme-warm .flip-face { background: #FFFDF7; border-color: #ECE6D8; }
+  .app.theme-dark .study-card, .app.theme-dark .flip-face {
+    background: #1F2630; border-color: #2C343F;
+    box-shadow: 0 18px 40px -20px rgba(0,0,0,0.55), 0 3px 10px -4px rgba(0,0,0,0.35);
+  }
+
+  /* Reversible flip — the term face turns on its Y axis to the definition face.
+     Both faces share one grid cell so the card sizes to the taller face and
+     there's no layout jump when it flips. */
+  .flip-card { perspective: 1600px; }
+  .flip-inner {
+    display: grid;
+    transform-style: preserve-3d;
+    transition: transform 560ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .flip-inner.is-flipped { transform: rotateY(180deg); }
+  .flip-face {
+    grid-area: 1 / 1;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .flip-face.flip-back { transform: rotateY(180deg); }
+  .flip-back .card-answer { margin-top: 0; animation: none; }  /* flip drives the motion */
+
+  /* Generation spinner */
+  .gen-spinner {
+    display: inline-block; width: 15px; height: 15px;
+    border: 2px solid rgba(255,255,255,0.35); border-top-color: #FFFFFF;
+    border-radius: 50%; vertical-align: -2px; margin-right: 9px;
+    animation: gen-spin 0.7s linear infinite;
+  }
+  @keyframes gen-spin { to { transform: rotate(360deg); } }
+  .flip-edge {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-bottom: 14px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    color: #9BA5B3;
+  }
+
   /* Cloze blank */
   .cloze {
     display: inline-block;
@@ -1529,7 +1819,7 @@
   }
   .card-foot-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   .card-meta {
-    font-size: 12px; color: #9BA5B3;
+    font-size: 12px; color: #6B7686;
     display: flex; align-items: center; gap: 10px;
     font-family: var(--font-mono);
     letter-spacing: 0.02em;
@@ -1670,6 +1960,14 @@
   }
   .priority-handle { color: #BCC5D0; display: flex; }
   .priority-label { flex: 1; font-size: 15px; color: #141920; }
+  .priority-move { display: inline-flex; gap: 2px; }
+  .priority-move-btn {
+    width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+    border: none; background: transparent; color: #7A8696; cursor: pointer; border-radius: 6px;
+  }
+  .priority-move-btn:hover:not(:disabled) { background: rgba(0,0,0,0.05); color: #141920; }
+  .priority-move-btn:disabled { opacity: 0.3; cursor: default; }
+  .priority-move-up svg { transform: rotate(180deg); }
 
   /* ─── Source figure (cell diagram, used in both review + occlusion) ─── */
   .figure-wrap {
@@ -1723,6 +2021,16 @@
 
   /* ─── Occlusion editor (draw / drag / resize) ─── */
   .figure-wrap.occ-editor { touch-action: none; user-select: none; }
+  .figure-wrap.occ-editor.is-cropping .occ-edit-surface { cursor: crosshair; }
+  /* Crop selection: a clear rectangle with everything outside it dimmed. */
+  .occ-crop-sel {
+    position: absolute;
+    z-index: 4;
+    border: 2px solid #FFFFFF;
+    border-radius: 2px;
+    box-shadow: 0 0 0 9999px rgba(20,25,32,0.50);
+    pointer-events: none;
+  }
   .occ-edit-surface {
     position: absolute; inset: 0;
     cursor: crosshair;
@@ -1867,6 +2175,16 @@
     transition: all 150ms;
   }
   .overlay-close:hover { background: #F7F8FA; color: #141920; }
+  /* Confirmation modal (trash delete-forever / empty) */
+  .confirm-card { max-width: 420px; padding: 28px; }
+  .confirm-title { font-size: 19px; font-weight: 600; color: #141920; letter-spacing: -0.01em; }
+  .app.theme-dark .confirm-title { color: #FBFCFD; }
+  .app.theme-warm .confirm-title { color: #1A1714; }
+  .confirm-message { font-size: 14px; color: #5C6878; line-height: 1.5; margin: 10px 0 0; }
+  .app.theme-dark .confirm-message { color: #9BA5B3; }
+  .confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+  .confirm-danger { background: #DC2626 !important; border-color: #DC2626 !important; color: #fff !important; }
+  .confirm-danger:hover { background: #B91C1C !important; border-color: #B91C1C !important; }
 
   /* ─── Source as a book page ─── */
   .source-page { padding: 36px 40px 40px; }
@@ -2016,6 +2334,11 @@
   .app.theme-warm .reveal-btn:hover, .app.theme-warm .primary:hover { background: #35302A; }
   .app.theme-warm .grade { border-color: #EAE5DC; }
   .app.theme-warm .grade:hover { background: #F5F2EC; }
+  /* The "got it" button must stay a solid dark button in warm theme, including on
+     hover — otherwise the generic warm .grade:hover lightens it and its white label
+     vanishes (looking disabled). */
+  .app.theme-warm .grade-continue { background: #1A1714; border-color: #1A1714; }
+  .app.theme-warm .grade-continue:hover { background: #35302A; border-color: #35302A; }
 
   /* Theme: dark */
   .app.theme-dark { background: #141920; color: #EBEEF2; }
@@ -2059,6 +2382,21 @@
     padding: 16px 14px;
   }
   .grade-row.two .grade svg { flex: none; }
+  .grade-row.three {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+  .grade-row.three .grade {
+    flex-direction: row;
+    justify-content: center;
+    gap: 9px;
+    padding: 16px 14px;
+  }
+  .grade-row.three .grade svg { flex: none; }
+  .grade-miss svg { color: #C0392B; }
+  .grade-miss:hover { border-color: #E2B8B2; }
   .grade-continue {
     background: #141920;
     border-color: #141920;
@@ -2214,6 +2552,10 @@
   .app.theme-warm .quick-resume { background: #1A1714; }
   .app.theme-warm .quick-resume-glyph { background: rgba(255,255,255,0.14); }
   .app.theme-dark .grade-continue { background: #FBFCFD; border-color: #FBFCFD; }
+  /* Dark theme inverts the button to white, so its label must be dark (not the
+     forced white from the base rule) or it would be white-on-white. */
+  .app.theme-dark .grade-continue .grade-name, .app.theme-dark .grade-continue svg { color: #141920 !important; }
+  .app.theme-dark .grade-continue:hover { background: #ffffff; border-color: #ffffff; }
   .app.theme-dark .grade-continue:hover { background: #fff; border-color: #fff; }
   .app.theme-dark .grade-continue .grade-name, .app.theme-dark .grade-continue svg { color: #141920 !important; }
   .app.theme-warm .grade-continue { background: #1A1714; border-color: #1A1714; }
@@ -2464,15 +2806,41 @@
   .src-trend:hover .src-trend-hint svg { color: var(--primary-500); transform: translateX(2px); }
   .app.theme-dark .src-trend-hint { color: #9BA5B3; }
   .app.theme-dark .src-trend:hover .src-trend-hint { color: #8FCBEC; }
+  /* ── Narrow screens / phones ─────────────────────────────────────
+     The layout otherwise has no width breakpoints; below ~640px the fixed nav/
+     stage padding and the very large display/count type overflow. Scale them
+     down and let the theme grid stack. Desktop (wider) is unaffected. */
+  @media (max-width: 640px) {
+    .nav { padding: 16px 18px; }
+    .stage { padding: 18px 16px 32px; }
+    .display { font-size: 38px; }
+    .home-count { font-size: 84px; }
+    .theme-list { grid-template-columns: 1fr; }
+  }
+
+  /* Visually-hidden but available to screen readers (for aria-live status). */
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
 </style>
 
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<!-- Vendored locally (prototype/vendor/) so the packaged desktop app renders
+     OFFLINE — local-first means no runtime dependency on a CDN staying up. These
+     are the production React builds (smaller, no dev-only warnings) and
+     @babel/standalone, which compiles app.jsx in the browser. Pinned versions:
+     react / react-dom 18.3.1, @babel/standalone 7.29.0. -->
+<script src="vendor/react.production.min.js"></script>
+<script src="vendor/react-dom.production.min.js"></script>
+<script src="vendor/babel.min.js"></script>
 </head>
 <body>
 <div id="root"></div>
 
+<!-- Interface translations + tiny i18n engine (plain JS, runs before app.jsx) -->
+<script src="i18n.js"></script>
+<!-- Static changelog + app description (plain JS, runs before app.jsx) -->
+<script src="changelog.js"></script>
 <script type="text/babel" src="app.jsx"></script>
 
 </body>

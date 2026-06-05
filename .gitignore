@@ -1,2 +1,11 @@
 # Claude Code / OpenSpec local tooling (regenerable via `openspec init --tools claude`)
 .claude/
+
+# Node / Electron
+node_modules/
+dist-electron/
+
+# Local env & OS cruft — never commit secrets or macOS metadata
+.env
+.env.*
+.DS_Store
