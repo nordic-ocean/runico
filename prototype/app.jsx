@@ -1311,6 +1311,12 @@ function FolderView({
                   );
                 })}
 
+                {!children.length && creatingIn !== parentId && (
+                  <div className="column-empty">
+                    {t('browse.emptyColumn', { newFolder: t('browse.newFolder'), addCards: t('browse.addAICards') })}
+                  </div>
+                )}
+
                 {creatingIn === parentId && (
                   <div className="column-item is-creating">
                     <span className="column-glyph"><Glyph name="folders" size={13} /></span>
