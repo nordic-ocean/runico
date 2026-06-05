@@ -10,7 +10,7 @@ recall the answer, reveal it, then Continue or Pause, with no grading scales to 
 
 ### ▶ [Launch the live prototype](https://nordic-ocean.github.io/runico/prototype/)
 
-Runs entirely in your browser · mock data persists in your session
+Runs entirely in your browser · your changes are saved locally and persist between visits
 
 </div>
 
@@ -91,9 +91,9 @@ Each section links to a full step-by-step walkthrough.
 
 A fully interactive, mock-data build of the app — browse the library, study cards
 (including image-occlusion), generate and review AI draft cards, rename/add/delete
-cards and folders, and switch themes and language. **Everything you change is saved to
-your browser's session storage**, so it survives reloads within the tab and resets when
-you close it.
+cards and folders, and switch themes and language. **Everything you change is saved
+locally in your browser** (localStorage), so it persists between visits and survives a
+full restart — until you clear your browser data or import a different library.
 
 **▶ [Open the live prototype](https://nordic-ocean.github.io/runico/prototype/)**
 
@@ -114,6 +114,14 @@ npm run build    # packages an app for your platform (unsigned)
 The browser build is unchanged and remains the lightweight default; the desktop
 shell only adds the keychain, request, and save-file backends.
 
+### Download
+
+Prebuilt installers for **macOS, Windows, and Linux** are attached to each
+[GitHub Release](https://github.com/nordic-ocean/runico/releases). The apps are
+**unsigned**, so on first launch macOS (Gatekeeper) and Windows (SmartScreen) warn
+about an unidentified developer — open via right-click → **Open** (macOS) or
+**More info → Run anyway** (Windows) to proceed.
+
 ## At a glance
 
 - **Study without grading scales.** Reveal the answer, then choose **Continue** or **Pause** — that's it.
@@ -129,6 +137,11 @@ shell only adds the keychain, request, and save-file backends.
 
 Every feature has its own page with a step-by-step walkthrough in
 **[`tutorial/`](tutorial/)** — start at the [tour index](tutorial/README.md).
+
+## License
+
+Runico is released under the **GNU Affero General Public License v3.0** (AGPL-3.0) —
+see [`LICENSE`](LICENSE) for the full text.
 
 ---
 

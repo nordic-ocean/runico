@@ -4,3 +4,8 @@
 # Node / Electron
 node_modules/
 dist-electron/
+
+# Local env & OS cruft — never commit secrets or macOS metadata
+.env
+.env.*
+.DS_Store

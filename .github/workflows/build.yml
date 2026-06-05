@@ -25,6 +25,8 @@ jobs:
             platform: mac
           - os: windows-latest
             platform: win
+          - os: ubuntu-latest
+            platform: linux
 
     steps:
       - uses: actions/checkout@v4
@@ -49,6 +51,7 @@ jobs:
             dist-electron/*.dmg
             dist-electron/*.zip
             dist-electron/*.exe
+            dist-electron/*.AppImage
           if-no-files-found: ignore
           retention-days: 14
 
@@ -61,4 +64,5 @@ jobs:
             dist-electron/*.dmg
             dist-electron/*.zip
             dist-electron/*.exe
+            dist-electron/*.AppImage
           fail_on_unmatched_files: false

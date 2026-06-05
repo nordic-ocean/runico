@@ -1,8 +1,13 @@
 {
   "name": "runico",
-  "version": "1.0.0-alpha.1",
+  "version": "1.0.0",
   "description": "Runico — a local-first flashcard study app. Desktop wrapper around the prototype renderer.",
+  "keywords": ["flashcards", "spaced-repetition", "study", "learning", "electron", "local-first", "image-occlusion", "openrouter"],
+  "homepage": "https://nordic-ocean.github.io/runico/prototype/",
+  "bugs": { "url": "https://github.com/nordic-ocean/runico/issues" },
   "license": "SEE LICENSE IN LICENSE",
+  "author": "Nordic Ocean",
+  "repository": { "type": "git", "url": "git+https://github.com/nordic-ocean/runico.git" },
   "main": "electron/main.js",
   "scripts": {
     "predev": "node electron/patch-dev-name.js",
@@ -18,6 +23,9 @@
   "devDependencies": {
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "build": {
     "appId": "com.runico.app",
