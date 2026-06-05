@@ -239,15 +239,6 @@ const QUEUE = [
   },
 ];
 
-const DRAFT_QUEUE = [
-  { id: 'd1', kind: 'cloze', q: 'The {{nucleus}} contains the cell’s genetic material.', a: 'nucleus', region: 'nucleus' },
-  { id: 'd2', kind: 'qa', q: 'Which organelle is the site of aerobic respiration?', a: 'Mitochondrion.', region: 'mitochondria' },
-  { id: 'd3', kind: 'qa', q: 'What name is given to the infolded inner-membrane projections of a mitochondrion?', a: 'Cristae.', region: 'mitochondria' },
-  { id: 'd4', kind: 'cloze', q: 'Rough ER is studded with {{ribosomes}}, giving it its name.', a: 'ribosomes', region: 'er' },
-  { id: 'd5', kind: 'qa', q: 'What is the primary function of the Golgi apparatus?', a: 'Modifies, sorts, and packages proteins for transport.', region: 'golgi' },
-  { id: 'd6', kind: 'occlusion', q: 'Identify each region of the eukaryotic cell.', a: null, regions: ['nucleus', 'mitochondria', 'ribosome', 'golgi', 'er', 'lysosome'] },
-];
-
 // ── AI card generation (OpenRouter) ──────────────────────────
 // One generation *contract* (a canonical prompt + the expected output shape +
 // one parser) feeds two *transports*: the app calling OpenRouter with the
@@ -876,7 +867,7 @@ const REVIEW_HISTORY = {
 };
 
 function fmtDay(ts) {
-  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return new Date(ts).toLocaleDateString(getRunicoLocale(), { month: 'short', day: 'numeric' });
 }
 function acc(passed, reviewed) {
   return reviewed > 0 ? Math.round((passed / reviewed) * 100) : 0;
@@ -999,45 +990,11 @@ function CellFigure({ overlay = null }) {
 
 // ── Screens ──────────────────────────────────────────────────
 
-function HomeScreen({ scope, dueCount, isLeafSource, onBegin, onAdd, onChooseScope, onEditSource, draftCount, onReviewDrafts }) {
-  // ─── Deprecated by folder-first navigation. Kept as a placeholder
-  // so the file remains valid; not rendered from App.
-  return null;
-}
-
 // ── Folder navigation ─────────────────────────────────────────
 // Folders are the primary surface. Every level of the hierarchy uses
 // the same view — root, intermediate spaces, and leaf sources.
 // FolderView renders root + intermediate. SourceView renders a leaf
 // source (where actual cards live).
-
-function pathFor(scopes, scopeId) {
-  // Build the chain from root → current (excludes 'all')
-  const path = [];
-  let cur = scopes.find(s => s.id === scopeId);
-  while (cur && cur.id !== 'all') {
-    path.unshift(cur);
-    cur = scopes.find(s => s.id === cur.parent);
-  }
-  return path;
-}
-
-function Breadcrumb({ scopes, scope, onNavigate }) {
-  const parentId = scope.parent || 'all';
-  const parent = scopes.find(s => s.id === parentId);
-  const label = parent && parent.id !== 'all' ? parent.label : t('common.breadcrumb.allFolders');
-  return (
-    <button className="breadcrumb" onClick={() => onNavigate(parentId)}>
-      <Glyph name="back" size={14} /> {label}
-    </button>
-  );
-}
-
-const CARD_KIND_GLYPH = { cloze: 'book', qa: 'spark', rev: 'restart', occlusion: 'eye' };
-function cardPreviewText(c) {
-  if (c.kind === 'cloze') return c.q.replace(/\{\{(.+?)\}\}/g, '____');
-  return c.q;
-}
 
 function QuickResume({ lastSession, scopes, onResume, hasStudyCards }) {
   if (!lastSession) return null;
@@ -1107,12 +1064,21 @@ function FolderView({
   const [menu, setMenu] = useState(null);
   const columnsRef = useRef(null);
 
-  // Close the action menu on Escape.
+  // Close the action menu on Escape, or on scroll/resize: it is fixed-positioned
+  // to a captured button rect, so any layout shift would leave it floating at a
+  // stale position.
   useEffect(() => {
     if (!menu) return;
     const onKey = (e) => { if (e.key === 'Escape') setMenu(null); };
+    const close = () => setMenu(null);
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, true);   // capture: also catch scrolls on inner containers
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close, true);
+    };
   }, [menu]);
 
   const selectedId = path[path.length - 1];
@@ -1613,294 +1579,6 @@ function ActionCard({
   );
 }
 
-function CreateInlineRow({ placeholder, name, setName, onSubmit, onCancel }) {
-  return (
-    <div className="child-row child-row-create">
-      <span className="child-glyph"><Glyph name="folders" size={14} /></span>
-      <input
-        className="folder-rename"
-        value={name}
-        autoFocus
-        placeholder={placeholder}
-        onChange={e => setName(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter') onSubmit();
-          if (e.key === 'Escape') onCancel();
-        }}
-      />
-      <div className="child-actions" style={{ opacity: 1 }}>
-        <button className="src-action" onClick={onCancel}>{t('browse.cancel')}</button>
-        <button className="src-action src-action-primary" onClick={onSubmit} disabled={!name.trim()}>
-          {t('browse.create')}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ScopeScreen({ currentScopeId, scopes, onPick, onEdit, onCreate, onCancel }) {
-  const [query, setQuery] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newParent, setNewParent] = useState('all');
-  const q = query.trim().toLowerCase();
-  const visible = q
-    ? scopes.filter(s => s.label.toLowerCase().includes(q))
-    : scopes;
-
-  // Possible parents = everything except leaf sources (depth 3+)
-  const parentChoices = scopes.filter(s => s.depth < 3);
-
-  function submitCreate() {
-    const name = newName.trim();
-    if (!name) return;
-    onCreate({ label: name, parent: newParent });
-    setCreating(false);
-    setNewName('');
-  }
-
-  return (
-    <div className="stage-inner">
-      <div className="eyebrow">{t('browse.scopeEyebrow')}</div>
-
-      <input
-        className="scope-search"
-        placeholder={t('browse.scopeSearchPlaceholder')}
-        value={query}
-        onChange={e => setQuery(e.target.value)}
-        autoFocus
-      />
-
-      <div className="scope-list">
-        {visible.map(s => {
-          const isSelected = s.id === currentScopeId;
-          const isLeaf = s.isLeaf;
-          return (
-            <div key={s.id}
-                 className={`scope-item ${isSelected ? 'is-selected' : ''}`}
-                 data-depth={s.depth}>
-              <button className="scope-item-tap" onClick={() => onPick(s.id)}>
-                <div className="scope-item-body">
-                  <div className={`scope-item-label ${s.depth <= 1 ? 'is-section' : ''}`}>{s.label}</div>
-                  <div className="scope-item-meta">
-                    {t('browse.scopeItemMeta', { total: s.total, last: s.last })}
-                  </div>
-                </div>
-                <div className="scope-check">
-                  {isSelected && <Glyph name="check" size={16} />}
-                </div>
-              </button>
-              {isLeaf && (
-                <button className="scope-edit"
-                        onClick={(e) => { e.stopPropagation(); onEdit(s.id); }}
-                        title={t('browse.editSourceTitle')}>
-                  {t('browse.edit')}
-                </button>
-              )}
-            </div>
-          );
-        })}
-        {visible.length === 0 && (
-          <div style={{ padding: '60px 0', textAlign: 'center', color: '#9BA5B3' }}>
-            {t('browse.noMatches', { query })}
-          </div>
-        )}
-      </div>
-
-      {creating ? (
-        <div className="scope-create">
-          <input
-            className="scope-search"
-            style={{ fontSize: 18, marginBottom: 14 }}
-            placeholder={t('browse.newFolderNamePlaceholder')}
-            value={newName}
-            autoFocus
-            onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') submitCreate(); }}
-          />
-          <div className="scope-create-row">
-            <label className="scope-create-label">{t('browse.createInsideLabel')}</label>
-            <select className="scope-create-select"
-                    value={newParent}
-                    onChange={e => setNewParent(e.target.value)}>
-              {parentChoices.map(p => (
-                <option key={p.id} value={p.id}>
-                  {'   '.repeat(p.depth)}{p.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="scope-create-actions">
-            <button className="quiet" onClick={() => { setCreating(false); setNewName(''); }}>{t('browse.cancel')}</button>
-            <button className="primary" onClick={submitCreate} disabled={!newName.trim()}>
-              <Glyph name="check" size={14} /> {t('browse.createFolder')}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button className="scope-new-btn" onClick={() => setCreating(true)}>
-          <Glyph name="plus" size={14} /> {t('browse.newFolder')}
-        </button>
-      )}
-
-      <div className="home-actions" style={{ marginTop: 32 }}>
-        <button className="quiet" onClick={onCancel}>{t('browse.cancel')}</button>
-      </div>
-    </div>
-  );
-}
-
-// ── Folders management ───────────────────────────────────────
-function FoldersScreen({ scopes, onRename, onDelete, onCreate, onOpenSource, onDone }) {
-  const [creatingUnder, setCreatingUnder] = useState(null); // parent id or 'root'
-  const [newName, setNewName] = useState('');
-  const [editingId, setEditingId] = useState(null);
-  const [editName, setEditName] = useState('');
-  const [pendingDeleteId, setPendingDeleteId] = useState(null);
-
-  function startCreate(parent) {
-    setCreatingUnder(parent);
-    setNewName('');
-    setEditingId(null);
-  }
-  function submitCreate() {
-    if (!newName.trim()) return;
-    onCreate({ label: newName.trim(), parent: creatingUnder });
-    setCreatingUnder(null);
-    setNewName('');
-  }
-  function startRename(scope) {
-    setEditingId(scope.id);
-    setEditName(scope.label);
-    setCreatingUnder(null);
-  }
-  function submitRename(id) {
-    onRename(id, editName.trim() || t('browse.untitledFolder'));
-    setEditingId(null);
-  }
-
-  return (
-    <div className="stage-inner">
-      <div className="eyebrow">{t('browse.foldersEyebrow')}</div>
-      <div className="lede center" style={{ marginBottom: 12 }}>{t('browse.foldersLede')}</div>
-      <p className="copy center" style={{ marginTop: 0, marginBottom: 28 }}>
-        {t('browse.foldersCopy')}
-      </p>
-
-      <button className="scope-new-btn" onClick={() => startCreate('all')}
-              style={{ marginTop: 0, marginBottom: 20 }}>
-        <Glyph name="plus" size={14} /> {t('browse.newFolderAtRoot')}
-      </button>
-
-      {creatingUnder === 'all' && (
-        <CreateFolderRow
-          name={newName} setName={setNewName}
-          onSubmit={submitCreate}
-          onCancel={() => setCreatingUnder(null)}
-        />
-      )}
-
-      <div className="folders-list">
-        {scopes.filter(s => s.id !== 'all').map(s => {
-          const isEditing = editingId === s.id;
-          const isDeleting = pendingDeleteId === s.id;
-          const isLeaf = s.isLeaf;
-          return (
-            <React.Fragment key={s.id}>
-              <div className={`folder-row ${isDeleting ? 'is-deleting' : ''}`} data-depth={s.depth}>
-                <span className="folder-glyph">
-                  <Glyph name={isLeaf ? 'spark' : 'folders'} size={14} />
-                </span>
-                {isEditing ? (
-                  <input
-                    className="folder-rename"
-                    value={editName}
-                    autoFocus
-                    onChange={e => setEditName(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') submitRename(s.id);
-                      if (e.key === 'Escape') setEditingId(null);
-                    }}
-                    onBlur={() => submitRename(s.id)}
-                  />
-                ) : (
-                  <span className="folder-name">{s.label}</span>
-                )}
-                <span className="folder-meta">
-                  {tp('browse.cardCount', s.total, { n: s.total })}
-                </span>
-                <div className="folder-actions">
-                  {isDeleting ? (
-                    <>
-                      <button className="src-action" onClick={() => setPendingDeleteId(null)}>{t('browse.cancel')}</button>
-                      <button className="src-action src-action-destructive"
-                              onClick={() => { onDelete(s.id); setPendingDeleteId(null); }}>
-                        {t('browse.delete')}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      {isLeaf
-                        ? <button className="src-action" onClick={() => onOpenSource(s.id)}>{t('browse.open')}</button>
-                        : <button className="src-action" title={t('browse.addSubfolderTitle')}
-                                  onClick={() => startCreate(s.id)}>
-                            <Glyph name="plus" size={13} /> {t('browse.subfolder')}
-                          </button>}
-                      <button className="src-action" onClick={() => startRename(s)}>
-                        <Glyph name="pencil" size={13} />
-                      </button>
-                      <button className="src-action src-action-quiet"
-                              onClick={() => setPendingDeleteId(s.id)}>
-                        <Glyph name="close" size={14} />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-              {creatingUnder === s.id && (
-                <CreateFolderRow
-                  depth={s.depth + 1}
-                  name={newName} setName={setNewName}
-                  onSubmit={submitCreate}
-                  onCancel={() => setCreatingUnder(null)}
-                />
-              )}
-            </React.Fragment>
-          );
-        })}
-      </div>
-
-      <div className="home-actions" style={{ marginTop: 32 }}>
-        <button className="primary" onClick={onDone}>{t('browse.done')}</button>
-      </div>
-    </div>
-  );
-}
-
-function CreateFolderRow({ depth = 1, name, setName, onSubmit, onCancel }) {
-  return (
-    <div className="folder-row folder-create-row" data-depth={depth}>
-      <span className="folder-glyph"><Glyph name="folders" size={14} /></span>
-      <input
-        className="folder-rename"
-        value={name}
-        autoFocus
-        placeholder={t('browse.folderNamePlaceholder')}
-        onChange={e => setName(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter') onSubmit();
-          if (e.key === 'Escape') onCancel();
-        }}
-      />
-      <div className="folder-actions" style={{ opacity: 1 }}>
-        <button className="src-action" onClick={onCancel}>{t('browse.cancel')}</button>
-        <button className="src-action src-action-primary" onClick={onSubmit} disabled={!name.trim()}>
-          {t('browse.create')}
-        </button>
-      </div>
-    </div>
-  );
-}
 function SourceDetailScreen({ scope, scopes, cards, history, onChangeName, onSaveCard, onDeleteCard, onAddManual, onAddFromFile, onBegin, onBack, draftCount, onReviewDrafts, onViewProgress }) {
   const [name, setName] = useState(scope.label);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -3086,32 +2764,6 @@ function ManualGenScreen({ source, onApply, onCancel }) {
   );
 }
 
-function ProcessingScreen({ phase, onDone }) {
-  // phase: 0..4
-  const phases = [t('add.phaseReading'), t('add.phaseUnderstanding'), t('add.phaseDrafting'), t('add.phaseChoosing'), t('add.phaseReady')];
-  const message = phase < phases.length ? phases[phase] : t('add.phaseReady');
-  return (
-    <div className="stage-inner">
-      <div className="eyebrow">{t('add.processingEyebrow')}</div>
-      <div className="lede center" style={{ marginBottom: 8 }}>{message}.</div>
-      <p className="copy center">{t('add.processingHint')}</p>
-
-      {/* Subtle progress band */}
-      <div style={{ margin: '40px auto 0', width: 240, height: 2, background: '#EBEEF2', borderRadius: 2, overflow: 'hidden' }}>
-        <div style={{
-          width: `${(phase / (phases.length - 1)) * 100}%`,
-          height: '100%',
-          background: '#141920',
-          transition: 'width 700ms cubic-bezier(0.16, 1, 0.3, 1)',
-        }} />
-      </div>
-      <div className="home-actions" style={{ marginTop: 36 }}>
-        <button className="quiet" onClick={onDone}>{t('add.backHome')}</button>
-      </div>
-    </div>
-  );
-}
-
 function OcclusionEditor({ card, onBoxesChange, onImageChange }) {
   const wrapRef = useRef(null);
   const [img, setImg] = useState(card.image || null);   // working image; cropping replaces it
@@ -3771,10 +3423,9 @@ function App() {
   // Tracks the last practice the user engaged with, for the quick-resume action.
   // status: 'open' (started, no progress) | 'paused' (mid-session) | 'finished'
   const [lastSession, setLastSession] = usePersistentState('lastSession', {
-    scopeId: 'bio-cell-photo', status: 'paused', position: 1, total: 4,
+    scopeId: 'bio-cell-photo', status: 'paused', position: 3, total: 6,
   });
   const [keptCount, setKeptCount] = useState(0);
-  const [processingPhase, setProcessingPhase] = useState(0);
   const [overlay, setOverlay] = useState(null); // null = closed; else { region, source }
   // Open the source view for a card: its stored source document if it has one,
   // else (for the seeded cell cards) the canned figure page via its region.
@@ -4201,7 +3852,7 @@ function App() {
     setGenDraftBackup(null);   // generation finished — clear the refresh-recovery backup
     // Only pull the user into review if they're still waiting on the Add/manual
     // screen; if they navigated away, leave them put and surface the pending badge.
-    if (screenRef.current === 'add' || screenRef.current === 'manualGen' || screenRef.current === 'processing') {
+    if (screenRef.current === 'add' || screenRef.current === 'manualGen') {
       setScreen('reviewDrafts');
     }
   }
@@ -4371,7 +4022,7 @@ function App() {
         </div>
       </div>
 
-      {(screen === 'add' || screen === 'processing' || screen === 'processedNotice' || screen === 'manualGen' || screen === 'reviewDrafts' || screen === 'settings' || screen === 'study' || screen === 'performance' || screen === 'about' || screen === 'source') && (
+      {(screen === 'add' || screen === 'manualGen' || screen === 'reviewDrafts' || screen === 'settings' || screen === 'study' || screen === 'performance' || screen === 'about' || screen === 'source') && (
         <div className="back-bar">
           <button className="nav-btn" onClick={() => {
             // Performance returns to where it was opened from; study pauses (saving
@@ -4536,23 +4187,6 @@ function App() {
             />
           );
         })()}
-        {screen === 'processing' && (
-          <ProcessingScreen
-            phase={processingPhase}
-            onDone={() => setScreen('folder')}
-          />
-        )}
-        {screen === 'processedNotice' && (
-          <div className="stage-inner">
-            <div className="done-mark"><Glyph name="spark" size={26} /></div>
-            <div className="lede center">{tp('common.processedNotice.title', DRAFT_QUEUE.length, { n: DRAFT_QUEUE.length })}</div>
-            <p className="copy center">{t('common.processedNotice.sub')}</p>
-            <div className="home-actions">
-              <button className="primary" onClick={reviewDrafts}>{t('common.processedNotice.reviewNow')}</button>
-              <button className="quiet" onClick={() => setScreen('folder')}>{t('common.processedNotice.later')}</button>
-            </div>
-          </div>
-        )}
         {screen === 'manualGen' && (
           <ManualGenScreen
             source={genSource}
