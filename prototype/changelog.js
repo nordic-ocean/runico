@@ -29,6 +29,7 @@ window.RUNICO_CHANGELOG = [
       { type: 'feature', text: 'Study sessions with a reveal-then-Continue/Pause flow and no grading scales.' },
       { type: 'feature', text: 'Pick up where you left off: the home view remembers your last session and cards remaining.' },
       { type: 'feature', text: 'Column browser for navigating subjects, folders, and topics, then practicing any topic.' },
+      { type: 'feature', text: 'Reorganize folders and topics: drag-and-drop, or cut/copy and paste, to move a folder (with everything inside) or copy it into another folder.' },
       { type: 'feature', text: 'Track your progress with per-session accuracy charts and a drill-down to any single card.' },
       { type: 'feature', text: 'Generate cards from pasted text, screenshots, or notes via OpenRouter, then review the drafts.' },
       { type: 'feature', text: 'Image-occlusion cards: draw, drag, and resize masks over a figure.' },

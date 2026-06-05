@@ -765,6 +765,21 @@
   }
   .app.theme-dark .columns-header-title { color: #FBFCFD; }
   .app.theme-warm .columns-header-title { color: #1A1714; }
+  /* Per-column sort control — a quiet, right-aligned affordance inside each card */
+  .column-sort {
+    display: flex; align-items: center; justify-content: flex-end; gap: 3px;
+    padding: 2px 8px 6px;
+    color: #97A2B0;
+  }
+  .column-sort-select {
+    font-family: inherit; font-size: 11.5px; color: #5C6878;
+    background: transparent; border: none; cursor: pointer;
+    padding: 2px; border-radius: 6px;
+  }
+  .column-sort-select:hover { color: #141920; }
+  .app.theme-dark .column-sort-select { color: #9AA7B5; }
+  .app.theme-dark .column-sort-select:hover { color: #FBFCFD; }
+  .app.theme-dark .column-sort-select option { color: #141920; }
 
   .columns {
     display: flex;
@@ -791,6 +806,12 @@
   }
   .app.theme-dark .column { background: #1A1F26; border-color: #2A323F; }
   .app.theme-warm .column { background: #FBFAF7; border-color: #EAE5DC; }
+  /* The whole card lights up when a dragged folder can be dropped into its folder. */
+  .column.is-col-drop-target {
+    outline: 2px dashed var(--primary-500); outline-offset: -2px;
+    background: rgba(0,118,180,0.05);
+  }
+  .app.theme-dark .column.is-col-drop-target { background: rgba(0,118,180,0.13); }
 
   .column-head {
     padding: 14px 16px 12px;
@@ -913,17 +934,82 @@
 
   .column-item-actions {
     display: flex; gap: 2px; align-items: center; flex: none;
-    padding-right: 4px;
+    /* Reserve NO width when hidden so folder names keep the full column; the
+       actions slide in on hover (and while confirming a delete). */
+    max-width: 0; overflow: hidden;
     opacity: 0;
-    transition: opacity 100ms;
+    transition: max-width 150ms ease, opacity 100ms;
   }
-  .column-item:hover .column-item-actions { opacity: 1; }
-  .column-item.is-selected .column-item-actions { opacity: 1; }
-  .column-item.is-deleting .column-item-actions { opacity: 1; }
+  .column-item:hover .column-item-actions,
+  .column-item.is-deleting .column-item-actions,
+  .column-item.is-menu-open .column-item-actions,
+  .column-item.is-paste-target .column-item-actions { max-width: 340px; opacity: 1; padding-right: 4px; }
+  .column-item.is-menu-open { background: rgba(0,0,0,0.04); }
+  .app.theme-dark .column-item.is-menu-open { background: rgba(255,255,255,0.05); }
   .column-item .src-action {
     padding: 5px;
     font-size: 11px;
   }
+
+  /* Move / copy reorganization (drag-and-drop + cut/copy/paste) */
+  /* Dim only the cut item's CONTENT (not its actions, so the cancel button
+     stays at full strength), and keep its actions visible without hover. */
+  .column-item.is-cut .column-item-tap { opacity: 0.45; }
+  .column-item.is-cut .column-item-actions { max-width: 340px; opacity: 1; padding-right: 4px; }
+  .src-action.src-action-cancelcut {
+    color: var(--error-500);
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; white-space: nowrap;
+  }
+  .column-item.is-drop-target {
+    outline: 2px dashed var(--primary-500);
+    outline-offset: -2px;
+    background: rgba(0,118,180,0.08);
+  }
+  .app.theme-dark .column-item.is-drop-target { background: rgba(0,118,180,0.18); }
+  .column-item .src-action.src-action-paste {
+    color: var(--primary-500); font-weight: 600;
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; white-space: nowrap;
+  }
+  .column-item.is-paste-target { background: rgba(0,118,180,0.06); }
+  .app.theme-dark .column-item.is-paste-target { background: rgba(0,118,180,0.14); }
+  .column-foot-btn.column-foot-paste { color: var(--primary-500); font-weight: 600; }
+  .clipboard-banner {
+    margin-top: 12px;
+    display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 6px 12px; border-radius: 999px;
+    background: rgba(0,118,180,0.10);
+    color: var(--primary-500);
+    font-size: 12.5px;
+  }
+  .app.theme-dark .clipboard-banner { background: rgba(0,118,180,0.20); }
+
+  /* Per-item ⋯ action menu */
+  .column-menu-overlay { position: fixed; inset: 0; z-index: 60; }
+  .column-menu {
+    position: fixed; z-index: 61;
+    min-width: 156px;
+    background: #fff;
+    border: 1px solid var(--border-default);
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(20,25,32,0.18);
+    padding: 4px;
+    display: flex; flex-direction: column;
+  }
+  .app.theme-dark .column-menu { background: #1B2230; border-color: #2A323F; }
+  .app.theme-warm .column-menu { background: #FFFDF8; }
+  .column-menu-item {
+    text-align: left; background: transparent; border: none; cursor: pointer;
+    font-family: inherit; font-size: 13px; line-height: 1.2;
+    padding: 8px 12px; border-radius: 7px; color: #1F2937; white-space: nowrap;
+    transition: background 100ms;
+  }
+  .column-menu-item:hover { background: rgba(0,0,0,0.06); }
+  .app.theme-dark .column-menu-item { color: #E7EBF0; }
+  .app.theme-dark .column-menu-item:hover { background: rgba(255,255,255,0.08); }
+  .column-menu-item.is-destructive { color: var(--error-500); }
+  .column-menu-item.is-primary { color: var(--primary-500); font-weight: 600; }
 
   .column-foot {
     padding: 8px 10px 10px;

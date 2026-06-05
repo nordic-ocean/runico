@@ -315,6 +315,130 @@ function buildGenPrompt(sourceText) {
 let GEN_ID = 0;
 function genId(prefix) { return prefix + '-' + Date.now().toString(36) + '-' + (++GEN_ID).toString(36); }
 
+// ── Scope move / copy (re-parenting) ─────────────────────────
+// `scopes` is a flat array kept in depth-first order: a parent is immediately
+// followed by the contiguous block of its descendants. These helpers move or
+// duplicate a scope (folder + subtree, or a single topic) into another folder
+// without a tree refactor — they're pure so they can be unit-tested.
+
+// The contiguous [start, end) index range of `id` + its descendants.
+function scopeSubtreeRange(scopes, id) {
+  const start = scopes.findIndex(s => s.id === id);
+  if (start === -1) return null;
+  const baseDepth = scopes[start].depth || 0;
+  let end = start + 1;
+  while (end < scopes.length && (scopes[end].depth || 0) > baseDepth) end++;
+  return [start, end];
+}
+
+// True when `scopeId` IS `ancestorId` or sits anywhere below it (cycle guard).
+function isScopeDescendant(scopes, ancestorId, scopeId) {
+  let cur = scopes.find(s => s.id === scopeId);
+  const seen = new Set();
+  while (cur && !seen.has(cur.id)) {
+    if (cur.id === ancestorId) return true;
+    seen.add(cur.id);
+    if (cur.parent == null) break;
+    cur = scopes.find(s => s.id === cur.parent);
+  }
+  return false;
+}
+
+// Whether `srcId` may be moved/copied into folder `destId`. Shared by drag-drop
+// and paste so both enforce identical rules.
+function canReceiveScope(scopes, srcId, destId, mode) {
+  const src = scopes.find(s => s.id === srcId);
+  const dest = scopes.find(s => s.id === destId);
+  if (!src || !dest) return false;
+  if (src.parent == null) return false;                 // never move/copy the root
+  if (dest.isLeaf) return false;                         // only folders receive children
+  if (destId === srcId) return false;
+  if (isScopeDescendant(scopes, srcId, destId)) return false;  // no cycle / into own subtree
+  if (mode === 'move' && dest.id === src.parent) return false; // move into current parent = no-op
+  return true;
+}
+
+// Index just after `destId`'s last descendant (where a moved/copied block goes),
+// keeping the depth-first ordering the browser relies on.
+function insertAfterSubtree(scopes, destId) {
+  const di = scopes.findIndex(s => s.id === destId);
+  if (di === -1) return scopes.length;
+  const destDepth = scopes[di].depth || 0;
+  let at = di + 1;
+  while (at < scopes.length && (scopes[at].depth || 0) > destDepth) at++;
+  return at;
+}
+
+// Pure: re-parent `srcId`'s subtree under `destId`. Ids are unchanged (so cards /
+// history / overrides keyed by id stay valid). Returns a new scopes array.
+function applyScopeMove(scopes, srcId, destId) {
+  if (!canReceiveScope(scopes, srcId, destId, 'move')) return scopes;
+  const range = scopeSubtreeRange(scopes, srcId);
+  if (!range) return scopes;
+  const [start, end] = range;
+  const block = scopes.slice(start, end);
+  const dest = scopes.find(s => s.id === destId);
+  const delta = (dest.depth + 1) - (block[0].depth || 0);
+  const moved = block.map(s => ({
+    ...s,
+    depth: (s.depth || 0) + delta,
+    ...(s.id === srcId ? { parent: destId } : {}),
+  }));
+  const rest = [...scopes.slice(0, start), ...scopes.slice(end)];
+  const at = insertAfterSubtree(rest, destId);
+  rest.splice(at, 0, ...moved);
+  return rest;
+}
+
+// Pure: deep-clone `srcId`'s subtree (and its cards) under `destId` with fresh
+// ids, fresh study history (none), and a disambiguated root label on collision.
+// `mintId(prefix)` mints unique ids; `copySuffix` localizes the "(copy)" marker.
+// Returns { scopes, sourceCards, scopeLabelOverrides } — history/drafts untouched.
+function applyScopeCopy(scopes, sourceCards, labelOverrides, srcId, destId, mintId, copySuffix) {
+  if (!canReceiveScope(scopes, srcId, destId, 'copy')) {
+    return { scopes, sourceCards, scopeLabelOverrides: labelOverrides };
+  }
+  const range = scopeSubtreeRange(scopes, srcId);
+  if (!range) return { scopes, sourceCards, scopeLabelOverrides: labelOverrides };
+  const [start, end] = range;
+  const block = scopes.slice(start, end);
+  const dest = scopes.find(s => s.id === destId);
+  const delta = (dest.depth + 1) - (block[0].depth || 0);
+  const idMap = {};
+  block.forEach(s => { idMap[s.id] = mintId(s.isLeaf ? 'src' : 'folder'); });
+  // Disambiguate the copied ROOT label against the destination's current children.
+  const siblings = new Set(scopes.filter(s => s.parent === destId).map(s => s.label));
+  let rootLabel = block[0].label;
+  if (siblings.has(rootLabel)) {
+    const base = rootLabel + ' ' + copySuffix;
+    rootLabel = base;
+    let n = 2;
+    while (siblings.has(rootLabel)) { rootLabel = base + ' ' + n; n++; }
+  }
+  const cloned = block.map(s => ({
+    ...s,
+    id: idMap[s.id],
+    parent: s.id === srcId ? destId : idMap[s.parent],
+    depth: (s.depth || 0) + delta,
+    label: s.id === srcId ? rootLabel : s.label,
+    last: 'never',
+    ...(s.paused ? { paused: undefined } : {}),
+    ...(s.isLeaf ? { total: (sourceCards[s.id] || []).length } : {}),
+  }));
+  const nextCards = { ...sourceCards };
+  const nextOverrides = { ...labelOverrides };
+  block.forEach(s => {
+    if (s.isLeaf && sourceCards[s.id]) {
+      nextCards[idMap[s.id]] = sourceCards[s.id].map(c => ({ ...c, id: mintId('c') }));
+    }
+    if (labelOverrides[s.id] != null) nextOverrides[idMap[s.id]] = labelOverrides[s.id];
+  });
+  const at = insertAfterSubtree(scopes, destId);
+  const nextScopes = [...scopes];
+  nextScopes.splice(at, 0, ...cloned);
+  return { scopes: nextScopes, sourceCards: nextCards, scopeLabelOverrides: nextOverrides };
+}
+
 // Tolerant parse: strip fences/prose, extract the JSON array, validate, and map
 // to Runico card shapes. Used by BOTH transports so they produce identical cards.
 function parseGenCards(responseText) {
@@ -764,6 +888,7 @@ function Glyph({ name, size = 16 }) {
     clock:  <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
     download:<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5" /><path d="M12 15V3" /></>,
     upload: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m17 8-5-5-5 5" /><path d="M12 3v12" /></>,
+    more:   <><circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none" /></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -940,6 +1065,8 @@ function FolderView({
   onCreateFolder, onAddSource,
   onRenameFolder, onDeleteFolder,
   onOpenSource, onViewProgress, hasStudyCards, pendingDrafts,
+  clipboard, canReceive, onMoveScope, onCutScope, onCopyScope, onPasteScope, onClearClipboard,
+  folderSort, onSortChange,
 }) {
   // ── Finder-style column view ─────────────────────────────────
   // The Single-folder view above was replaced by a multi-column
@@ -952,7 +1079,21 @@ function FolderView({
   const [creatingIn, setCreatingIn] = useState(null);   // parent id
   const [creatingName, setCreatingName] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [dragId, setDragId] = useState(null);       // scope being dragged
+  const [dragOverId, setDragOverId] = useState(null); // folder ROW currently hovered as a drop target
+  const [dragOverCol, setDragOverCol] = useState(null); // column CARD (by its folder id) hovered as a drop target
+  // The open ⋯ action menu: { id, top, right } anchored to the button's screen
+  // rect (fixed-positioned so the column-list's overflow can't clip it).
+  const [menu, setMenu] = useState(null);
   const columnsRef = useRef(null);
+
+  // Close the action menu on Escape.
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (e) => { if (e.key === 'Escape') setMenu(null); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [menu]);
 
   const selectedId = path[path.length - 1];
   const selectedScope = scopes.find(s => s.id === selectedId) || scopes[0];
@@ -990,6 +1131,22 @@ function FolderView({
     return { total };
   }
 
+  // Order a folder's children for DISPLAY only — the underlying `scopes` array
+  // stays depth-first ordered (so move/copy block operations are unaffected).
+  // `mode` is per-folder; 'manual' keeps insertion order, the others sort a copy.
+  function sortChildren(list, mode) {
+    if (mode === 'manual') return list;
+    const loc = getRunicoLocale();
+    const count = (s) => s.isLeaf ? (sourceCards[s.id] || []).length : descendantStats(s.id).total;
+    const arr = [...list];
+    if (mode === 'name-desc') arr.sort((a, b) => b.label.localeCompare(a.label, loc));
+    else if (mode === 'cards-desc') arr.sort((a, b) => count(b) - count(a) || a.label.localeCompare(b.label, loc));
+    else arr.sort((a, b) => a.label.localeCompare(b.label, loc)); // name-asc (default)
+    return arr;
+  }
+  // This folder's chosen sort (default name-asc). folderSort is a {scopeId: mode} map.
+  const sortModeFor = (id) => (folderSort && typeof folderSort === 'object' && folderSort[id]) || 'name-asc';
+
   // Opening a folder appends a column to the right of the track; on narrow
   // screens (phones) that new column lands off-screen. Scroll the track fully
   // right on every path change so the newest column — or the selected leaf's
@@ -999,6 +1156,21 @@ function FolderView({
     const el = columnsRef.current;
     if (el) el.scrollTo({ left: el.scrollWidth });
   }, [path]);
+
+  // Keep the open column path valid when the tree changes underneath it (e.g. a
+  // move/paste re-parents a scope that's currently open). Each step must still
+  // be a child of the previous; trim to the last valid prefix so the browser
+  // never shows a stale column for a scope that has moved away.
+  useEffect(() => {
+    setPath(prev => {
+      let valid = 1; // index 0 is always 'all'
+      for (let i = 1; i < prev.length; i++) {
+        const s = scopes.find(x => x.id === prev[i]);
+        if (s && s.parent === prev[i - 1]) valid = i + 1; else break;
+      }
+      return valid === prev.length ? prev : prev.slice(0, valid);
+    });
+  }, [scopes]);
 
   return (
     <div className="stage-inner stage-columns">
@@ -1018,10 +1190,18 @@ function FolderView({
         {Array.from({ length: columnsToRender }).map((_, i) => {
           const parentId = path[i];
           const parent = scopes.find(s => s.id === parentId);
-          const children = scopes.filter(s => s.parent === parentId);
+          const sortMode = sortModeFor(parentId);
+          const children = sortChildren(scopes.filter(s => s.parent === parentId), sortMode);
           const selectedChild = path[i + 1];
+          // The whole card is a drop target for ITS folder (parentId): dropping a
+          // dragged scope onto the card's body (not onto a child folder row) moves
+          // it into this folder. Child folder rows claim their own drops below.
+          const colCanDrop = !!dragId && !!parent && !parent.isLeaf && canReceive(dragId, parentId, 'move');
           return (
-            <div key={i} className="column">
+            <div key={i}
+                 className={`column ${dragOverCol === parentId && colCanDrop ? 'is-col-drop-target' : ''}`}
+                 onDragOver={(e) => { if (colCanDrop) { e.preventDefault(); if (dragOverCol !== parentId) { setDragOverCol(parentId); setDragOverId(null); } } }}
+                 onDrop={(e) => { e.preventDefault(); const d = dragId; setDragId(null); setDragOverId(null); setDragOverCol(null); if (d && canReceive(d, parentId, 'move')) onMoveScope(d, parentId); }}>
               {parent && parent.id !== 'all' && (
                 <div className="column-head">
                   <div className="column-head-title">{parent.label}</div>
@@ -1061,15 +1241,48 @@ function FolderView({
                 </div>
               )}
 
+              {children.length >= 2 && (
+                <div className="column-sort">
+                  <Glyph name="sliders" size={12} />
+                  <select className="column-sort-select"
+                          value={sortMode}
+                          onChange={(e) => onSortChange(parentId, e.target.value)}
+                          aria-label={t('browse.sortBy')}>
+                    <option value="name-asc">{t('browse.sortNameAsc')}</option>
+                    <option value="name-desc">{t('browse.sortNameDesc')}</option>
+                    <option value="cards-desc">{t('browse.sortCards')}</option>
+                    <option value="manual">{t('browse.sortManual')}</option>
+                  </select>
+                </div>
+              )}
+
               <div className="column-list">
                 {children.map(c => {
                   const isLeaf = c.isLeaf;
                   const isSelected = selectedChild === c.id;
                   const isEditing = editingId === c.id;
                   const isDeleting = pendingDeleteId === c.id;
+                  const isCut = clipboard && clipboard.mode === 'cut' && clipboard.scopeId === c.id;
+                  const isDropTarget = dragOverId === c.id;
+                  const canPasteHere = !!clipboard && !isLeaf && canReceive(clipboard.scopeId, c.id, clipboard.mode);
+                  // A folder ROW claims its own drops (stopPropagation) so they don't
+                  // fall through to the card. Valid → into this folder; invalid → no-op.
+                  const dropProps = isLeaf ? {} : {
+                    onDragOver: (e) => {
+                      e.stopPropagation();
+                      if (dragId && canReceive(dragId, c.id, 'move')) { e.preventDefault(); if (dragOverId !== c.id) { setDragOverId(c.id); setDragOverCol(null); } }
+                      else if (dragOverId === c.id) setDragOverId(null);
+                    },
+                    onDragLeave: () => { if (dragOverId === c.id) setDragOverId(null); },
+                    onDrop: (e) => { e.preventDefault(); e.stopPropagation(); const d = dragId; setDragId(null); setDragOverId(null); setDragOverCol(null); if (d && canReceive(d, c.id, 'move')) onMoveScope(d, c.id); },
+                  };
                   return (
                     <div key={c.id}
-                         className={`column-item ${isSelected ? 'is-selected' : ''} ${isLeaf ? 'is-leaf' : ''} ${isDeleting ? 'is-deleting' : ''}`}>
+                         className={`column-item ${isSelected ? 'is-selected' : ''} ${isLeaf ? 'is-leaf' : ''} ${isDeleting ? 'is-deleting' : ''} ${isCut ? 'is-cut' : ''} ${isDropTarget ? 'is-drop-target' : ''} ${menu && menu.id === c.id ? 'is-menu-open' : ''} ${canPasteHere ? 'is-paste-target' : ''}`}
+                         draggable={!isEditing}
+                         onDragStart={(e) => { setDragId(c.id); try { e.dataTransfer.effectAllowed = 'move'; } catch (err) {} }}
+                         onDragEnd={() => { setDragId(null); setDragOverId(null); setDragOverCol(null); }}
+                         {...dropProps}>
                       {isEditing ? (
                         <>
                           <span className="column-glyph">
@@ -1124,15 +1337,29 @@ function FolderView({
                           </>
                         ) : !isEditing && (
                           <>
-                            <button className="src-action src-action-quiet"
-                                    onClick={(e) => { e.stopPropagation(); startRename(c); }}
-                                    title={t('browse.renameTitle')}>
-                              <Glyph name="pencil" size={12} />
-                            </button>
-                            <button className="src-action src-action-quiet"
-                                    onClick={(e) => { e.stopPropagation(); setPendingDeleteId(c.id); }}
-                                    title={t('browse.deleteTitle')}>
-                              <Glyph name="close" size={13} />
+                            {canPasteHere && (
+                              <button className="src-action src-action-paste"
+                                      onClick={(e) => { e.stopPropagation(); onPasteScope(c.id); }}
+                                      title={t('browse.pasteHereTitle')}>
+                                <Glyph name="download" size={12} /> {t('browse.pasteHere')}
+                              </button>
+                            )}
+                            {isCut && (
+                              <button className="src-action src-action-cancelcut"
+                                      onClick={(e) => { e.stopPropagation(); onClearClipboard(); }}
+                                      title={t('browse.cancelCut')} aria-label={t('browse.cancelCut')}>
+                                <Glyph name="close" size={13} /> {t('browse.cancelCut')}
+                              </button>
+                            )}
+                            <button className="src-action src-action-quiet column-item-menu-btn"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (menu && menu.id === c.id) { setMenu(null); return; }
+                                      const r = e.currentTarget.getBoundingClientRect();
+                                      setMenu({ id: c.id, top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+                                    }}
+                                    title={t('browse.moreActions')} aria-label={t('browse.moreActions')}>
+                              <Glyph name="more" size={15} />
                             </button>
                           </>
                         )}
@@ -1171,6 +1398,12 @@ function FolderView({
               </div>
 
               <div className="column-foot">
+                {clipboard && parent && !parent.isLeaf && canReceive(clipboard.scopeId, parentId, clipboard.mode) && (
+                  <button className="column-foot-btn column-foot-paste"
+                          onClick={() => onPasteScope(parentId)}>
+                    <Glyph name="download" size={12} /> {t('browse.pasteHere')}
+                  </button>
+                )}
                 {parent && !parent.isLeaf && (
                   <button className="column-foot-btn"
                           onClick={() => { setCreatingIn(parentId); setCreatingName(''); }}>
@@ -1213,6 +1446,35 @@ function FolderView({
           />
         )}
       </div>
+
+      {/* The ⋯ action menu is rendered HERE, at the browser root — not inside a
+          column-item — so a row's cut-dimming / scroll-clipping / stacking can
+          never bleed into it. It's fixed-positioned from the button's rect. */}
+      {menu && (() => {
+        const c = scopes.find(s => s.id === menu.id);
+        if (!c) return null;
+        return (
+          <>
+            <div className="column-menu-overlay" onClick={() => setMenu(null)} />
+            <div className="column-menu" style={{ top: menu.top, right: menu.right }} onClick={(e) => e.stopPropagation()}>
+              {clipboard && clipboard.mode === 'copy' && (
+                <button className="column-menu-item"
+                        onClick={() => { onClearClipboard(); setMenu(null); }}>
+                  {t('browse.cancelCopy')}
+                </button>
+              )}
+              <button className="column-menu-item"
+                      onClick={() => { startRename(c); setMenu(null); }}>{t('browse.renameTitle')}</button>
+              <button className="column-menu-item"
+                      onClick={() => { onCutScope(c.id); setMenu(null); }}>{t('browse.cut')}</button>
+              <button className="column-menu-item"
+                      onClick={() => { onCopyScope(c.id); setMenu(null); }}>{t('browse.copy')}</button>
+              <button className="column-menu-item is-destructive"
+                      onClick={() => { setPendingDeleteId(c.id); setMenu(null); }}>{t('browse.delete')}</button>
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }
@@ -3495,6 +3757,14 @@ function App() {
   const [sourceCards, setSourceCards] = usePersistentState('sourceCards', () => ({ ...SOURCE_CARDS_SEED }));
   const [scopeLabelOverrides, setScopeLabelOverrides] = usePersistentState('scopeLabels', () => ({}));
   const [scopes, setScopes] = usePersistentState('scopes', () => [...SCOPES]);
+  // Ephemeral cut/copy clipboard for reorganizing scopes — intentionally NOT
+  // persisted, so it clears on reload. Shape: { mode:'cut'|'copy', scopeId }.
+  const [clipboard, setClipboard] = useState(null);
+  // How the column browser orders each folder's children. Persisted so it sticks.
+  // 'name-asc' | 'name-desc' | 'cards-desc' | 'manual' (manual = insertion order).
+  // Per-folder sort: a { [folderId]: 'name-asc'|'name-desc'|'cards-desc'|'manual' }
+  // map (each folder defaults to name-asc when unset). Persisted so it sticks.
+  const [folderSort, setFolderSort] = usePersistentState('folderSort', () => ({}));
 
   // Per-scope study history (sittings + per-card pass/miss), seeded once from the
   // demo data and then durably persisted. Real sessions append a sitting on finish.
@@ -3714,6 +3984,46 @@ function App() {
     setPendingDrafts(prune);
     setHistory(prune);
     setScopeLabelOverrides(prune);
+    // If the cut/copied scope (or an ancestor of it) was just deleted, the
+    // clipboard now points at a missing id — drop it so no stale banner lingers.
+    if (clipboard && removed.has(clipboard.scopeId)) setClipboard(null);
+  }
+
+  // ── Move / copy a scope (folder subtree or topic) into another folder ──
+  // Move re-parents in place (ids stable, so cards/history follow); copy
+  // duplicates the subtree + its cards with fresh ids and no prior history.
+  // Both validate via canReceiveScope and persist through existing state.
+  function moveScope(srcId, destId) {
+    if (!canReceiveScope(scopes, srcId, destId, 'move')) return false;
+    setScopes(prev => applyScopeMove(prev, srcId, destId));
+    return true;
+  }
+  function copyScope(srcId, destId) {
+    if (!canReceiveScope(scopes, srcId, destId, 'copy')) return false;
+    // The three stores share one id map, so they're computed together from the
+    // current (consistent) render values and written as literals. Safe because
+    // every scope mutation here is a synchronous user handler — none interleaves.
+    const r = applyScopeCopy(scopes, sourceCards, scopeLabelOverrides, srcId, destId, genId, t('browse.copySuffix'));
+    setScopes(r.scopes);
+    setSourceCards(r.sourceCards);
+    setScopeLabelOverrides(r.scopeLabelOverrides);
+    return true;
+  }
+  function cutScope(id) {
+    const s = scopes.find(x => x.id === id);
+    if (s && s.parent != null) setClipboard({ mode: 'cut', scopeId: id });
+  }
+  function copyScopeToClipboard(id) {
+    const s = scopes.find(x => x.id === id);
+    if (s && s.parent != null) setClipboard({ mode: 'copy', scopeId: id });
+  }
+  function pasteScopeInto(destId) {
+    if (!clipboard) return;
+    const { mode, scopeId } = clipboard;
+    if (!scopes.find(s => s.id === scopeId)) { setClipboard(null); return; }  // source vanished
+    if (!canReceiveScope(scopes, scopeId, destId, mode)) return;
+    const ok = mode === 'cut' ? moveScope(scopeId, destId) : copyScope(scopeId, destId);
+    if (ok) setClipboard(null);  // clear after ANY successful paste — clears every paste affordance
   }
 
   // The demo deck (the fixed QUEUE) drives the session. v1 has no
@@ -4035,6 +4345,15 @@ function App() {
             }}
             onOpenSource={(id) => { setScopeId(id); setCardIdx(0); setScreen('source'); }}
             onViewProgress={(id) => { setScopeId(id); setPerfReturn('folder'); setScreen('performance'); }}
+            folderSort={folderSort}
+            onSortChange={(scopeId, mode) => setFolderSort(prev => ({ ...(prev && typeof prev === 'object' ? prev : {}), [scopeId]: mode }))}
+            clipboard={clipboard}
+            canReceive={(srcId, destId, mode) => canReceiveScope(scopes, srcId, destId, mode)}
+            onMoveScope={moveScope}
+            onCutScope={cutScope}
+            onCopyScope={copyScopeToClipboard}
+            onPasteScope={pasteScopeInto}
+            onClearClipboard={() => setClipboard(null)}
           />
         )}
         {screen === 'source' && isLeafSource && (
