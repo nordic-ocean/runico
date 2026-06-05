@@ -104,7 +104,11 @@ const EMPTY_LIBRARY = { format: 'runico-library', version: 1, library: { scopes:
 async function openLibrary() {
   const r = await dialog.showOpenDialog(win || undefined, {
     title: 'Open Runico library', properties: ['openFile'],
-    filters: [{ name: 'Runico library', extensions: ['runico', 'json'] }],
+    // 'runico' is a custom extension with no registered type, so on a cold launch
+    // macOS can briefly fail to resolve its dynamic UTI and gray the file out in the
+    // panel (it resolves on a second open). An "All files" option is a reliable
+    // escape hatch on any build; the renderer validates the file's contents anyway.
+    filters: [{ name: 'Runico library', extensions: ['runico', 'json'] }, { name: 'All files', extensions: ['*'] }],
   });
   if (r.canceled || !r.filePaths || !r.filePaths[0]) return { canceled: true };
   const fp = r.filePaths[0];
