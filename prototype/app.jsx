@@ -3480,6 +3480,14 @@ function App() {
   // Ephemeral cut/copy clipboard for reorganizing scopes — intentionally NOT
   // persisted, so it clears on reload. Shape: { mode:'cut'|'copy', scopeId }.
   const [clipboard, setClipboard] = useState(null);
+  // Screen-reader announcement for clipboard actions — cut/copy/paste are
+  // otherwise conveyed only visually. Surfaced via a hidden aria-live region.
+  const [announce, setAnnounce] = useState('');
+  useEffect(() => {
+    if (!clipboard) { setAnnounce(''); return; }
+    const sc = scopes.find(s => s.id === clipboard.scopeId);
+    if (sc) setAnnounce(t(clipboard.mode === 'cut' ? 'browse.clipboardCut' : 'browse.clipboardCopy', { label: sc.label }));
+  }, [clipboard]);
   // How the column browser orders each folder's children. Persisted so it sticks.
   // 'name-asc' | 'name-desc' | 'cards-desc' | 'manual' (manual = insertion order).
   // Per-folder sort: a { [folderId]: 'name-asc'|'name-desc'|'cards-desc'|'manual' }
@@ -3998,6 +4006,7 @@ function App() {
 
   return (
     <div className={`app theme-${tweaks.theme}`} style={{ ['--size-mul']: sizeMul }}>
+      <div className="sr-only" aria-live="polite" role="status">{announce}</div>
       <div className="nav">
         <div className="nav-left">
           <button className="nav-mark" onClick={() => { setGenDraftBackup(null); setRestoreDraft(null); setScopeId('all'); setScreen('folder'); }}>

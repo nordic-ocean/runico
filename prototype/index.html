@@ -2721,6 +2721,23 @@
   .src-trend:hover .src-trend-hint svg { color: var(--primary-500); transform: translateX(2px); }
   .app.theme-dark .src-trend-hint { color: #9BA5B3; }
   .app.theme-dark .src-trend:hover .src-trend-hint { color: #8FCBEC; }
+  /* ── Narrow screens / phones ─────────────────────────────────────
+     The layout otherwise has no width breakpoints; below ~640px the fixed nav/
+     stage padding and the very large display/count type overflow. Scale them
+     down and let the theme grid stack. Desktop (wider) is unaffected. */
+  @media (max-width: 640px) {
+    .nav { padding: 16px 18px; }
+    .stage { padding: 18px 16px 32px; }
+    .display { font-size: 38px; }
+    .home-count { font-size: 84px; }
+    .theme-list { grid-template-columns: 1fr; }
+  }
+
+  /* Visually-hidden but available to screen readers (for aria-live status). */
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
 </style>
 
 <!-- Vendored locally (prototype/vendor/) so the packaged desktop app renders
