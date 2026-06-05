@@ -35,6 +35,49 @@
   .app.theme-warm { background: #FBFAF7; }
   .app.theme-warm body { color: #1F1B17; }
 
+  /* Build version — faint, fixed in the bottom-left; opens the About page.
+     Colors inherit the theme base and dim via opacity, so it stays legible
+     on light, warm, and dark without per-theme overrides. */
+  .version-badge {
+    position: fixed; bottom: 14px; left: 16px;
+    font-family: inherit; font-size: 11px; line-height: 1; letter-spacing: 0.02em;
+    color: inherit; opacity: 0.45;
+    background: none; border: none; padding: 4px; margin: 0;
+    cursor: pointer; user-select: none;
+    z-index: 80;
+    transition: opacity 150ms;
+  }
+  .version-badge:hover { opacity: 0.9; text-decoration: underline; }
+
+  /* About + changelog page */
+  .about-hero { text-align: center; margin: 4px 0 20px; }
+  .about-mark { width: 56px; height: 56px; }
+  .about-name { font-size: 22px; font-weight: 600; margin-top: 10px; letter-spacing: -0.01em; }
+  .about-version { font-size: 13px; margin-top: 3px; opacity: 0.55; }
+  .about-tagline { font-size: 15px; margin-top: 8px; opacity: 0.8; font-style: italic; }
+  .about-desc { line-height: 1.65; margin: 12px 0; opacity: 0.92; }
+  .changelog { margin-top: 14px; display: flex; flex-direction: column; gap: 26px; }
+  .cl-release-head { display: flex; align-items: baseline; gap: 10px; }
+  .cl-version { font-size: 16px; font-weight: 600; }
+  .cl-date { font-size: 12px; opacity: 0.55; }
+  .cl-summary { margin-top: 5px; opacity: 0.7; line-height: 1.5; }
+  .cl-entries { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 9px; }
+  .cl-entry { display: flex; align-items: flex-start; gap: 10px; }
+  .cl-text { line-height: 1.5; opacity: 0.92; }
+  .cl-tag {
+    flex: none; margin-top: 2px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  }
+  .cl-feature     { background: rgba(34,197,94,0.15);  color: #15803d; }
+  .cl-enhancement { background: rgba(59,130,246,0.15); color: #1d4ed8; }
+  .cl-fix         { background: rgba(245,158,11,0.18); color: #b45309; }
+  .cl-security    { background: rgba(239,68,68,0.15);  color: #b91c1c; }
+  .app.theme-dark .cl-feature     { color: #4ade80; }
+  .app.theme-dark .cl-enhancement { color: #7aa7ff; }
+  .app.theme-dark .cl-fix         { color: #fbbf24; }
+  .app.theme-dark .cl-security    { color: #f87171; }
+
   /* Wordmark + tiny top bar */
   .nav {
     display: flex; align-items: center; justify-content: space-between;
@@ -1387,6 +1430,14 @@
   .app.theme-warm .src-card-q { color: #1A1714; }
   .app.theme-warm .src-card-a { color: #5C5147; }
 
+  /* Occlusion card row: figure thumbnail + mask count */
+  .src-card-occ { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .src-card-thumb {
+    max-height: 64px; max-width: 120px; height: auto; width: auto;
+    border-radius: 6px; border: 1px solid var(--border-subtle); display: block;
+  }
+  .src-card-occ-meta { font-size: 13px; color: #5C6878; }
+
   .src-card-actions {
     display: flex; gap: 4px; align-items: center; flex: none;
     opacity: 0;
@@ -1505,6 +1556,59 @@
   .card-answer.muted {
     color: #475361;
     font-weight: 400;
+  }
+
+  /* Study cards render on a real flashcard surface so a reversible card can flip
+     over convincingly and the kinds look consistent. */
+  .study-card, .flip-face {
+    background: #FFFFFF;
+    border: 1px solid #ECEFF3;
+    border-radius: 20px;
+    box-shadow: 0 18px 40px -20px rgba(20,25,32,0.22), 0 3px 10px -4px rgba(20,25,32,0.08);
+    padding: 44px 40px;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .app.theme-warm .study-card, .app.theme-warm .flip-face { background: #FFFDF7; border-color: #ECE6D8; }
+  .app.theme-dark .study-card, .app.theme-dark .flip-face {
+    background: #1F2630; border-color: #2C343F;
+    box-shadow: 0 18px 40px -20px rgba(0,0,0,0.55), 0 3px 10px -4px rgba(0,0,0,0.35);
+  }
+
+  /* Reversible flip — the term face turns on its Y axis to the definition face.
+     Both faces share one grid cell so the card sizes to the taller face and
+     there's no layout jump when it flips. */
+  .flip-card { perspective: 1600px; }
+  .flip-inner {
+    display: grid;
+    transform-style: preserve-3d;
+    transition: transform 560ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .flip-inner.is-flipped { transform: rotateY(180deg); }
+  .flip-face {
+    grid-area: 1 / 1;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .flip-face.flip-back { transform: rotateY(180deg); }
+  .flip-back .card-answer { margin-top: 0; animation: none; }  /* flip drives the motion */
+
+  /* Generation spinner */
+  .gen-spinner {
+    display: inline-block; width: 15px; height: 15px;
+    border: 2px solid rgba(255,255,255,0.35); border-top-color: #FFFFFF;
+    border-radius: 50%; vertical-align: -2px; margin-right: 9px;
+    animation: gen-spin 0.7s linear infinite;
+  }
+  @keyframes gen-spin { to { transform: rotate(360deg); } }
+  .flip-edge {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-bottom: 14px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    color: #9BA5B3;
   }
 
   /* Cloze blank */
@@ -1723,6 +1827,16 @@
 
   /* ─── Occlusion editor (draw / drag / resize) ─── */
   .figure-wrap.occ-editor { touch-action: none; user-select: none; }
+  .figure-wrap.occ-editor.is-cropping .occ-edit-surface { cursor: crosshair; }
+  /* Crop selection: a clear rectangle with everything outside it dimmed. */
+  .occ-crop-sel {
+    position: absolute;
+    z-index: 4;
+    border: 2px solid #FFFFFF;
+    border-radius: 2px;
+    box-shadow: 0 0 0 9999px rgba(20,25,32,0.50);
+    pointer-events: none;
+  }
   .occ-edit-surface {
     position: absolute; inset: 0;
     cursor: crosshair;
@@ -2059,6 +2173,21 @@
     padding: 16px 14px;
   }
   .grade-row.two .grade svg { flex: none; }
+  .grade-row.three {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+  .grade-row.three .grade {
+    flex-direction: row;
+    justify-content: center;
+    gap: 9px;
+    padding: 16px 14px;
+  }
+  .grade-row.three .grade svg { flex: none; }
+  .grade-miss svg { color: #C0392B; }
+  .grade-miss:hover { border-color: #E2B8B2; }
   .grade-continue {
     background: #141920;
     border-color: #141920;
@@ -2473,6 +2602,10 @@
 <body>
 <div id="root"></div>
 
+<!-- Interface translations + tiny i18n engine (plain JS, runs before app.jsx) -->
+<script src="i18n.js"></script>
+<!-- Static changelog + app description (plain JS, runs before app.jsx) -->
+<script src="changelog.js"></script>
 <script type="text/babel" src="app.jsx"></script>
 
 </body>

@@ -1,0 +1,37 @@
+{
+  "name": "runico",
+  "version": "1.0.0-alpha.1",
+  "description": "Runico — a local-first flashcard study app. Desktop wrapper around the prototype renderer.",
+  "license": "SEE LICENSE IN LICENSE",
+  "main": "electron/main.js",
+  "scripts": {
+    "predev": "node electron/patch-dev-name.js",
+    "dev": "electron .",
+    "prestart": "node electron/patch-dev-name.js",
+    "start": "electron .",
+    "build": "electron-builder --publish never",
+    "build:mac": "electron-builder --mac --publish never",
+    "build:win": "electron-builder --win --publish never",
+    "build:linux": "electron-builder --linux --publish never",
+    "build:all": "electron-builder -mwl --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.runico.app",
+    "productName": "Runico",
+    "icon": "prototype/assets/runico-ring.png",
+    "files": [
+      "electron/**/*",
+      "prototype/**/*"
+    ],
+    "directories": {
+      "output": "dist-electron"
+    },
+    "mac": { "category": "public.app-category.education" },
+    "win": { "target": "nsis" },
+    "linux": { "target": "AppImage", "category": "Education" }
+  }
+}
