@@ -288,6 +288,7 @@ const RUNICO_STRINGS = {
     "nav.saveFile": "Save file",
     "nav.loadFile": "Load file",
     "nav.loadConfirm": "Load a save file? This replaces your current library (your API key is kept).",
+    "nav.storageFull": "Storage is full — your latest change may not have been saved. Export your library, then remove some image cards to free space.",
     "nav.loadError": "That file isn't a valid Runico save.",
     "occ.useOriginal": "Use original image",
     "nav.saveAsPrompt": "Save your backup as:"
@@ -569,6 +570,7 @@ const RUNICO_STRINGS = {
     "nav.saveFile": "Salvar arquivo",
     "nav.loadFile": "Carregar arquivo",
     "nav.loadConfirm": "Carregar um arquivo salvo? Isso substitui sua biblioteca atual (sua chave de API é mantida).",
+    "nav.storageFull": "O armazenamento está cheio — sua alteração mais recente pode não ter sido salva. Exporte sua biblioteca e remova alguns cartões com imagem para liberar espaço.",
     "nav.loadError": "Esse arquivo não é um save válido do Runico.",
     "occ.useOriginal": "Usar imagem original",
     "nav.saveAsPrompt": "Salvar o backup como:"
@@ -850,6 +852,7 @@ const RUNICO_STRINGS = {
     "nav.saveFile": "Guardar ficheiro",
     "nav.loadFile": "Carregar ficheiro",
     "nav.loadConfirm": "Carregar um ficheiro guardado? Isto substitui a sua biblioteca atual (a sua chave de API é mantida).",
+    "nav.storageFull": "O armazenamento está cheio — a sua alteração mais recente pode não ter sido guardada. Exporte a sua biblioteca e remova alguns cartões com imagem para libertar espaço.",
     "nav.loadError": "Esse ficheiro não é um save válido do Runico.",
     "occ.useOriginal": "Usar imagem original",
     "nav.saveAsPrompt": "Guardar a cópia como:"
@@ -1131,6 +1134,7 @@ const RUNICO_STRINGS = {
     "nav.saveFile": "Guardar archivo",
     "nav.loadFile": "Cargar archivo",
     "nav.loadConfirm": "¿Cargar un archivo guardado? Esto reemplaza tu biblioteca actual (se conserva tu clave de API).",
+    "nav.storageFull": "El almacenamiento está lleno: es posible que tu cambio más reciente no se haya guardado. Exporta tu biblioteca y elimina algunas tarjetas con imagen para liberar espacio.",
     "nav.loadError": "Ese archivo no es un guardado válido de Runico.",
     "occ.useOriginal": "Usar imagen original",
     "nav.saveAsPrompt": "Guardar la copia como:"
@@ -1412,6 +1416,7 @@ const RUNICO_STRINGS = {
     "nav.saveFile": "Сохранить файл",
     "nav.loadFile": "Загрузить файл",
     "nav.loadConfirm": "Загрузить файл сохранения? Это заменит вашу текущую библиотеку (ключ API сохранится).",
+    "nav.storageFull": "Хранилище заполнено — последнее изменение могло не сохраниться. Экспортируйте библиотеку и удалите несколько карточек с изображениями, чтобы освободить место.",
     "nav.loadError": "Этот файл не является корректным сохранением Runico.",
     "occ.useOriginal": "Исходное изображение",
     "nav.saveAsPrompt": "Сохранить резервную копию как:"
@@ -1693,6 +1698,7 @@ const RUNICO_STRINGS = {
     "nav.saveFile": "Salva file",
     "nav.loadFile": "Carica file",
     "nav.loadConfirm": "Caricare un file salvato? Sostituisce la libreria attuale (la chiave API viene mantenuta).",
+    "nav.storageFull": "Spazio di archiviazione pieno — l'ultima modifica potrebbe non essere stata salvata. Esporta la tua libreria ed elimina alcune schede con immagini per liberare spazio.",
     "nav.loadError": "Quel file non è un salvataggio valido di Runico.",
     "occ.useOriginal": "Usa immagine originale",
     "nav.saveAsPrompt": "Salva il backup come:"
@@ -1974,6 +1980,7 @@ const RUNICO_STRINGS = {
     "nav.saveFile": "保存文件",
     "nav.loadFile": "加载文件",
     "nav.loadConfirm": "加载存档文件？这将替换当前的卡片库（会保留你的 API 密钥）。",
+    "nav.storageFull": "存储空间已满——你最近的更改可能未保存。请导出你的卡片库，并删除一些含图片的卡片以释放空间。",
     "nav.loadError": "该文件不是有效的 Runico 存档。",
     "occ.useOriginal": "使用原图",
     "nav.saveAsPrompt": "将备份另存为："

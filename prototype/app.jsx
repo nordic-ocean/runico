@@ -101,6 +101,10 @@ async function exportSaveFile() {
 }
 function applyImportedData(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) { try { alert(t('nav.loadError')); } catch (e) {} return; }
+  // Shape guard: a real Runico export is a map of STORE_PREFIX-prefixed keys. Any
+  // other .json (a package.json, another app's export, {}) would otherwise pass the
+  // type check and then irreversibly wipe and replace the user's entire library.
+  if (!Object.keys(data).some(k => k.indexOf(STORE_PREFIX) === 0)) { try { alert(t('nav.loadError')); } catch (e) {} return; }
   if (!window.confirm(t('nav.loadConfirm'))) return;
   if (IS_DESKTOP) {
     // Sync the in-memory store to the imported data IN PLACE before reloading, so
@@ -153,6 +157,22 @@ async function importSaveFile() {
   input.click();
 }
 
+// localStorage has a hard ~5MB cap in the browser. usePersistentState's write
+// used to swallow QuotaExceededError silently, so a just-approved batch (esp.
+// image-occlusion cards, which embed a base64 image) could fail to persist and
+// vanish on the next reload with zero feedback. Detect the quota error and warn
+// the user ONCE per session so they can export and free space instead of losing
+// work silently. (Desktop is file-backed and unaffected.)
+function isQuotaError(e) {
+  return !!e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22 || e.code === 1014);
+}
+let _storageFullWarned = false;
+function notifyStorageFull() {
+  if (_storageFullWarned) return;
+  _storageFullWarned = true;
+  try { alert(t('nav.storageFull')); } catch (e) {}
+}
+
 function usePersistentState(key, initial) {
   const [val, setVal] = useState(() => {
     try {
@@ -169,7 +189,7 @@ function usePersistentState(key, initial) {
     try {
       if (IS_DESKTOP) { NATIVE_STORE[STORE_PREFIX + key] = val; nativeSaveSoon(); }
       else { localStorage.setItem(STORE_PREFIX + key, JSON.stringify(val)); }
-    } catch (e) { /* ignore quota / serialization errors */ }
+    } catch (e) { if (isQuotaError(e)) notifyStorageFull(); /* else ignore serialization errors */ }
   }, [key, val]);
   return [val, setVal];
 }
@@ -242,7 +262,7 @@ const GEN_MODELS = [
   { id: 'qwen/qwen3.5-35b-a3b',         label: 'Qwen 3.5 35B',          vision: true,  in: 0.14, out: 1.00 },
   { id: 'google/gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite', vision: true,  in: 0.25, out: 1.50 },
   { id: 'openai/gpt-5.4-mini',          label: 'GPT-5.4 Mini',          vision: true,  in: 0.75, out: 4.50 },
-  { id: 'mistralai/mistral-medium-3.5', label: 'Mistral Medium 3.5',    vision: true,  in: 1.50, out: 7.50 },
+  { id: 'mistralai/mistral-medium-3-5', label: 'Mistral Medium 3.5',    vision: true,  in: 1.50, out: 7.50 },
   { id: 'google/gemini-3.5-flash',      label: 'Gemini 3.5 Flash',      vision: true,  in: 1.50, out: 9.00 },
   { id: 'openai/gpt-5.4',               label: 'GPT-5.4 · flagship',    vision: true,  in: 2.50, out: 15.00 },
 ];
@@ -723,7 +743,7 @@ const SCOPES = [
   { id: 'bio-cell-organelles', label: 'Organelles · Ch. 4',  parent: 'bio-cell',   depth: 3, due: 4,  total: 8,   last: '7d ago', isLeaf: true },
   { id: 'bio-cell-membrane',   label: 'Membrane transport',  parent: 'bio-cell',   depth: 3, due: 3,  total: 4,   last: '3d ago', isLeaf: true },
   { id: 'bio-cell-mitosis',    label: 'Mitosis · five phases', parent: 'bio-cell', depth: 3, due: 0,  total: 0,   last: 'never', isLeaf: true },
-  { id: 'bio-cell-photo',      label: 'Photosynthesis',      parent: 'bio-cell',   depth: 3, due: 4,  total: 6,   last: '9d ago', isLeaf: true, paused: { at: 2, remaining: 3 } },
+  { id: 'bio-cell-photo',      label: 'Photosynthesis',      parent: 'bio-cell',   depth: 3, due: 4,  total: 6,   last: '9d ago', isLeaf: true },
   { id: 'bio-genetics',        label: 'Genetics',            parent: 'bio',        depth: 2, due: 7,  total: 72,  last: '2d ago', isLeaf: false },
   { id: 'bio-ecology',         label: 'Ecology',             parent: 'bio',        depth: 2, due: 1,  total: 48,  last: '11d ago', isLeaf: false },
   { id: 'chem',                label: 'Chemistry',           parent: 'all',        depth: 1, due: 8,  total: 96,  last: '5d ago', isLeaf: false },
@@ -2551,9 +2571,9 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
           <div style={{ marginTop: 36 }}>
             <div className="eyebrow">
               {t('study.occlusionScore', { correct: occState.marks.filter(m => m === 'right').length, total: items.length })}
-              {' · '}{items.length > 0 && occState.marks.every(m => m === 'right') ? t('study.resultGotIt') : t('study.resultMissed')}
+              {' · '}{items.length === 0 || occState.marks.every(m => m === 'right') ? t('study.resultGotIt') : t('study.resultMissed')}
             </div>
-            <GradeRow continueLabel={t('study.done')} onContinue={() => onGrade(items.length > 0 && occState.marks.every(m => m === 'right') ? 'good' : 'miss')} onPause={onExit} />
+            <GradeRow continueLabel={t('study.done')} onContinue={() => onGrade(items.length === 0 || occState.marks.every(m => m === 'right') ? 'good' : 'miss')} onPause={onExit} />
           </div>
         )}
       </div>
@@ -3690,6 +3710,10 @@ function App() {
   // time, whether the user is still waiting on the Add/manual screen).
   const screenRef = useRef('folder');
   useEffect(() => { screenRef.current = screen; }, [screen]);
+  // Tracks a leaf source created on-the-fly by storeDraftsAndReview for a folder
+  // target, so approveDrafts can delete it again if the user keeps zero cards
+  // (otherwise an empty orphan topic is left cluttering Browse).
+  const freshSourceRef = useRef(null);
   const [scopeId, setScopeId] = useState('all');
   const [addTargetScope, setAddTargetScope] = useState('bio-cell');
   // When adding a brand-new source (vs. adding to an existing leaf), holds { parentId, name }
@@ -4100,8 +4124,10 @@ function App() {
   function storeDraftsAndReview(cards, src, name) {
     let targetId = addTargetScope;
     const target = scopes.find(s => s.id === addTargetScope);
+    freshSourceRef.current = null;   // only set below when we mint a brand-new leaf
     if (target && !target.isLeaf) {
       targetId = genId('src');
+      freshSourceRef.current = targetId;   // mark as freshly-created so an all-skip review can remove it
       const depth = (target.depth || 1) + 1;
       const newScope = { id: targetId, label: (name && name.trim()) || 'New source', parent: target.id, depth, total: 0, last: 'never', isLeaf: true };
       setScopes(prev => {
@@ -4142,10 +4168,12 @@ function App() {
       try { text = await callOpenRouter({ apiKey, model: model || genModel, sourceText, imageDataUrl }); }
       catch (e) { const c = e && e.message; throw new Error(['key', 'rate', 'network', 'http'].indexOf(c) >= 0 ? c : 'http'); }
       const cards = parseGenCards(text);
-      if (!cards.length) throw new Error('empty');
       // When a source image is attached, also try to build ONE image-occlusion card
       // from the figure in it (best-effort; a failure here never affects the text
-      // cards already produced).
+      // cards already produced). Run this BEFORE the empty check: a pure labeled
+      // diagram legitimately yields zero text cards (the prompt returns []), and the
+      // occlusion card is the whole point of that source — so it must count toward
+      // "did we produce anything?" or the one good card gets discarded as 'empty'.
       if (imageDataUrl) {
         try {
           // Always use the most capable vision model for occlusion (it both detects
@@ -4155,6 +4183,7 @@ function App() {
           if (occ) cards.push(occ);
         } catch (e) { /* occlusion is optional */ }
       }
+      if (!cards.length) throw new Error('empty');
       return cards;
     } catch (e) {
       setGenDraftBackup(null);   // failed — drop the backup (success clears it in storeDraftsAndReview)
@@ -4224,11 +4253,11 @@ function App() {
                     : e.image ? {}
                     : (c.boxes && c.boxes.length ? { boxes: c.boxes } : (c.regions ? { regions: c.regions } : {}))),
                 ...((e.image || c.image) ? { image: e.image || c.image } : {}),  // prefer the cropped image
-                // Keep the full original + crop box so "Use original" works on the saved
-                // card too — but ONLY when it wasn't re-cropped here (a re-crop, e.image
-                // !== c.image, would leave cropBox describing the wrong region).
-                ...((c.fullImage && c.cropBox && (!e.image || e.image === c.image))
-                    ? { fullImage: c.fullImage, cropBox: c.cropBox } : {}),
+                // Persist ONLY the cropped image actually studied — never the full
+                // original. fullImage/cropBox stay on the draft for re-cropping during
+                // review, but keeping a base64 copy of every source image on every saved
+                // card is the main cause of localStorage quota overflow, so it is
+                // intentionally dropped on approve.
               }
             : {}),
         };
@@ -4242,7 +4271,13 @@ function App() {
       setScopes(prev => prev.map(s => s.id === targetId
         ? { ...s, total: newTotal, last: 'today' }
         : s));
+    } else if (kept === 0 && targetId && freshSourceRef.current === targetId && !(sourceCards[targetId] || []).length) {
+      // The user skipped every draft into a source we created on-the-fly for this
+      // batch that never held any cards — remove it so it doesn't linger as an empty
+      // orphan topic in Browse (and so "View cards" can't open an empty source).
+      setScopes(prev => prev.filter(s => s.id !== targetId));
     }
+    freshSourceRef.current = null;
     // Clear this topic's pending drafts (reviewed).
     setPendingDrafts(prev => { const n = { ...prev }; delete n[targetId]; return n; });
     setKeptCount(kept);
