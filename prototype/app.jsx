@@ -15,7 +15,7 @@ const STORE_PREFIX = 'runico:v3:';
 
 // App version shown in the bottom-left build badge. Keep in sync with
 // package.json "version" — electron-builder names the installers from that.
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 
 // ── Native (desktop) backend ─────────────────────────────
 // In the Electron build, window.runico (preload.js) exposes the OS keychain, the
@@ -862,6 +862,7 @@ function Glyph({ name, size = 16 }) {
     download:<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5" /><path d="M12 15V3" /></>,
     upload: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m17 8-5-5-5 5" /><path d="M12 3v12" /></>,
     more:   <><circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none" /></>,
+    trash:  <><path d="M3 6h18" /><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></>,
   };
   return (
     <svg aria-hidden="true" focusable="false" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -3221,6 +3222,104 @@ const CHANGELOG_CATEGORIES = {
 // About / changelog page. Describes the app and lists every release. Reached from
 // the version badge (bottom-left) and from Settings → About. Reads its content from
 // the globals defined in changelog.js, guarding against the file failing to load.
+// Trash bin — soft-deleted folders/topics/cards with Restore / Delete forever /
+// Empty. Opened from the top-nav trash button. Items are newest-first.
+// Reusable confirmation modal: backdrop + dialog with Escape-to-close, a focus
+// trap, return-focus on close, and dialog semantics (mirrors SourceOverlay).
+function ConfirmModal({ title, message, confirmLabel, danger, onConfirm, onCancel }) {
+  const cardRef = useRef(null);
+  const confirmRef = useRef(null);
+  useEffect(() => {
+    const prev = (typeof document !== 'undefined') ? document.activeElement : null;
+    if (confirmRef.current) confirmRef.current.focus();
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); onCancel(); return; }
+      if (e.key !== 'Tab' || !cardRef.current) return;
+      const f = cardRef.current.querySelectorAll('button');
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('keydown', onKey); try { if (prev && prev.focus) prev.focus(); } catch (e) {} };
+  }, []);
+  return (
+    <div className="overlay" onClick={onCancel}>
+      <div className="overlay-card confirm-card" ref={cardRef} role="dialog" aria-modal="true" aria-label={title} onClick={e => e.stopPropagation()}>
+        <div className="confirm-title">{title}</div>
+        {message ? <p className="confirm-message">{message}</p> : null}
+        <div className="confirm-actions">
+          <button className="quiet" onClick={onCancel}>{t('browse.cancel')}</button>
+          <button className={danger ? 'primary confirm-danger' : 'primary'} ref={confirmRef} onClick={onConfirm}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TrashScreen({ trash, onRestore, onDeleteForever, onEmpty, onDone }) {
+  const [confirm, setConfirm] = useState(null);   // null | { kind:'empty' } | { kind:'item', trashId, label }
+  const kindOf = (e) => e.kind === 'card' ? 'card' : (((e.scopes || [])[0] || {}).isLeaf ? 'topic' : 'folder');
+  const kindLabel = (k) => t(k === 'card' ? 'trash.kindCard' : k === 'topic' ? 'trash.kindTopic' : 'trash.kindFolder');
+  const kindGlyph = (k) => k === 'card' ? 'spark' : k === 'topic' ? 'book' : 'folders';
+  const itemLabel = (e) => e.kind === 'card' ? ((e.card && (e.card.q || e.card.a)) || t('trash.kindCard')) : e.label;
+  const cardCount = (e) => e.kind === 'card' ? 1 : Object.keys(e.cards || {}).reduce((n, k) => n + ((e.cards[k] || []).length), 0);
+  return (
+    <div className="stage-inner">
+      <div className="trash-head">
+        <div className="lede" style={{ margin: 0 }}>{t('trash.title')}</div>
+        {trash.length > 0 && (
+          <button className="quiet" onClick={() => setConfirm({ kind: 'empty' })}>{t('trash.empty')}</button>
+        )}
+      </div>
+      {trash.length === 0 ? (
+        <div className="trash-none">{t('trash.none')}</div>
+      ) : (
+        <div className="trash-list">
+          {trash.map(e => {
+            const k = kindOf(e);
+            return (
+              <div className="trash-row" key={e.trashId}>
+                <span className="trash-row-glyph"><Glyph name={kindGlyph(k)} size={15} /></span>
+                <span className="trash-row-main">
+                  <span className="trash-row-label">{itemLabel(e)}</span>
+                  <span className="trash-row-meta">{kindLabel(k)} · {tp('browse.cardCount', cardCount(e), { n: cardCount(e) })} · {fmtDay(e.deletedAt)}</span>
+                </span>
+                <span className="trash-row-actions">
+                  <button className="src-action" onClick={() => setConfirm({ kind: 'restore', trashId: e.trashId, label: itemLabel(e) })}>{t('trash.restore')}</button>
+                  <button className="src-action src-action-danger" onClick={() => setConfirm({ kind: 'item', trashId: e.trashId, label: itemLabel(e) })}>{t('trash.deleteForever')}</button>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div className="home-actions" style={{ marginTop: 28 }}>
+        <button className="quiet" onClick={onDone}>{t('settings.doneButton')}</button>
+      </div>
+      {confirm && confirm.kind === 'empty' && (
+        <ConfirmModal
+          title={t('trash.empty')} message={t('trash.emptyConfirm')} confirmLabel={t('trash.emptyYes')} danger
+          onConfirm={() => { onEmpty(); setConfirm(null); }} onCancel={() => setConfirm(null)}
+        />
+      )}
+      {confirm && confirm.kind === 'item' && (
+        <ConfirmModal
+          title={t('trash.deleteForever')} message={t('trash.deleteForeverConfirm', { label: confirm.label })} confirmLabel={t('trash.deleteForever')} danger
+          onConfirm={() => { onDeleteForever(confirm.trashId); setConfirm(null); }} onCancel={() => setConfirm(null)}
+        />
+      )}
+      {confirm && confirm.kind === 'restore' && (
+        <ConfirmModal
+          title={t('trash.restore')} message={t('trash.restoreConfirm', { label: confirm.label })} confirmLabel={t('trash.restore')}
+          onConfirm={() => { onRestore(confirm.trashId); setConfirm(null); }} onCancel={() => setConfirm(null)}
+        />
+      )}
+    </div>
+  );
+}
+
 function AboutScreen() {
   const about = (typeof window !== 'undefined' && window.RUNICO_ABOUT) || {};
   const releases = (typeof window !== 'undefined' && window.RUNICO_CHANGELOG) || [];
@@ -3465,6 +3564,11 @@ function App() {
   // Per-scope study history (sittings + per-card pass/miss), seeded once from the
   // demo data and then durably persisted. Real sessions append a sitting on finish.
   const [history, setHistory] = usePersistentState('history', () => REVIEW_HISTORY);
+  // Soft-deleted items (folder/topic subtrees + individual cards), kept until the
+  // user restores or empties them. Newest-first; captured at delete time. Trashed
+  // items are removed from scopes/sourceCards, so they're already excluded from
+  // counts, decks, and study.
+  const [trash, setTrash] = usePersistentState('trash', () => []);
   // Accumulates the current sitting's results; "Got it" = pass, "Missed" = miss.
   // `cards` holds per-card {id, passed} so per-card history can be recorded.
   const [sitting, setSitting] = useState({ reviewed: 0, passed: 0, cards: [] });
@@ -3663,6 +3767,8 @@ function App() {
   }
 
   function deleteFolder(id) {
+    const root = scopes.find(s => s.id === id);
+    if (!root) return;
     // The folder + all its descendants.
     const removed = new Set([id]);
     let added = true;
@@ -3672,6 +3778,27 @@ function App() {
         if (!removed.has(s.id) && removed.has(s.parent)) { removed.add(s.id); added = true; }
       }
     }
+    // Snapshot what we're about to remove into the trash BEFORE pruning, so the
+    // delete is recoverable. Capture the scope objects (depth-first order), their
+    // cards, and label overrides — NOT history/pendingDrafts (transient/derived).
+    // originChain = the root's ancestor ids at delete time, so Restore can return
+    // it to its place (or the nearest surviving ancestor / root).
+    const removedScopes = scopes.filter(s => removed.has(s.id));
+    const cards = {}; const overrides = {}; const hist = {}; const drafts = {};
+    removedScopes.forEach(s => {
+      if (sourceCards[s.id]) cards[s.id] = sourceCards[s.id];
+      if (scopeLabelOverrides[s.id] != null) overrides[s.id] = scopeLabelOverrides[s.id];
+      if (history[s.id]) hist[s.id] = history[s.id];               // keep study progress so Restore is a true undo
+      if (pendingDrafts[s.id]) drafts[s.id] = pendingDrafts[s.id]; // and any unreviewed drafts
+    });
+    const originChain = [];
+    let p = root.parent;
+    while (p) { originChain.push(p); const par = scopes.find(s => s.id === p); p = par ? par.parent : null; }
+    setTrash(prev => [{
+      trashId: genId('trash'), kind: 'scope', deletedAt: Date.now(),
+      label: scopeLabelOverrides[id] || root.label,
+      scopes: removedScopes, cards, labelOverrides: overrides, history: hist, pendingDrafts: drafts, originChain,
+    }, ...prev]);
     setScopes(prev => prev.filter(s => !removed.has(s.id)));
     // Also prune the removed scopes' cards / drafts / history / label overrides,
     // so a delete can't leave orphaned card-sets behind (which bloat the save file
@@ -3688,6 +3815,73 @@ function App() {
     // If the cut/copied scope (or an ancestor of it) was just deleted, the
     // clipboard now points at a missing id — drop it so no stale banner lingers.
     if (clipboard && removed.has(clipboard.scopeId)) setClipboard(null);
+  }
+
+  function deleteForever(trashId) { setTrash(prev => prev.filter(e => e.trashId !== trashId)); }
+  function emptyTrash() { setTrash([]); }
+
+  // Restore a trashed item: a card to its source topic (if it still exists), or a
+  // folder/topic subtree to the first surviving ancestor in its originChain (else
+  // the root). Ids/structure/cards are preserved; colliding ids are reminted.
+  function restoreFromTrash(trashId) {
+    const entry = trash.find(e => e.trashId === trashId);
+    if (!entry) return;
+    if (entry.kind === 'card') {
+      if (!scopes.some(s => s.id === entry.sourceId)) { try { alert(t('trash.restoreCardFailed')); } catch (e) {} return; }
+      const list = [entry.card, ...(sourceCards[entry.sourceId] || [])];
+      setSourceCards(s => ({ ...s, [entry.sourceId]: list }));
+      setScopes(prev => prev.map(sc => sc.id === entry.sourceId ? { ...sc, total: list.length, last: 'today' } : sc));
+      deleteForever(trashId);
+      return;
+    }
+    const block = entry.scopes || [];
+    if (!block.length) { deleteForever(trashId); return; }
+    const existing = new Set(scopes.map(s => s.id));
+    const target = (entry.originChain || []).find(pid => existing.has(pid))
+      || (scopes.find(s => s.parent == null) || {}).id || 'all';
+    // If any restored id already exists (e.g. trash imported into another library),
+    // remint the whole block (and remap card-set keys + child parents).
+    const collide = block.some(s => existing.has(s.id));
+    let restoreBlock = block, idMap = null;
+    if (collide) {
+      idMap = {};
+      block.forEach(s => { idMap[s.id] = genId(s.isLeaf ? 'src' : 'folder'); });
+      restoreBlock = block.map(s => ({ ...s, id: idMap[s.id], parent: s.id === block[0].id ? s.parent : idMap[s.parent] }));
+    }
+    const tdepth = (scopes.find(s => s.id === target) || {}).depth || 0;
+    const delta = (tdepth + 1) - (restoreBlock[0].depth || 0);
+    const placed = restoreBlock.map(s => ({
+      ...s, depth: (s.depth || 0) + delta,
+      ...(s.id === restoreBlock[0].id ? { parent: target } : {}),
+    }));
+    setScopes(prev => {
+      const at = insertAfterSubtree(prev, target);
+      const next = [...prev];
+      next.splice(at, 0, ...placed);
+      return next;
+    });
+    setSourceCards(sc => {
+      const n = { ...sc };
+      Object.keys(entry.cards || {}).forEach(oldId => { n[idMap ? idMap[oldId] : oldId] = entry.cards[oldId]; });
+      return n;
+    });
+    setScopeLabelOverrides(ov => {
+      const n = { ...ov };
+      Object.keys(entry.labelOverrides || {}).forEach(oldId => { n[idMap ? idMap[oldId] : oldId] = entry.labelOverrides[oldId]; });
+      return n;
+    });
+    // Restore study progress + any unreviewed drafts so a restore is a faithful undo.
+    setHistory(h => {
+      const n = { ...h };
+      Object.keys(entry.history || {}).forEach(oldId => { n[idMap ? idMap[oldId] : oldId] = entry.history[oldId]; });
+      return n;
+    });
+    setPendingDrafts(pd => {
+      const n = { ...pd };
+      Object.keys(entry.pendingDrafts || {}).forEach(oldId => { n[idMap ? idMap[oldId] : oldId] = entry.pendingDrafts[oldId]; });
+      return n;
+    });
+    deleteForever(trashId);
   }
 
   // ── Move / copy a scope (folder subtree or topic) into another folder ──
@@ -3990,6 +4184,9 @@ function App() {
               <button className="nav-btn" onClick={importSaveFile} title={t('nav.loadFile')}>
                 <Glyph name="upload" size={14} /> {t('nav.loadFile')}
               </button>
+              <button className="nav-btn" onClick={() => { setGenDraftBackup(null); setRestoreDraft(null); setScreen('trash'); }} title={t('trash.title')}>
+                <Glyph name="trash" size={14} /> {t('trash.title')}
+              </button>
               <button className="nav-btn" onClick={() => setScreen('settings')} title={t('common.nav.settings')}>
                 <Glyph name="gear" size={14} /> {t('common.nav.settings')}
               </button>
@@ -3998,7 +4195,7 @@ function App() {
         </div>
       </div>
 
-      {(screen === 'add' || screen === 'manualGen' || screen === 'reviewDrafts' || screen === 'settings' || screen === 'study' || screen === 'performance' || screen === 'about' || screen === 'source') && (
+      {(screen === 'add' || screen === 'manualGen' || screen === 'reviewDrafts' || screen === 'settings' || screen === 'study' || screen === 'performance' || screen === 'about' || screen === 'source' || screen === 'trash') && (
         <div className="back-bar">
           <button className="nav-btn" onClick={() => {
             // Performance returns to where it was opened from; study pauses (saving
@@ -4082,6 +4279,8 @@ function App() {
               [scope.id]: (s[scope.id] || []).map(c => c.id === id ? { ...c, ...patch } : c),
             }))}
             onDeleteCard={(id) => {
+              const card = (sourceCards[scope.id] || []).find(c => c.id === id);
+              if (card) setTrash(prev => [{ trashId: genId('trash'), kind: 'card', deletedAt: Date.now(), card, sourceId: scope.id, sourceLabel: (scopeLabelOverrides[scope.id] || scope.label) }, ...prev]);
               const next = (sourceCards[scope.id] || []).filter(c => c.id !== id);
               setSourceCards(s => ({ ...s, [scope.id]: next }));
               setScopes(prev => prev.map(sc => sc.id === scope.id ? { ...sc, total: next.length } : sc));
@@ -4205,6 +4404,15 @@ function App() {
           />
         )}
         {screen === 'about' && <AboutScreen />}
+        {screen === 'trash' && (
+          <TrashScreen
+            trash={trash}
+            onRestore={restoreFromTrash}
+            onDeleteForever={deleteForever}
+            onEmpty={emptyTrash}
+            onDone={() => setScreen('folder')}
+          />
+        )}
       </div>
 
       {overlay && (

@@ -1,6 +1,6 @@
 {
   "name": "runico",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Runico — a local-first flashcard study app. Desktop wrapper around the prototype renderer.",
   "keywords": ["flashcards", "spaced-repetition", "study", "learning", "electron", "local-first", "image-occlusion", "openrouter"],
   "homepage": "https://nordic-ocean.github.io/runico/prototype/",
