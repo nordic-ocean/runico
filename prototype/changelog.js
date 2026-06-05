@@ -41,6 +41,10 @@ window.RUNICO_CHANGELOG = [
       { type: 'enhancement', text: 'All your data persists to a single local save file you own, with export/import backups.' },
       { type: 'enhancement', text: 'A per-model cost estimate (cards per $1) is shown when choosing a generation model.' },
       { type: 'enhancement', text: 'Re-crop an image-occlusion card from the full original image.' },
+      { type: 'enhancement', text: '“Use my own AI” can now also build image-occlusion cards: copy the figure prompt, paste back the result, and the masks are placed for you.' },
+      { type: 'fix', text: 'Image-occlusion masks now land correctly when the AI returns coordinates in pixels or a 0–1000 grounding scale, not just 0–1 fractions.' },
+      { type: 'enhancement', text: 'Image occlusion now skips photos, satellite imagery, and before/after comparisons that have no labeled parts to learn, instead of masking their captions.' },
+      { type: 'enhancement', text: 'Rewrote the card-generation and image-occlusion prompts using current prompt-engineering guidance — atomic, single-answer cards, clearer output rules, and tighter, better-placed occlusion masks.' },
     ],
   },
   {

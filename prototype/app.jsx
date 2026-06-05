@@ -265,28 +265,44 @@ function modelCardEstimate(m) {
 // in the list as a capability proxy, so it tracks the curated list automatically.
 const OCCLUSION_MODEL = (GEN_MODELS.filter(m => m.vision).sort((a, b) => b.in - a.in)[0] || {}).id || DEFAULT_GEN_MODEL;
 
+// The card-generation prompt. Structure follows current prompt-engineering
+// guidance shared across Anthropic/OpenAI/Google: a role line, calm positive
+// rules (atomicity, precise/focused/effortful questions, no list answers — the
+// SuperMemo "minimum information" principles), the source delimited in <tags>,
+// a fenced structure-only example, and the output/language contract restated at
+// the END (models weight the last instruction most). Kept model-agnostic because
+// the same text feeds OpenRouter and the user's own chat app.
 function buildGenPrompt(sourceText) {
+  const src = sourceText && sourceText.trim() ? sourceText.trim() : '(The source is the attached image.)';
   return [
-    'You are an expert tutor creating high-quality study flashcards from the source material below.',
-    'Cover the material thoroughly: capture every important fact, name, date, definition, cause-and-effect, and relationship — not just the headline idea. Aim for 8–15 cards (more for richer sources).',
-    'Write specific, self-contained questions that test real understanding and recall. Each card must stand on its own (never "according to the text"). Avoid trivial, yes/no, or vague questions, and do not duplicate cards.',
-    'CRITICAL: Write the ENTIRE output — every question and every answer — in ONE single language: the exact same language as the source material. Never mix languages, never switch alphabets/scripts, and never insert a word from another language (for example, if the source is Portuguese do NOT drop in an Arabic, Cyrillic, Chinese, or English word — write the Portuguese word instead). Proper names keep their original spelling.',
+    'You are an expert tutor creating high-quality study flashcards from the source material.',
+    'Make each card test exactly ONE fact with the shortest possible answer (often a single name, date, term, value, or short clause). If a sentence holds several facts, split it into several cards rather than one long or multi-part answer.',
+    'Write each question to be precise (one unambiguous answer), focused on a single detail, and effortful (not guessable from its own wording). Every card must stand alone: name the subject explicitly, and do not write "according to the text" or use pronouns for context the reader cannot see.',
+    'Skip trivial, yes/no, and vague questions, and any question whose answer is a list or enumeration — to cover a list, make one card (or one cloze) per item. Use only facts found in the source; never invent.',
+    'Cover the important, high-yield material — the key facts, names, dates, definitions, causes and effects, and relationships. Generate about 8–15 cards when the material supports it (fewer for thin sources, more for rich ones); never pad with filler and never repeat a card. If the source is too thin for good cards, or an attached image is unreadable, return an empty array: []',
+    'Write every question and answer in ONE language — the same language as the source material. Do not translate, mix languages, or add glosses; keep proper names in their original spelling.',
+    'Return ONLY a JSON array — no prose, no markdown, no code fences; the first character of your reply must be [ and the last must be ]. Each card is an object with exactly the keys "kind", "q", and "a" (keep the keys in English; only the values follow the source language):',
+    '- "kind" must be EXACTLY one of "qa", "cloze", or "rev".',
+    '- "qa": a precise question in q with a complete, short answer in a.',
+    '- "cloze": q is a complete, self-contained sentence with rich context and EXACTLY ONE key term hidden in double braces — e.g. "The powerhouse of the cell is the {{mitochondrion}}." — and a is that hidden term. Hide the key term being learned, never a trivial word, and never omit the {{ }}; if no natural blank fits, use "qa" instead.',
+    '- "rev": q is a term or concept; a is its short, discriminating definition (one clause, not a paragraph).',
+    'Mix the kinds deliberately as a target — roughly 40% qa, 30% cloze, 30% rev — choosing whichever kind tests each fact best, not as a strict quota.',
+    'Make the JSON strictly valid: straight double quotes only (no single or curly quotes), no trailing comma, no comments.',
     '',
-    'Use a DELIBERATE MIX of the card kinds below — do NOT return only "qa". For ~10 cards, aim for roughly 4 "qa", 3 "cloze", and 3 "rev" (adjust to the material, but always include several of each kind where it fits).',
-    'Return ONLY a JSON array (no prose, no markdown, no code fences). Each card is an object {"kind","q","a"}:',
-    '- "qa": a precise question (q) with a complete answer (a). Use for facts, processes, comparisons, cause/effect.',
-    '- "cloze": q is a COMPLETE sentence with exactly ONE key term hidden using double braces, e.g. "The powerhouse of the cell is the {{mitochondrion}}."; a is that hidden term. The {{ }} braces are REQUIRED — never omit them.',
-    '- "rev": a term/definition pair for two-way recall — q is the term or concept name (a few words), a is its definition. Use for vocabulary, names, and key concepts.',
-    '',
-    'Example (note the mix and the REQUIRED {{ }} in cloze):',
+    'The example below shows ONLY the structure — ignore its topic and language and write your cards in the source language:',
+    '<example_format>',
     '[',
     '  {"kind":"qa","q":"Which European powers seized Caribbean islands from Spain in the 17th century?","a":"The English, Dutch, and French."},',
     '  {"kind":"cloze","q":"In 1655 the English captured the island of {{Jamaica}} from Spain.","a":"Jamaica"},',
     '  {"kind":"rev","q":"Privateer","a":"A private sailor licensed by a government to attack enemy ships during wartime."}',
     ']',
+    '</example_format>',
     '',
-    'SOURCE MATERIAL:',
-    sourceText && sourceText.trim() ? sourceText.trim() : '(see the attached image)',
+    '<source_material>',
+    src,
+    '</source_material>',
+    '',
+    'Now respond with ONLY the JSON array of cards — first character [, last character ], nothing else.',
   ].join('\n');
 }
 
@@ -387,20 +403,25 @@ async function callOpenRouter({ apiKey, model, sourceText, imageDataUrl, prompt 
 // in draft review on the clean, cropped figure.
 function buildOcclusionPrompt(theme) {
   return [
-    'You are shown an image that may be a textbook/document page containing a diagram, map, or labeled illustration.',
-    'Step 1 — locate the SINGLE main figure (the diagram/map/illustration itself) and READ ITS TITLE to understand its SUBJECT. Ignore body paragraphs and any text outside the figure.',
-    theme && theme.trim() ? ('Study topic context: "' + theme.trim().slice(0, 400) + '". Combine it with the figure\'s own title to judge what matters.') : null,
-    'Step 2 — choose labels to mask. CRITICAL: mask ONLY labels that are the SUBJECT of the figure — the things a student is meant to learn from its title/theme. Do NOT mask generic context or chrome labels that are not the subject. For example, if the figure title is about ISLANDS, mask the island names but NOT oceans, seas, gulfs, bays, the compass rose, the scale bar, latitude/longitude or grid labels, the legend/key, or the title itself. When unsure whether a label is the subject, leave it out.',
-    'Return ONLY JSON (no prose, no markdown, no code fences): {"figure":{"x":0.0,"y":0.0,"w":0.0,"h":0.0},"labels":[{"text":"...","x":0.0,"y":0.0,"w":0.0,"h":0.0}, ...]}',
-    'ALL coordinates are NORMALIZED fractions of the FULL image, range 0..1: x,y = top-left corner, w,h = width,height.',
-    '"figure" = a TIGHT box around just the figure (exclude the body text columns and the source caption).',
-    'For each subject label give its text and a tight box around just that word, in FULL-image coordinates. Provide 3 to 10 labels.',
-    'If there is NO real figure/diagram (the page is only text), or the figure has no subject labels worth masking, return {"figure":null,"labels":[]}.',
+    'You are a vision assistant that builds image-occlusion flashcards from a labeled diagram.',
+    'A card is appropriate ONLY for a labeled diagram whose printed labels name PARTS to learn — an anatomical figure, a map with place names, or the labeled parts of a machine or structure. It is not appropriate for a photo, satellite or aerial image, screenshot, chart, or before/after comparison; for any of those, make no card (return the empty form below).',
+    theme && theme.trim() ? ('Study topic context: <topic>' + theme.trim().slice(0, 400) + '</topic>. Combine it with the figure\'s own title to judge what matters.') : null,
+    'When you analyze the image, reason silently: locate the single main figure, read its title to grasp the subject, then choose the labels to mask.',
+    'Mask only labels that name a PART of the figure\'s subject — the things a student must learn. Leave everything else unmasked as context: oceans and seas, the compass, scale bar, grid or coordinates, legend, the figure title and captions, panel or before/after labels, dates, and source or credit lines.',
+    'Box the PRINTED LABEL TEXT itself — the word or phrase on the page — tight and centered on those characters, not the whole structure it points to; prefer to under-size rather than overshoot. Give 3 to 10 labels (never more than 10).',
+    'Output one JSON object with exactly the keys "figure" and "labels": "figure" is a tight box around just the figure, and each entry in "labels" has "text" plus a box. A box is four numbers x, y, w, h given as FRACTIONS of the full image between 0 and 1 — NOT pixels, NOT 0–100, NOT 0–1000 — where x = left edge / image width, y = top edge / image height, w = width / image width, h = height / image height.',
+    'Example (values are illustrative only): {"figure":{"x":0.08,"y":0.12,"w":0.84,"h":0.66},"labels":[{"text":"Nucleus","x":0.41,"y":0.30,"w":0.10,"h":0.04},{"text":"Cell membrane","x":0.62,"y":0.71,"w":0.16,"h":0.04}]}',
+    'If the image is not a real labeled diagram of parts to learn, return {"figure":null,"labels":[]}.',
+    'Reply with that JSON object and nothing else — keys in English, straight double quotes, no extra keys, no extra text, no comments, no markdown, no code fences; the first character must be { and the last must be }.',
   ].filter(l => l !== null).join('\n');
 }
 
-// Tolerant parse of the occlusion JSON. Accepts 0..1 or 0..100 coordinates.
-function parseOcclusionResult(responseText) {
+// Tolerant parse of the occlusion JSON → boxes normalized to 0..1. The model is
+// asked for 0..1 fractions but in practice returns one of several scales, so we
+// detect it. `dims` (the real image {w,h}) is OPTIONAL but lets us handle raw
+// pixel coordinates of a large image; without it we still cover the common
+// normalized scales.
+function parseOcclusionResult(responseText, dims) {
   if (!responseText) return null;
   const t = String(responseText).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
   let obj = null;
@@ -410,15 +431,21 @@ function parseOcclusionResult(responseText) {
     try { obj = JSON.parse(t.slice(s, e2 + 1)); } catch (e3) { return null; }
   }
   if (!obj || typeof obj !== 'object') return null;
-  // Detect the coordinate scale ONCE across the whole response — the model uses
-  // either 0..1 or 0..100, and deciding per box would let a small label stay on a
-  // different scale than the figure, misplacing every mask.
+  // Detect the coordinate scale ONCE across the whole response (deciding per box
+  // would let a small label stay on a different scale than the figure, misplacing
+  // every mask). Despite the "0..1" instruction the model commonly returns:
+  //   ≤1.5 → already 0..1 · ≤100 → percent · ≤1000 → Gemini's 0..1000 grounding
+  //   scale · larger → raw pixels (needs the image's real W/H, one divisor per
+  //   axis since width ≠ height). A uniform divisor covers the first three.
   const raw = [obj.figure, ...(Array.isArray(obj.labels) ? obj.labels : [])].filter(b => b && typeof b === 'object');
   const vals = raw.flatMap(b => [+b.x, +b.y, +b.w, +b.h]).filter(n => Number.isFinite(n));
-  const scale = vals.some(v => v > 1.5) ? 100 : 1;
+  const maxVal = vals.length ? Math.max(...vals) : 0;
+  const hasDims = !!(dims && dims.w > 0 && dims.h > 0);
+  const sx = maxVal <= 1.5 ? 1 : maxVal <= 100 ? 100 : (maxVal <= 1000 || !hasDims) ? 1000 : dims.w;
+  const sy = maxVal <= 1.5 ? 1 : maxVal <= 100 ? 100 : (maxVal <= 1000 || !hasDims) ? 1000 : dims.h;
   const norm = (b) => {
     if (!b || typeof b !== 'object') return null;
-    const x = +b.x / scale, y = +b.y / scale, w = +b.w / scale, h = +b.h / scale;
+    const x = +b.x / sx, y = +b.y / sy, w = +b.w / sx, h = +b.h / sy;
     if (![x, y, w, h].every(n => Number.isFinite(n)) || w <= 0 || h <= 0) return null;
     return { x, y, w, h };
   };
@@ -480,18 +507,45 @@ function isOffThemeLabel(text) {
   if (/\d/.test(s) && /(km|mi|°|º|'|")/.test(s)) return true;             // scale bar / coordinates
   if (/(tróp|trop|equad|equat|meridian|paralel|parallel|latitud|longitud|legenda|legend|escala|\bscale\b|fonte\s*:|source\s*:)/.test(s)) return true;
   if (/(oceano|ocean|océano|\bmar\b|\bsea\b|golfo|gulf|ba[íi]a|bah[íi]a|\bbay\b|estreito|strait|\bcanal\b|channel|\brio\b|\br[íi]o\b|\briver\b|\blago\b|\blake\b)/.test(s)) return true;
+  // Before/after comparison captions — text a photo or comparison carries but
+  // never a learnable part. When these are ALL an image has (a satellite or photo
+  // before/after), dropping them leaves no labels, so no card is made. Kept tight
+  // to before/after words only — figure/plate/panel captions are left to the
+  // model's relevance prompt, since "plate"/"lamina"/etc. are real anatomy labels.
+  // The trailing (?!-[a-zà-ÿ]) keeps hyphenated French part labels ("avant-bras"
+  // forearm, "avant-pied" forefoot, "après-midi") — \b alone treats the hyphen as
+  // a boundary — while still dropping a bare caption or a dangling "after-".
+  if (/\b(antes|depois|ap[oó]s|before|after|avant|apr[eèé]s|despu[eé]s|vorher|nachher)\b(?!-[a-zà-ÿ])/.test(s)) return true;
   return false;
 }
 
-// Build ONE occlusion card from an image: find + crop the figure, mask its labels.
-// Best-effort — returns null (no card) on any failure or when there's no figure,
-// so it can never break or block the text-card generation.
-async function generateOcclusionCard({ apiKey, model, imageDataUrl, theme }) {
+// Read a data URL's natural pixel size — used to normalize pixel-scale occlusion
+// coordinates. Resolves null if the image can't be decoded.
+function imageNaturalSize(dataUrl) {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => resolve({ w: img.naturalWidth || img.width, h: img.naturalHeight || img.height });
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    } catch (e) { resolve(null); }
+  });
+}
+
+// Turn an occlusion-pass RESPONSE into ONE occlusion card: parse the JSON, drop
+// off-theme labels, crop the figure, and re-map the masks. Shared by BOTH
+// transports (OpenRouter and the user's own AI), so a pasted response and an
+// API response yield an identical card — the figure/label boxes come back as
+// normalized fractions, and all the cropping/remapping geometry happens here,
+// client-side, against the image the user already has. Best-effort: returns null
+// on any failure or when there's no real figure, so it can never block the text
+// cards. `imageDataUrl` is the FULL source image the coordinates refer to.
+async function buildOcclusionCardFromResult(responseText, imageDataUrl) {
   if (!imageDataUrl) return null;
-  let text;
-  try { text = await callOpenRouter({ apiKey, model, imageDataUrl, prompt: buildOcclusionPrompt(theme) }); }
-  catch (e) { return null; }
-  const data = parseOcclusionResult(text);
+  // Pass the image's real size so the parser can normalize raw pixel coordinates
+  // (harmless for the 0..1 / percent / 0..1000 cases it handles without dims).
+  const dims = await imageNaturalSize(imageDataUrl);
+  const data = parseOcclusionResult(responseText, dims);
   if (!data || !data.figure) return null;
   // Drop off-theme labels (oceans, seas, map chrome) the model may have included.
   const labels = (data.labels || []).filter(l => !isOffThemeLabel(l.text));
@@ -510,6 +564,17 @@ async function generateOcclusionCard({ apiKey, model, imageDataUrl, theme }) {
   // Keep the FULL image + the crop box on the draft so the user can re-crop from
   // the original in the editor when the auto-crop is wrong (dropped on approve).
   return { id: genId('g'), kind: 'occlusion', q, a: null, boxes, image: cropped, fullImage: imageDataUrl, cropBox: cf };
+}
+
+// Automatic transport for occlusion: run the vision prompt on OpenRouter, then
+// hand the response to the shared builder above. Best-effort (returns null on a
+// failed request) so it can never break or block the text-card generation.
+async function generateOcclusionCard({ apiKey, model, imageDataUrl, theme }) {
+  if (!imageDataUrl) return null;
+  let text;
+  try { text = await callOpenRouter({ apiKey, model, imageDataUrl, prompt: buildOcclusionPrompt(theme) }); }
+  catch (e) { return null; }
+  return buildOcclusionCardFromResult(text, imageDataUrl);
 }
 
 // Lightweight key check against OpenRouter's key endpoint. Desktop validates via
@@ -2648,29 +2713,44 @@ function AddScreen({ targetPath, isExistingSource, hasApiKey, defaultModel, init
 }
 
 function ManualGenScreen({ source, onApply, onCancel }) {
+  // The manual transport mirrors the OpenRouter one: a text-card prompt and,
+  // when this source has an image, a SECOND image-occlusion prompt. The user
+  // runs whichever they want in their own AI and pastes the result(s) back —
+  // both feed one combined draft set.
+  const hasImage = !!(source && source.imageDataUrl);
   const prompt = buildGenPrompt(source ? source.sourceText : '');
+  const occPrompt = hasImage ? buildOcclusionPrompt(source ? source.sourceText : '') : '';
   const [pasteText, setPasteText] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [occPaste, setOccPaste] = useState('');
+  const [copiedKey, setCopiedKey] = useState(null);                   // 'text' | 'occ'
   const [err, setErr] = useState(false);
-  function copy() {
+  const [busy, setBusy] = useState(false);
+  function copyPrompt(text, key) {
     try {
-      navigator.clipboard.writeText(prompt);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(k => (k === key ? null : k)), 1500);
     } catch (e) { /* clipboard may be unavailable; user can select-all manually */ }
+  }
+  async function apply() {
+    if (busy) return;
+    setBusy(true);
+    let ok = false;
+    try { ok = await onApply(pasteText, occPaste); } catch (e) { ok = false; }
+    if (!ok) { setErr(true); setBusy(false); }                        // success unmounts this screen
   }
   return (
     <div className="stage-inner">
       <div className="eyebrow">{t('manual.title')}</div>
       <p className="copy" style={{ marginTop: 8 }}>{t('manual.step1')}</p>
-      {source && source.imageDataUrl && (
+      {hasImage && (
         <div className="add-name-required" style={{ marginTop: 8 }}>{t('manual.imageNote')}</div>
       )}
       <textarea readOnly className="scope-search"
         style={{ width: '100%', minHeight: 150, marginTop: 12, resize: 'vertical', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: 1.5 }}
         value={prompt} onFocus={e => e.target.select()} />
       <div className="row-tight" style={{ marginTop: 10 }}>
-        <button className="primary" onClick={copy}><Glyph name="folders" size={14} /> {copied ? t('manual.copied') : t('manual.copyPrompt')}</button>
+        <button className="primary" onClick={() => copyPrompt(prompt, 'text')}><Glyph name="folders" size={14} /> {copiedKey === 'text' ? t('manual.copied') : t('manual.copyPrompt')}</button>
       </div>
 
       <p className="copy" style={{ marginTop: 28 }}>{t('manual.step2')}</p>
@@ -2679,12 +2759,32 @@ function ManualGenScreen({ source, onApply, onCancel }) {
         placeholder={t('manual.pastePlaceholder')}
         value={pasteText}
         onChange={e => { setPasteText(e.target.value); if (err) setErr(false); }} />
+
+      {hasImage && (
+        <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--border-default)' }}>
+          <div className="eyebrow">{t('manual.occlusionTitle')}</div>
+          <p className="copy" style={{ marginTop: 8 }}>{t('manual.occlusionStep1')}</p>
+          <textarea readOnly className="scope-search"
+            style={{ width: '100%', minHeight: 150, marginTop: 12, resize: 'vertical', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: 1.5 }}
+            value={occPrompt} onFocus={e => e.target.select()} />
+          <div className="row-tight" style={{ marginTop: 10 }}>
+            <button className="primary" onClick={() => copyPrompt(occPrompt, 'occ')}><Glyph name="folders" size={14} /> {copiedKey === 'occ' ? t('manual.copied') : t('manual.copyPrompt')}</button>
+          </div>
+          <p className="copy" style={{ marginTop: 20 }}>{t('manual.occlusionStep2')}</p>
+          <textarea className="scope-search"
+            style={{ width: '100%', minHeight: 110, marginTop: 12, resize: 'vertical', fontFamily: 'var(--font-mono)', fontSize: 13, lineHeight: 1.5 }}
+            placeholder={t('manual.occlusionPastePlaceholder')}
+            value={occPaste}
+            onChange={e => { setOccPaste(e.target.value); if (err) setErr(false); }} />
+        </div>
+      )}
+
       {err && (
         <div className="add-name-required" style={{ color: 'var(--error-500)', marginTop: 8 }}>{t('add.genErrorEmpty')}</div>
       )}
       <div className="home-actions" style={{ marginTop: 16 }}>
-        <button className="primary lg" onClick={() => { if (!onApply(pasteText)) setErr(true); }} disabled={!pasteText.trim()}>
-          {t('manual.useResponse')} <Glyph name="arrow" size={18} />
+        <button className="primary lg" onClick={apply} disabled={busy || (!pasteText.trim() && !occPaste.trim())}>
+          {busy ? <><span className="gen-spinner" />{t('add.generating')}</> : <>{t('manual.useResponse')} <Glyph name="arrow" size={18} /></>}
         </button>
         <button className="quiet" onClick={onCancel}>{t('manual.cancel')}</button>
       </div>
@@ -3764,10 +3864,31 @@ function App() {
     setScreen('manualGen');
   }
 
-  // Parse a response pasted from the user's own AI chat into draft cards.
-  // Returns true if cards were applied (ManualGenScreen shows its own error otherwise).
-  function applyManualResponse(text) {
+  // Parse the response(s) pasted from the user's own AI chat into draft cards.
+  // `text` is the text-card response (a JSON array); `occText` is the OPTIONAL
+  // image-occlusion response (a {figure,labels} object) — only meaningful when
+  // this source has an image. Either box alone is enough; whatever parses is
+  // combined into one draft set, exactly as the OpenRouter path does. Async
+  // because building an occlusion card crops the image. Returns true if any
+  // cards were applied (ManualGenScreen shows its own error otherwise).
+  async function applyManualResponse(text, occText) {
     const cards = parseGenCards(text);
+    // Build the occlusion card from the dedicated box — or, if the text box
+    // wasn't a card array, from whatever was pasted there (the response shapes
+    // are unambiguous: text cards are a [ ] array, occlusion is a { } object,
+    // so this can never mistake one for the other). Best-effort: a bad paste
+    // here never discards the text cards that did parse.
+    if (genSource && genSource.imageDataUrl) {
+      const occInputs = [];
+      if ((occText || '').trim()) occInputs.push(occText);
+      if (!cards.length && (text || '').trim()) occInputs.push(text);
+      for (const input of occInputs) {
+        try {
+          const occ = await buildOcclusionCardFromResult(input, genSource.imageDataUrl);
+          if (occ) { cards.push(occ); break; }
+        } catch (e) { /* occlusion is optional */ }
+      }
+    }
     if (!cards.length) return false;
     const name = (genSource && genSource.name) || ((scopes.find(s => s.id === addTargetScope) || {}).label) || '';
     storeDraftsAndReview(cards, genSource, name);
