@@ -1319,11 +1319,6 @@ function FolderView({
                             const n = isLeaf ? (sourceCards[c.id] || []).length : descendantStats(c.id).total;
                             return n > 0 && <span className="column-item-due">{n}</span>;
                           })()}
-                          {!isLeaf && (
-                            <Glyph name="caret"
-                                   size={11}
-                                   style={{ transform: 'rotate(-90deg)', color: 'currentColor', opacity: 0.4 }} />
-                          )}
                         </button>
                       )}
                       <div className="column-item-actions">
