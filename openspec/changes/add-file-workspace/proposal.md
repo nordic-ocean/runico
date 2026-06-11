@@ -14,5 +14,5 @@ Today the library persists invisibly — browser `localStorage`, or a save file 
 ## Impact
 
 - Affected specs: new capability `file-workspace`.
-- Affected code: `prototype/app.jsx` (library/settings persistence split, start-screen gate, open/new/save flow, auto-save), `electron/main.js` + `electron/preload.js` (open / new / save-to-path IPC), `prototype/index.html` (start screen + indicator styles), `prototype/i18n.js` (file/start strings ×7), `prototype/changelog.js`.
+- Affected code: `app/app.jsx` (library/settings persistence split, start-screen gate, open/new/save flow, auto-save), `electron/main.js` + `electron/preload.js` (open / new / save-to-path IPC), `app/index.html` (start screen + indicator styles), `app/i18n.js` (file/start strings ×7), `app/changelog.js`.
 - Behavior change: library keys no longer persist to `localStorage` / the native store; app settings still do. Export/Import stays available for backups.

@@ -18,11 +18,11 @@
 
 ## 4. Styles & i18n
 
-- [x] 4.1 Add CSS in `prototype/index.html` for the nav trash button (+ count badge) and the Trash list / rows / empty state (theme-aware, AA contrast).
+- [x] 4.1 Add CSS in `app/index.html` for the nav trash button (+ count badge) and the Trash list / rows / empty state (theme-aware, AA contrast).
 - [x] 4.2 Add trash i18n keys (nav button title, screen title, Restore, Delete forever, Empty trash + confirm, folder/topic/card kind labels, relative-time, restore-failed notice, empty state) to all 7 locales (en, pt-BR, pt-PT, es, ru, it, zh).
 
 ## 5. Verify & document
 
 - [x] 5.1 Verify each spec scenario: delete folder/topic/card → appears in trash and is gone from the browser/counts/decks; restore → reappears in place (and under the nearest surviving ancestor when the parent is gone); delete-forever / empty; trash survives a reload and round-trips through export/import.
 - [x] 5.2 Confirm `app.jsx` transforms cleanly (in-browser Babel) and the headless jsdom SSR smoke still renders the app.
-- [x] 5.3 Add a changelog entry in `prototype/changelog.js` for the trash bin.
+- [x] 5.3 Add a changelog entry in `app/changelog.js` for the trash bin.

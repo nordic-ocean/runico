@@ -37,7 +37,7 @@ The system SHALL present generated cards as drafts the user reviews one at a tim
 - **THEN** a confirmation states how many cards were added, with actions to view the cards or return home
 
 ### Requirement: Pending drafts are surfaced for review
-The system SHALL indicate when a topic has draft cards awaiting review and provide a path to review them, and SHALL guard practice until drafts are reviewed where the prototype does so.
+The system SHALL indicate when a topic has draft cards awaiting review and provide a path to review them, and SHALL guard practice until drafts are reviewed where the app does so.
 
 #### Scenario: Draft indicator
 - **WHEN** a topic has unreviewed drafts
