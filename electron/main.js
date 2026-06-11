@@ -1,11 +1,11 @@
 // Runico desktop (Electron) main process.
-// Thin shell around the existing prototype renderer:
-//  • serves prototype/ over a localhost http server (so the Babel-via-src renderer
+// Thin shell around the app renderer:
+//  • serves app/ over a localhost http server (so the Babel-via-src renderer
 //    and CDN scripts load exactly as in the browser),
 //  • stores the OpenRouter key in the OS keychain (safeStorage) — the raw key
 //    never crosses IPC to the renderer,
 //  • makes OpenRouter validation + generation requests here (no CORS),
-//  • persists all user data to a single user-owned save file (data.json).
+//  • persists the library to a user-owned .runico save file; app settings to data.json.
 const { app, BrowserWindow, ipcMain, safeStorage, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -144,9 +144,9 @@ async function openRouterValidate() {
   } catch (e) { return 'untested'; }
 }
 
-// ── Local static server for prototype/ ──
+// ── Local static server for app/ ──
 function startServer() {
-  const root = path.join(__dirname, '..', 'prototype');
+  const root = path.join(__dirname, '..', 'app');
   const MIME = {
     '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
     '.js': 'text/javascript; charset=utf-8', '.jsx': 'text/javascript; charset=utf-8',
@@ -187,7 +187,7 @@ ipcMain.handle('runico:newLibrary', () => newLibrary());
 ipcMain.handle('runico:saveLibrary', (e, p) => saveLibrary(p && p.path, p && p.lib));
 ipcMain.on('runico:saveLibrarySync', (e, p) => { e.returnValue = saveLibrary(p && p.path, p && p.lib); });
 
-const ICON = path.join(__dirname, '..', 'prototype', 'assets', 'runico-ring.png');
+const ICON = path.join(__dirname, '..', 'app', 'assets', 'runico-ring.png');
 
 let win = null;
 async function createWindow() {

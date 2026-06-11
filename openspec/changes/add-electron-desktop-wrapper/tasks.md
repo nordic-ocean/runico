@@ -1,7 +1,7 @@
 <!-- Implemented: a thin Electron shell (electron/main.js + electron/preload.js +
-     root package.json) around the existing prototype renderer. The renderer is
+     root package.json) around the existing app renderer. The renderer is
      served over a localhost http server (the Babel-via-src + CDN setup can't load
-     over file://). A single native seam in prototype/app.jsx (RUNICO/IS_DESKTOP)
+     over file://). A single native seam in app/app.jsx (RUNICO/IS_DESKTOP)
      routes the key to the OS keychain, OpenRouter requests to the main process
      (no CORS), and persistence to a local data.json — falling back to localStorage
      + fetch in the browser. Verification of a running window / live request / packaged
@@ -14,7 +14,7 @@
 ## 1. Electron scaffold
 
 - [x] 1.1 Add `package.json` with `electron` and a builder/packager dev dependency, plus `dev` and `build` scripts
-- [x] 1.2 Create `main.js` that creates a `BrowserWindow` (`contextIsolation: true`, `nodeIntegration: false`) and loads the `prototype/` app
+- [x] 1.2 Create `main.js` that creates a `BrowserWindow` (`contextIsolation: true`, `nodeIntegration: false`) and loads the `app/` app
 - [x] 1.3 Add app lifecycle handling (quit-on-close per platform, basic application menu)
 - [ ] 1.4 Verify `npm run dev` launches a window showing the existing Runico UI
 
@@ -67,4 +67,4 @@
 
 - [ ] 8.1 Document code signing / notarization and installer distribution as a follow-up (not in this change)
 - [ ] 8.2 Cloud sync across devices (out of scope; users can sync the save file themselves)
-- [x] 8.3 Vendor React + Babel locally so the desktop app launches offline (done in 1.0.0 prep: production React/ReactDOM/Babel vendored into prototype/vendor/, loaded via local <script> tags)
+- [x] 8.3 Vendor React + Babel locally so the desktop app launches offline (done in 1.0.0 prep: production React/ReactDOM/Babel vendored into app/vendor/, loaded via local <script> tags)

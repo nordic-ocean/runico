@@ -13,5 +13,5 @@ Deleting a folder, topic, or card is currently irreversible. `deleteFolder` remo
 ## Impact
 
 - Affected specs: new capability `trash-bin`.
-- Affected code: `prototype/app.jsx` (`deleteFolder`, `onDeleteCard`, new `trash` state + handlers, nav button, `TrashScreen`), `prototype/index.html` (nav button + Trash view styles), `prototype/i18n.js` (trash strings in all 7 locales), `prototype/changelog.js` (entry).
+- Affected code: `app/app.jsx` (`deleteFolder`, `onDeleteCard`, new `trash` state + handlers, nav button, `TrashScreen`), `app/index.html` (nav button + Trash view styles), `app/i18n.js` (trash strings in all 7 locales), `app/changelog.js` (entry).
 - No change to scheduling or grading: trashed items are removed from `scopes`/`sourceCards` at capture time, so they are already excluded from counts, decks, and study until restored.

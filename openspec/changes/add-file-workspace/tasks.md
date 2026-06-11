@@ -33,4 +33,4 @@
 
 - [x] 7.1 Verify each scenario: launch → start screen; New → empty library; Open → folders/cards/pictures load; a change writes the file; reopen shows the changes; settings persist across files; invalid file rejected; both FSA and fallback browser paths.
 - [x] 7.2 Confirm `app.jsx` transforms and the headless jsdom SSR smoke renders the start screen.
-- [x] 7.3 Add a changelog entry in `prototype/changelog.js`.
+- [x] 7.3 Add a changelog entry in `app/changelog.js`.

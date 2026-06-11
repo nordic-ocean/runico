@@ -8,9 +8,15 @@
 Runico turns anything you're learning into flashcards and helps you practice them —
 recall the answer, reveal it, then Continue or Pause, with no grading scales to fuss over.
 
-### ▶ [Launch the live prototype](https://nordic-ocean.github.io/runico/prototype/)
+<br>
 
-Runs entirely in your browser · your changes are saved locally and persist between visits
+# [▶&nbsp; Open Runico](https://nordic-ocean.github.io/runico/app/)
+
+**Runico 1.0 is released and ready to use — free, in your browser, right now.**
+No install, no account. Your whole library lives in a single file you own —
+open it and you're back exactly where you left off.
+
+<sub>Prefer an installed app? <b><a href="#desktop-app">Download for macOS · Windows · Linux ↓</a></b></sub>
 
 </div>
 
@@ -87,23 +93,25 @@ Each section links to a full step-by-step walkthrough.
 
 ---
 
-## Try the prototype
+## Use Runico in your browser
 
-A fully interactive, mock-data build of the app — browse the library, study cards
+The full app, no installation needed — browse your library, study cards
 (including image-occlusion), generate and review AI draft cards, rename/add/delete
-cards and folders, and switch themes and language. **Everything you change is saved
-locally in your browser** (localStorage), so it persists between visits and survives a
-full restart — until you clear your browser data or import a different library.
+cards and folders, and switch themes and language. **Your library is a single
+`.runico` file you own**: create one on first visit, and Runico auto-saves it as you
+work (in Chromium browsers; others save by downloading the file), so you can
+back it up, sync it, or carry it between browser and desktop. Your preferences
+(theme, language) stay in the browser.
 
-**▶ [Open the live prototype](https://nordic-ocean.github.io/runico/prototype/)**
+### **▶ [Open Runico now](https://nordic-ocean.github.io/runico/app/)** — it's ready to use
 
-Prefer to run it locally? See [`prototype/`](prototype/) — `python3 -m http.server --directory prototype`, then open the printed URL.
+Prefer to run it locally? See [`app/`](app/) — `python3 -m http.server --directory app`, then open the printed URL.
 
 ## Desktop app
 
-A desktop build wraps the same UI in Electron so your OpenRouter key is stored in
-the **OS keychain** (never in the page), card-generation requests run in the main
-process (**no CORS**), and all your data lives in a single local **save file** you own.
+A desktop build wraps the same UI in Electron so your OpenRouter key is encrypted
+via the **OS keychain** (never in the page), card-generation requests run in the main
+process (**no CORS**), and your library lives in a single local **save file** you own.
 
 ```sh
 npm install
@@ -111,7 +119,7 @@ npm start        # launches the desktop app
 npm run build    # packages an app for your platform (unsigned)
 ```
 
-The browser build is unchanged and remains the lightweight default; the desktop
+The browser build remains the lightweight default; the desktop
 shell only adds the keychain, request, and save-file backends.
 
 ### Download
@@ -145,4 +153,10 @@ see [`LICENSE`](LICENSE) for the full text.
 
 ---
 
-<div align="center"><sub>Runico · feature tour</sub></div>
+<div align="center">
+
+### Ready to study? **[▶ Open Runico](https://nordic-ocean.github.io/runico/app/)**
+
+<sub>Runico · magical runes for your learning</sub>
+
+</div>

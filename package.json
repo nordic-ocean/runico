@@ -1,9 +1,9 @@
 {
   "name": "runico",
   "version": "1.0.0",
-  "description": "Runico — a local-first flashcard study app. Desktop wrapper around the prototype renderer.",
+  "description": "Runico — a local-first flashcard study app. Desktop wrapper around the app renderer.",
   "keywords": ["flashcards", "spaced-repetition", "study", "learning", "electron", "local-first", "image-occlusion", "openrouter"],
-  "homepage": "https://nordic-ocean.github.io/runico/prototype/",
+  "homepage": "https://nordic-ocean.github.io/runico/app/",
   "bugs": { "url": "https://github.com/nordic-ocean/runico/issues" },
   "license": "SEE LICENSE IN LICENSE",
   "author": "Nordic Ocean",
@@ -30,7 +30,7 @@
   "build": {
     "appId": "com.runico.app",
     "productName": "Runico",
-    "icon": "prototype/assets/runico-ring.png",
+    "icon": "app/assets/runico-ring.png",
     "fileAssociations": [
       {
         "ext": "runico",
@@ -41,7 +41,7 @@
     ],
     "files": [
       "electron/**/*",
-      "prototype/**/*"
+      "app/**/*"
     ],
     "directories": {
       "output": "dist-electron"

@@ -771,7 +771,7 @@ function kindLabel(k){ return t(({ qa:'progress.cardKindQa', cloze:'progress.car
 // is read-only — it never touches grading or scheduling.
 //
 // In production these rows are appended every time a session ends. For the
-// prototype we seed a deterministic ~3 months of sittings per leaf source so
+// demo library we seed a deterministic ~3 months of sittings per leaf source so
 // the rolling-30-day window and the page-back-through-earlier-spans behavior
 // have something real to render.
 
