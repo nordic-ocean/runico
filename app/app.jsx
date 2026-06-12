@@ -202,6 +202,23 @@ function usePersistentState(key, initial) {
   return [val, setVal];
 }
 
+// True when the viewport is phone-width — used to switch layouts that CSS alone
+// can't (e.g. an SVG chart's viewBox). Tracks the same 640px breakpoint as the CSS.
+function useIsNarrow(maxWidth = 640) {
+  const query = `(max-width: ${maxWidth}px)`;
+  const read = () => (typeof window !== 'undefined' && window.matchMedia) ? window.matchMedia(query).matches : false;
+  const [narrow, setNarrow] = useState(read);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia(query);
+    const on = () => setNarrow(mq.matches);
+    on();
+    mq.addEventListener ? mq.addEventListener('change', on) : mq.addListener(on);
+    return () => { mq.removeEventListener ? mq.removeEventListener('change', on) : mq.removeListener(on); };
+  }, [query]);
+  return narrow;
+}
+
 // ── File-workspace helpers ───────────────────────────────────
 // The library is a self-describing document; app settings are NOT part of it.
 const ROOT_SCOPE = { id: 'all', label: 'Everything', parent: null, depth: 0, isLeaf: false };
@@ -1131,6 +1148,17 @@ function FolderView({
     if (el) el.scrollTo({ left: el.scrollWidth });
   }, [path]);
 
+  // A folder's inline delete confirm (Cancel / Delete) lives in the row, which
+  // can sit in a column the strip has scrolled off-screen — on a phone that
+  // clipped only the Cancel, leaving just the destructive Delete reachable.
+  // When a confirm opens, scroll its column into view so both buttons show.
+  useEffect(() => {
+    if (pendingDeleteId == null) return;
+    const el = columnsRef.current;
+    const col = el && el.querySelector('.column-item.is-deleting')?.closest('.column');
+    if (col) col.scrollIntoView({ inline: 'center', block: 'nearest' });
+  }, [pendingDeleteId]);
+
   // Keep the open column path valid when the tree changes underneath it (e.g. a
   // move/paste re-parents a scope that's currently open). Each step must still
   // be a child of the previous; trim to the last valid prefix so the browser
@@ -1325,7 +1353,15 @@ function FolderView({
                                       e.stopPropagation();
                                       if (menu && menu.id === c.id) { setMenu(null); return; }
                                       const r = e.currentTarget.getBoundingClientRect();
-                                      setMenu({ id: c.id, top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+                                      // Anchor from the visual viewport width (documentElement.clientWidth),
+                                      // not window.innerWidth — the latter inflates when the page has any
+                                      // horizontal overflow, throwing the fixed menu off the left edge.
+                                      // Then clamp so a left-edge anchor (e.g. a column scrolled toward the
+                                      // left on a phone) can't push the right-aligned menu off-screen.
+                                      const vw = document.documentElement.clientWidth;
+                                      const MENU_W = 156;   // .column-menu min-width
+                                      const right = Math.min(Math.max(8, vw - r.right), Math.max(8, vw - MENU_W - 8));
+                                      setMenu({ id: c.id, top: r.bottom + 4, right });
                                     }}
                                     title={t('browse.moreActions')} aria-label={t('browse.moreActions')}>
                               <Glyph name="more" size={15} />
@@ -1884,7 +1920,12 @@ function MiniSpark({ points }) {
 // accuracy (%) on y. `mode` is 'deck' (continuous %) or 'card' (binary).
 function PerfChart({ points, windowStart, windowEnd, mode }) {
   const [hover, setHover] = useState(null);
-  const W = 880, H = 320, padL = 48, padR = 22, padT = 22, padB = 36;
+  const narrow = useIsNarrow();
+  // A narrower viewBox on phones means the SVG is downscaled far less when it
+  // fills the card width, so the 11px axis text stays legible instead of
+  // shrinking to a few pixels.
+  const W = narrow ? 380 : 880, H = narrow ? 300 : 320;
+  const padL = narrow ? 40 : 48, padR = narrow ? 14 : 22, padT = 22, padB = 36;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const span = windowEnd - windowStart || 1;
   const xOf = (ts) => padL + ((ts - windowStart) / span) * plotW;
@@ -1895,7 +1936,8 @@ function PerfChart({ points, windowStart, windowEnd, mode }) {
     .sort((a, b) => a.ts - b.ts);
 
   const yTicks = [0, 25, 50, 75, 100];
-  const xTicks = Array.from({ length: 6 }, (_, i) => windowStart + (span * i) / 5);
+  const xTickCount = narrow ? 4 : 6;
+  const xTicks = Array.from({ length: xTickCount }, (_, i) => windowStart + (span * i) / (xTickCount - 1));
 
   const linePts = inWin.map(p => `${xOf(p.ts).toFixed(1)},${yOf(p.value).toFixed(1)}`).join(' ');
   const areaD = inWin.length
@@ -1934,8 +1976,10 @@ function PerfChart({ points, windowStart, windowEnd, mode }) {
             <circle
               className={`chart-dot ${mode === 'card' ? (p.passed ? 'pass' : 'miss') : ''}`}
               cx={xOf(p.ts)} cy={yOf(p.value)} r={hover === i ? 6 : 4.5} />
-            <circle cx={xOf(p.ts)} cy={yOf(p.value)} r="14" fill="transparent"
-                    onMouseEnter={() => setHover(i)} style={{ cursor: 'pointer' }} />
+            <circle cx={xOf(p.ts)} cy={yOf(p.value)} r={narrow ? 20 : 14} fill="transparent"
+                    onMouseEnter={() => setHover(i)}
+                    onPointerDown={(e) => { if (e.pointerType !== 'mouse') setHover(h => h === i ? null : i); }}
+                    style={{ cursor: 'pointer' }} />
           </g>
         ))}
       </svg>
