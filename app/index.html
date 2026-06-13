@@ -2837,6 +2837,19 @@
     }
     .nav-right .nav-btn > svg { width: 18px; height: 18px; }
 
+    /* Base the shell on the *dynamic* viewport height: 100vh counts the area
+       behind the mobile browser's address bar, so it pushed content below the
+       fold; dvh tracks the actually-visible height. */
+    .app { min-height: 100dvh; }
+
+    /* The browse view fills exactly the visible viewport and never scrolls the
+       page — its column card lists (.column-list) scroll internally instead.
+       A min-height floor only sets a floor; the hard height + overflow:hidden
+       caps the shell so the bounded height propagates down the flex chain and
+       the inner list becomes the scroller. Scoped with :has() to the browse
+       screen so other (taller) screens keep normal page scrolling. */
+    .app:has(.stage-columns) { height: 100dvh; overflow: hidden; }
+
     .stage { padding: 18px 16px 32px; }
     .display { font-size: 38px; }
     .home-count { font-size: 84px; }
@@ -2850,9 +2863,12 @@
        middle: without it scrollIntoView clamps an edge card flush against the
        side, since there's no content past it to fill the other half. */
     .columns {
-      --card-min-h: 320px;
       justify-content: safe center;
       padding-inline: calc(50% - 140px);
+      /* Drop the desktop min-height floor on phones: let the track shrink to the
+         space under the header so the whole view fits the viewport, and the card
+         list scrolls internally instead of the page. */
+      min-height: 0;
     }
 
     /* Touch-friendly browse controls — lift the begin / footer / sort / row /
