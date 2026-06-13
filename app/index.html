@@ -2888,6 +2888,11 @@
        enlarge them on touch so a mask can be resized and deleted by finger. */
     .occ-edit-handle { width: 24px; height: 24px; right: -10px; bottom: -10px; }
     .occ-edit-del { width: 28px; height: 28px; top: -12px; right: -12px; }
+
+    /* Hide the keyboard shortcut hints — a touch device has no Enter / X / Esc /
+       Space keys. The same actions stay reachable via the on-screen buttons
+       (Got it / Missed / Pause and the Show button). */
+    .card-meta-keys, .reveal-hint { display: none; }
   }
 
   /* Visually-hidden but available to screen readers (for aria-live status). */

@@ -2352,7 +2352,7 @@ function StudyScreen({ card, idx, total, onGrade, onExit, onShowSource }) {
               {(card.region || card.sourceId) && card.sourceLabel && <span className="dot" />}
               {card.sourceLabel && <span>{card.sourceLabel}</span>}
             </div>
-            <div className="card-meta">
+            <div className="card-meta card-meta-keys">
               <span>{t('study.footHintEnter')}</span>
               <span className="dot" />
               <span>{t('study.footHintMiss')}</span>
