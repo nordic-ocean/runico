@@ -1068,6 +1068,7 @@ function FolderView({
   // rect (fixed-positioned so the column-list's overflow can't clip it).
   const [menu, setMenu] = useState(null);
   const columnsRef = useRef(null);
+  const isNarrow = useIsNarrow();
 
   // Close the action menu on Escape, or on scroll/resize: it is fixed-positioned
   // to a captured button rect, so any layout shift would leave it floating at a
@@ -1138,15 +1139,20 @@ function FolderView({
   // This folder's chosen sort (default name-asc). folderSort is a {scopeId: mode} map.
   const sortModeFor = (id) => (folderSort && typeof folderSort === 'object' && folderSort[id]) || 'name-asc';
 
-  // Opening a folder appends a column to the right of the track; on narrow
-  // screens (phones) that new column lands off-screen. Scroll the track fully
-  // right on every path change so the newest column — or the selected leaf's
-  // action card — is in view. (Smooth/instant honors prefers-reduced-motion
-  // via the track's CSS scroll-behavior.)
+  // Opening a folder appends a card to the right of the track (a folder column,
+  // or the selected leaf's action card). Bring the last-opened one into view on
+  // every path change:
+  //   • Phones — center it. Reading the active card mid-screen is calmer than
+  //     pinning it to the right edge, and a single card that already fits is
+  //     centered by the track's `justify-content` (so scrollIntoView is a no-op).
+  //   • Wider screens — keep the Finder-style scroll-to-end.
+  // (Smooth/instant honors prefers-reduced-motion via the track's scroll-behavior.)
   useEffect(() => {
     const el = columnsRef.current;
-    if (el) el.scrollTo({ left: el.scrollWidth });
-  }, [path]);
+    if (!el) return;
+    if (isNarrow) el.lastElementChild?.scrollIntoView({ inline: 'center', block: 'nearest' });
+    else el.scrollTo({ left: el.scrollWidth });
+  }, [path, isNarrow]);
 
   // A folder's inline delete confirm (Cancel / Delete) lives in the row, which
   // can sit in a column the strip has scrolled off-screen — on a phone that

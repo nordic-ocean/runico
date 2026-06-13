@@ -2841,7 +2841,19 @@
     .display { font-size: 38px; }
     .home-count { font-size: 84px; }
     .theme-list { grid-template-columns: 1fr; }
-    .columns { --card-min-h: 320px; }
+    /* Center the active card on phones. `safe center` centers the track when its
+       cards fit the viewport (so a single open folder sits mid-screen), but
+       falls back to flex-start the moment they overflow — without that, a
+       centered overflowing row clips its left edge out of reach.
+       The inline padding is half-a-card of scroll room at each end (cards are
+       280px wide) so the last-opened card can actually be scrolled to the
+       middle: without it scrollIntoView clamps an edge card flush against the
+       side, since there's no content past it to fill the other half. */
+    .columns {
+      --card-min-h: 320px;
+      justify-content: safe center;
+      padding-inline: calc(50% - 140px);
+    }
 
     /* Touch-friendly browse controls — lift the begin / footer / sort / row /
        menu targets toward the ~40px tap-target floor. */
