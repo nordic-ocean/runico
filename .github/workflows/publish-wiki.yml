@@ -1,0 +1,71 @@
+name: Publish wiki
+
+# Publishes the Markdown in wiki/ to this repository's GitHub Wiki.
+#
+# The GitHub Wiki is itself a tiny git repo (<repo>.wiki.git). This job clones
+# it, mirrors wiki/ into it, and pushes — so the wiki is edited like any other
+# source: change a file under wiki/, merge to main, and it goes live.
+#
+# Two ways in:
+#   • Automatic: any push to main that touches wiki/ (or this workflow).
+#   • Manual:    Actions → "Publish wiki" → Run workflow.
+#
+# ONE-TIME SETUP: the .wiki.git repo doesn't exist until the wiki has at least
+# one page. If this job reports "wiki not initialized", open the repo's Wiki tab
+# once, click "Create the first page", Save, then re-run this workflow.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'wiki/**'
+      - '.github/workflows/publish-wiki.yml'
+  workflow_dispatch:
+
+# Needed to push to the wiki repo with the built-in token.
+permissions:
+  contents: write
+
+# One publish at a time; let an in-progress run finish.
+concurrency:
+  group: publish-wiki
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo (for wiki/)
+        uses: actions/checkout@v4
+
+      - name: Mirror wiki/ into the GitHub Wiki
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          wiki_remote="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git"
+          work="$(mktemp -d)"
+
+          echo "Cloning the wiki repo…"
+          if ! git clone --quiet "$wiki_remote" "$work"; then
+            echo "::error::Could not clone the wiki repo. The wiki may not be initialized yet."
+            echo "Open the repository's Wiki tab, create the first page once, then re-run this workflow."
+            exit 1
+          fi
+
+          echo "Syncing wiki/ → wiki repo (with deletions)…"
+          rsync -a --delete --exclude='.git/' wiki/ "$work/"
+
+          cd "$work"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "Wiki already up to date — nothing to publish."
+            exit 0
+          fi
+
+          git commit --quiet -m "Publish wiki from ${GITHUB_SHA::7}"
+          git push --quiet origin HEAD
+          echo "Wiki published."
