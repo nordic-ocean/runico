@@ -800,7 +800,15 @@
   .app.theme-warm .src-name { color: #5C5147; }
 
   /* ─── Finder-style column view ─── */
-  .stage-columns { max-width: 1280px; }
+  /* The browse screen fills the viewport remainder: the header keeps its
+     natural height and .columns absorbs the rest, so the folder cards reach
+     the bottom of the window without forcing page scroll. */
+  .stage-columns {
+    max-width: 1280px;
+    align-self: stretch;
+    display: flex; flex-direction: column;
+    min-height: 0;
+  }
   .columns-header {
     text-align: center;
     margin-bottom: 24px;
@@ -837,9 +845,12 @@
     overflow-x: auto;
     padding-bottom: 12px;
     scroll-behavior: smooth;
-    /* Fixed folder-column height, so columns don't grow/shrink as you navigate.
-       Fuller folders scroll within it. */
-    --card-h: 495px;
+    /* Fill the space under the header; columns stretch to match, so their
+       height is constant as you navigate and fuller folders scroll within.
+       The min-height floor keeps cards usable in short windows (the page
+       scrolls instead of squashing them); 12px covers the bottom padding. */
+    flex: 1 1 auto;
+    min-height: calc(var(--card-min-h, 380px) + 12px);
   }
   .columns::-webkit-scrollbar { height: 6px; }
   .columns::-webkit-scrollbar-thumb { background: #D6DCE3; border-radius: 3px; }
@@ -865,7 +876,6 @@
     border: 1px solid #F0F2F5;
     border-radius: 12px;
     display: flex; flex-direction: column;
-    height: var(--card-h);
   }
   .app.theme-dark .column { background: #1A1F26; border-color: #2A323F; }
   .app.theme-warm .column { background: #FBFAF7; border-color: #EAE5DC; }
@@ -1119,7 +1129,6 @@
     border-radius: 12px;
     padding: 18px;
     display: flex; flex-direction: column; gap: 10px;
-    height: var(--card-h);
     box-shadow: 0 8px 16px rgba(0,0,0,0.04);
     animation: scene-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -2811,11 +2820,74 @@
      stage padding and the very large display/count type overflow. Scale them
      down and let the theme grid stack. Desktop (wider) is unaffected. */
   @media (max-width: 640px) {
-    .nav { padding: 16px 18px; }
+    /* Compact app-bar. The five file/nav actions become icon-only and the
+       wordmark is dropped so the row fits a phone instead of overflowing — the
+       old overflow widened the layout viewport and shrank the whole page to fit.
+       font-size:0 (not display:none) hides the labels while keeping them in the
+       accessibility tree, so screen readers still announce each action. */
+    .nav { padding: 12px 12px; gap: 8px; }
+    .nav-left { gap: 8px; min-width: 0; flex: 1 1 auto; }
+    .nav-mark .mark-wordmark { display: none; }
+    .file-chip { margin-left: 0; min-width: 0; }
+    .file-chip-name { max-width: 96px; }
+    .nav-right { flex: none; gap: 2px; }
+    .nav-right .nav-btn {
+      font-size: 0; gap: 0; padding: 0;
+      min-width: 40px; min-height: 40px; justify-content: center;
+    }
+    .nav-right .nav-btn > svg { width: 18px; height: 18px; }
+
     .stage { padding: 18px 16px 32px; }
     .display { font-size: 38px; }
     .home-count { font-size: 84px; }
     .theme-list { grid-template-columns: 1fr; }
+    /* Center the active card on phones. `safe center` centers the track when its
+       cards fit the viewport (so a single open folder sits mid-screen), but
+       falls back to flex-start the moment they overflow — without that, a
+       centered overflowing row clips its left edge out of reach.
+       The inline padding is half-a-card of scroll room at each end (cards are
+       280px wide) so the last-opened card can actually be scrolled to the
+       middle: without it scrollIntoView clamps an edge card flush against the
+       side, since there's no content past it to fill the other half. */
+    .columns {
+      --card-min-h: 320px;
+      justify-content: safe center;
+      padding-inline: calc(50% - 140px);
+    }
+
+    /* Touch-friendly browse controls — lift the begin / footer / sort / row /
+       menu targets toward the ~40px tap-target floor. */
+    .column-head-begin { padding: 9px 16px; font-size: 13px; }
+    .column-foot { gap: 4px; }
+    .column-foot-btn { padding: 9px 10px; font-size: 13px; }
+    .column-sort-select { padding: 8px 6px; font-size: 12.5px; }
+    .column-item-tap { padding-top: 11px; padding-bottom: 11px; }
+    .column-item .src-action.column-item-menu-btn {
+      min-width: 40px; min-height: 40px; padding: 10px;
+      box-sizing: border-box; justify-content: center;
+    }
+
+    /* Trash actions: lift Restore / Delete-forever to ~40px and widen the gap so
+       the destructive button isn't a mis-tap away from the benign one. */
+    .trash-row-actions { gap: 12px; }
+    .trash-row-actions .src-action { padding: 12px 14px; }
+
+    /* Let the quick-resume sub-line and stat labels wrap rather than clip the
+       topic name / metric label mid-word on a narrow screen. */
+    .quick-resume-sub { white-space: normal; }
+    .perf-stat-label { white-space: normal; }
+  }
+
+  /* On touch devices there is no hover, so the per-row folder actions (the ⋯
+     menu opening Rename / Move / Copy / Delete, and Paste here) would never
+     appear. Reveal them wherever hover is unavailable. */
+  @media (hover: none) {
+    .column-item-actions { max-width: 340px; opacity: 1; padding-right: 4px; }
+
+    /* Occlusion-editor region controls are tiny (14/20px) for mouse precision;
+       enlarge them on touch so a mask can be resized and deleted by finger. */
+    .occ-edit-handle { width: 24px; height: 24px; right: -10px; bottom: -10px; }
+    .occ-edit-del { width: 28px; height: 28px; top: -12px; right: -12px; }
   }
 
   /* Visually-hidden but available to screen readers (for aria-live status). */
