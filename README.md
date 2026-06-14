@@ -16,7 +16,9 @@ recall the answer, reveal it, then Continue or Pause, with no grading scales to 
 No install, no account. Your whole library lives in a single file you own —
 open it and you're back exactly where you left off.
 
-<sub>Prefer an installed app? <b><a href="#desktop-app">Download for macOS · Windows · Linux ↓</a></b></sub>
+### 📖 [Read the documentation →](https://nordic-ocean.github.io/runico/docs/)
+
+<sub>Guides for every feature, getting started, and an FAQ. &nbsp;·&nbsp; Prefer an installed app? <b><a href="#desktop-app">Download for macOS · Windows · Linux ↓</a></b></sub>
 
 </div>
 
