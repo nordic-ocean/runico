@@ -15,7 +15,7 @@ const STORE_PREFIX = 'runico:v3:';
 
 // App version shown in the bottom-left build badge. Keep in sync with
 // package.json "version" — electron-builder names the installers from that.
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.1.0';
 
 // ── Native (desktop) backend ─────────────────────────────
 // In the Electron build, window.runico (preload.js) exposes the OS keychain, the
@@ -455,6 +455,263 @@ function applyScopeCopy(scopes, sourceCards, labelOverrides, srcId, destId, mint
   const nextScopes = [...scopes];
   nextScopes.splice(at, 0, ...cloned);
   return { scopes: nextScopes, sourceCards: nextCards, scopeLabelOverrides: nextOverrides };
+}
+
+// ── Merge another library into the open one ──────────────────
+// Fold library B into library A by matching scopes on their EFFECTIVE label-path
+// (label overrides applied): a same-label, same-kind child unions (folders recurse,
+// topics union their cards), anything else is grafted with fresh ids. Study history
+// travels (remapped onto the new ids); cards that match both PATH and CONTENT are
+// deferred as duplicates for the user to resolve. All functions here are pure so
+// they can be unit-tested; the React layer only feeds them current state and a
+// genId minter. See specs/merge-library/spec.md.
+const SOURCES_CAP = 40;
+function effLabel(scope, overrides) { return (overrides && overrides[scope.id] != null) ? overrides[scope.id] : scope.label; }
+
+// Stable 32-bit FNV-1a hash → base36, so an occlusion card's (large) base64 image
+// can fingerprint into a key without bloating it.
+function hashStr(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0; }
+  return h.toString(36);
+}
+
+// Content fingerprint: two cards are "the same content" iff their keys match.
+// Text cards compare kind + question + answer (whitespace-normalized); occlusion
+// cards compare the masked image (hashed) + the box/region layout.
+function cardContentKey(card) {
+  if (card.kind === 'occlusion') {
+    const layout = (card.boxes && card.boxes.length)
+      ? card.boxes.map(b => [Math.round(b.x), Math.round(b.y), Math.round(b.w), Math.round(b.h), b.label || ''].join(',')).sort().join(';')
+      : (Array.isArray(card.regions) ? [...card.regions].sort().join(',') : '');
+    return 'occlusion ' + hashStr(card.image || '') + ' ' + layout;
+  }
+  const norm = (x) => (x == null ? '' : String(x)).trim().replace(/\s+/g, ' ');
+  return card.kind + ' ' + norm(card.q) + ' ' + norm(card.a);
+}
+
+// Remap a per-card history map (cardId → results) onto new card ids; entries with
+// no mapping are dropped (their card isn't coming across).
+function remapCardHistMapped(cardHist, cardIdMap) {
+  const out = {};
+  for (const oldId in (cardHist || {})) { if (cardIdMap[oldId]) out[cardIdMap[oldId]] = cardHist[oldId]; }
+  return out;
+}
+
+// Merge B's source docs into A's, keeping all of A's and adding B's only up to the
+// cap; cards whose source is dropped degrade to the graceful "unavailable" note.
+function mergeSourcesCapped(baseSources, addSources, cap) {
+  const next = { ...baseSources };
+  let room = cap ? Math.max(0, cap - Object.keys(next).length) : Infinity;
+  for (const k in (addSources || {})) { if (room <= 0) break; next[k] = addSources[k]; room--; }
+  return next;
+}
+
+// The displayed folder/topic path for a scope (root excluded), e.g. "Biology › Cells".
+function scopePathLabel(scopes, id, overrides) {
+  const parts = [];
+  let cur = scopes.find(s => s.id === id);
+  const seen = new Set();
+  while (cur && cur.parent != null && !seen.has(cur.id)) { seen.add(cur.id); parts.unshift(effLabel(cur, overrides)); cur = scopes.find(s => s.id === cur.parent); }
+  return parts.join(' › ');
+}
+
+// Phase 1 (pure): compute the merge plan WITHOUT touching live state. Returns a
+// `base` library (A + every unconditional addition: grafts, union-added cards,
+// merged sessions, remapped history, merged sources) plus the `duplicates` list to
+// resolve and a `summary` of what was added. `mintId` mints fresh ids; `copySuffix`
+// localizes the "(copy)" disambiguation marker.
+function planLibraryMerge(A, B, mintId, copySuffix) {
+  const work = {
+    scopes: A.scopes.map(s => ({ ...s })),
+    cards: { ...A.sourceCards },
+    overrides: { ...A.scopeLabels },
+    folderSort: { ...A.folderSort },
+    history: { ...A.history },
+  };
+  const srcIdMap = {};     // B sourceId → new id, shared across the whole merge
+  const newSources = {};   // new id → source object pulled from B
+  const duplicates = [];
+  const summary = { folders: 0, topics: 0, cards: 0 };
+
+  function adoptCard(card) {
+    const nc = { ...card, id: mintId('c') };
+    if (card.sourceId != null) {
+      let ns = srcIdMap[card.sourceId];
+      if (ns == null) { ns = mintId('usrc'); srcIdMap[card.sourceId] = ns; const so = (B.sources || {})[card.sourceId]; if (so) newSources[ns] = so; }
+      nc.sourceId = ns;
+    }
+    return nc;
+  }
+
+  // Clone an entire B subtree (folders + topics + cards + history) under an A folder.
+  function graft(bRootId, destId) {
+    const range = scopeSubtreeRange(B.scopes, bRootId);
+    if (!range) return;
+    const block = B.scopes.slice(range[0], range[1]);
+    const dest = work.scopes.find(s => s.id === destId);
+    if (!dest) return;
+    const delta = (dest.depth + 1) - (block[0].depth || 0);
+    const idMap = {};
+    block.forEach(s => { idMap[s.id] = mintId(s.isLeaf ? 'src' : 'folder'); });
+    // Disambiguate the grafted root's EFFECTIVE label (override applied — matching how
+    // walk() pairs scopes) against the destination's current children's effective labels.
+    const sib = new Set(work.scopes.filter(s => s.parent === destId).map(s => effLabel(s, work.overrides)));
+    const bOverride = (B.scopeLabels || {})[bRootId];
+    let rootEff = (bOverride != null) ? bOverride : block[0].label;
+    if (sib.has(rootEff)) { const b = rootEff + ' ' + copySuffix; rootEff = b; let n = 2; while (sib.has(rootEff)) { rootEff = b + ' ' + n; n++; } }
+    const cloned = block.map(s => ({
+      ...s, id: idMap[s.id],
+      parent: s.id === bRootId ? destId : idMap[s.parent],
+      depth: (s.depth || 0) + delta,
+      label: (s.id === bRootId && bOverride == null) ? rootEff : s.label,
+      last: 'never',
+      ...(s.paused ? { paused: undefined } : {}),
+      ...(s.isLeaf ? { total: ((B.sourceCards || {})[s.id] || []).length } : {}),
+    }));
+    const at = insertAfterSubtree(work.scopes, destId);
+    work.scopes.splice(at, 0, ...cloned);
+    block.forEach(s => {
+      if (s.isLeaf) {
+        const cardIdMap = {};
+        const list = ((B.sourceCards || {})[s.id] || []).map(c => { const nc = adoptCard(c); cardIdMap[c.id] = nc.id; return nc; });
+        work.cards[idMap[s.id]] = list;
+        const bh = (B.history || {})[s.id];
+        if (bh) work.history[idMap[s.id]] = { sessions: [...(bh.sessions || [])], cardHist: remapCardHistMapped(bh.cardHist, cardIdMap) };
+        summary.topics++; summary.cards += list.length;
+      } else { summary.folders++; }
+      if ((B.scopeLabels || {})[s.id] != null) work.overrides[idMap[s.id]] = B.scopeLabels[s.id];
+      if ((B.folderSort || {})[s.id] != null) work.folderSort[idMap[s.id]] = B.folderSort[s.id];
+    });
+    // If B's root carried a display override, the disambiguated name lives on the
+    // override (its raw label is preserved); otherwise it's on .label above.
+    if (bOverride != null) work.overrides[idMap[bRootId]] = rootEff;
+  }
+
+  // Union B topic `bId`'s cards into matched A topic `aId`: new cards add now,
+  // duplicates (same content) defer to resolution; B's sessions merge into A's.
+  function unionTopic(aId, bId) {
+    const aCards = work.cards[aId] || [];
+    const index = new Map();
+    aCards.forEach(c => { const k = cardContentKey(c); if (!index.has(k)) index.set(k, c); });
+    const bCards = (B.sourceCards || {})[bId] || [];
+    const bHist = (B.history || {})[bId] || { sessions: [], cardHist: {} };
+    const cardIdMap = {};
+    const added = [];
+    const pathLabel = scopePathLabel(work.scopes, aId, work.overrides);
+    bCards.forEach(c => {
+      const k = cardContentKey(c);
+      const hit = index.get(k);
+      if (hit) {
+        duplicates.push({ dupId: 'dup-' + duplicates.length, aTopicId: aId, aCard: hit, aCardId: hit.id, bCard: c, bCardHist: (bHist.cardHist || {})[c.id] || null, pathLabel });
+      } else {
+        const nc = adoptCard(c); cardIdMap[c.id] = nc.id; added.push(nc);
+      }
+    });
+    if (added.length) {
+      work.cards[aId] = [...added, ...aCards];
+      work.scopes = work.scopes.map(s => s.id === aId ? { ...s, total: (work.cards[aId] || []).length, last: 'today' } : s);
+      summary.cards += added.length;
+    }
+    const aH = work.history[aId] || { sessions: [], cardHist: {} };
+    if ((bHist.sessions && bHist.sessions.length) || added.length) {
+      work.history[aId] = {
+        sessions: [...(aH.sessions || []), ...(bHist.sessions || [])].sort((x, y) => (x.ts || 0) - (y.ts || 0)),
+        cardHist: { ...(aH.cardHist || {}), ...remapCardHistMapped(bHist.cardHist, cardIdMap) },
+      };
+    }
+  }
+
+  // Walk B's tree against A's, matching siblings by effective label + kind. Match
+  // only A's ORIGINAL children at each level (a snapshot), so freshly grafted
+  // siblings can't accidentally absorb a later B child.
+  function walk(aParentId, bParentId) {
+    const poolIds = work.scopes.filter(s => s.parent === aParentId).map(s => s.id);
+    const used = new Set();
+    const bChildren = B.scopes.filter(s => s.parent === bParentId);
+    for (const bc of bChildren) {
+      const bl = effLabel(bc, B.scopeLabels);
+      const matchId = poolIds.find(id => {
+        if (used.has(id)) return false;
+        const s = work.scopes.find(x => x.id === id);
+        return s && effLabel(s, work.overrides) === bl && (!!s.isLeaf === !!bc.isLeaf);
+      });
+      if (matchId == null) { graft(bc.id, aParentId); }
+      else { used.add(matchId); if (bc.isLeaf) unionTopic(matchId, bc.id); else walk(matchId, bc.id); }
+    }
+  }
+
+  const aRoot = work.scopes.find(s => s.parent == null) || work.scopes[0];
+  const bRoot = (B.scopes || []).find(s => s.parent == null) || (B.scopes || [])[0];
+  if (aRoot && bRoot) walk(aRoot.id, bRoot.id);
+
+  return {
+    base: {
+      scopes: work.scopes, sourceCards: work.cards, scopeLabels: work.overrides,
+      folderSort: work.folderSort, history: work.history,
+      sources: mergeSourcesCapped(A.sources || {}, newSources, SOURCES_CAP),
+    },
+    duplicates, summary, srcIdMap, _B: B,
+  };
+}
+
+// Phase 2 (pure): apply the user's per-duplicate resolutions to a plan, producing
+// the final library. Keep/Edit add the incoming card (fresh id, its history under
+// it); Skip discards it but merges B's per-card history into A's surviving card.
+function applyMergeResolutions(plan, resolutions, mintId) {
+  resolutions = (resolutions && typeof resolutions === 'object' && !Array.isArray(resolutions)) ? resolutions : {};
+  const B = plan._B;
+  const srcIdMap = plan.srcIdMap;
+  const newSources = {};
+  const out = {
+    scopes: plan.base.scopes.map(s => ({ ...s })),
+    sourceCards: { ...plan.base.sourceCards },
+    scopeLabels: { ...plan.base.scopeLabels },
+    folderSort: { ...plan.base.folderSort },
+    history: { ...plan.base.history },
+    sources: { ...plan.base.sources },
+  };
+  function adoptCard(card) {
+    const nc = { ...card, id: mintId('c') };
+    if (card.sourceId != null) {
+      let ns = srcIdMap[card.sourceId];
+      if (ns == null) { ns = mintId('usrc'); srcIdMap[card.sourceId] = ns; }
+      const so = (B.sources || {})[card.sourceId];
+      if (so && out.sources[ns] == null) newSources[ns] = so;
+      nc.sourceId = ns;
+    }
+    return nc;
+  }
+  function applyEdit(card, edit) {
+    if (!edit) return card;
+    if (card.kind === 'occlusion') return { ...card, ...(edit.boxes ? { boxes: edit.boxes } : {}), ...(edit.image ? { image: edit.image } : {}) };
+    const q = edit.q != null ? edit.q : card.q;
+    const a = edit.a != null ? edit.a : card.a;
+    const kind = (card.kind === 'cloze' && !/\{\{.+?\}\}/.test(q)) ? 'qa' : card.kind;
+    return { ...card, kind, q, a };
+  }
+  function mergeHistInto(topicId, cardId, entries) {
+    if (!entries || !entries.length) return;
+    const h = out.history[topicId] || { sessions: [], cardHist: {} };
+    const ch = { ...(h.cardHist || {}) };
+    ch[cardId] = [...(ch[cardId] || []), ...entries];
+    out.history[topicId] = { sessions: h.sessions || [], cardHist: ch };
+  }
+  let kept = 0;
+  for (const d of plan.duplicates) {
+    const r = resolutions[d.dupId] || { action: 'keep' };   // never silently drop
+    if (r.action === 'skip') {
+      mergeHistInto(d.aTopicId, d.aCardId, d.bCardHist);
+    } else {
+      const nc = adoptCard(applyEdit(d.bCard, r.action === 'edit' ? r.edit : null));
+      out.sourceCards[d.aTopicId] = [nc, ...(out.sourceCards[d.aTopicId] || [])];
+      out.scopes = out.scopes.map(s => s.id === d.aTopicId ? { ...s, total: (out.sourceCards[d.aTopicId] || []).length, last: 'today' } : s);
+      mergeHistInto(d.aTopicId, nc.id, d.bCardHist);
+      kept++;
+    }
+  }
+  out.sources = mergeSourcesCapped(out.sources, newSources, SOURCES_CAP);
+  return { library: out, kept };
 }
 
 // Tolerant parse: strip fences/prose, extract the JSON array, validate, and map
@@ -905,6 +1162,7 @@ function Glyph({ name, size = 16 }) {
     upload: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m17 8-5-5-5 5" /><path d="M12 3v12" /></>,
     more:   <><circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" /><circle cx="12" cy="19" r="1.5" fill="currentColor" stroke="none" /></>,
     trash:  <><path d="M3 6h18" /><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></>,
+    merge:  <><circle cx="18" cy="18" r="3" /><circle cx="6" cy="6" r="3" /><path d="M6 21V9a9 9 0 0 0 9 9" /></>,
   };
   return (
     <svg aria-hidden="true" focusable="false" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -3132,6 +3390,102 @@ function ApprovedScreen({ keptCount, onHome, onViewCards, topicLabel }) {
   );
 }
 
+// Resolve duplicate cards found while merging another library — one pair at a
+// time (existing vs. incoming), mirroring the drafts-review flow. Decisions are
+// accumulated; the last one commits the merge. Text cards can be edited inline;
+// occlusion cards offer keep/skip (the user can edit a kept card later).
+function MergeResolveScreen({ duplicates, onResolve, onCancel }) {
+  const [idx, setIdx] = useState(0);
+  const [resolutions, setResolutions] = useState({});
+  const [editing, setEditing] = useState(false);
+  const [editQ, setEditQ] = useState('');
+  const [editA, setEditA] = useState('');
+  const d = duplicates[idx];
+  useEffect(() => { setEditing(false); }, [idx]);
+
+  function decide(action, edit) {
+    const next = { ...resolutions, [d.dupId]: { action, edit } };
+    setResolutions(next);
+    if (idx === duplicates.length - 1) onResolve(next);
+    else setIdx(idx + 1);
+  }
+
+  const isOcc = d.bCard.kind === 'occlusion';
+  const renderCard = (card) => {
+    if (card.kind === 'occlusion') {
+      return card.image
+        ? <img className="merge-dup-img" src={card.image} alt="" />
+        : <div className="merge-dup-a">{t('add.reviewOcclusionTag')}</div>;
+    }
+    return (
+      <>
+        <div className="merge-dup-q">{card.kind === 'cloze' ? <Cloze text={card.q} revealed={true} /> : card.q}</div>
+        {card.a && <><div className="merge-dup-divider" /><div className="merge-dup-a">{card.a}</div></>}
+      </>
+    );
+  };
+
+  return (
+    <div className="stage-inner wide">
+      <div className="eyebrow">{t('merge.dupCounter', { idx: idx + 1, total: duplicates.length })}<span className="dot" />{d.pathLabel}</div>
+      <p className="merge-dup-lead">{t('merge.dupExplain')}</p>
+
+      <div className="merge-dup-pair">
+        <div className="merge-dup-col">
+          <div className="merge-dup-tag">{t('merge.dupExisting')}</div>
+          <div className="merge-dup-card">{renderCard(d.aCard)}</div>
+        </div>
+        <div className="merge-dup-col is-incoming">
+          <div className="merge-dup-tag">{t('merge.dupIncoming')}</div>
+          <div className="merge-dup-card">
+            {editing ? (
+              <>
+                <input className="merge-dup-edit" value={editQ} onChange={e => setEditQ(e.target.value)} />
+                <input className="merge-dup-edit" value={editA} onChange={e => setEditA(e.target.value)} />
+              </>
+            ) : renderCard(d.bCard)}
+          </div>
+        </div>
+      </div>
+
+      <div className="card-foot">
+        <div className="card-foot-row">
+          <div className="card-meta">
+            <button className="merge-dup-cancel" onClick={onCancel}>{t('merge.dupCancel')}</button>
+          </div>
+          {editing ? (
+            <div className="row-tight">
+              <button className="quiet" onClick={() => setEditing(false)}>{t('add.reviewCancel')}</button>
+              <button className="primary" onClick={() => { setEditing(false); decide('edit', { q: editQ, a: editA }); }}>{t('add.reviewSaveAndKeep')} <Glyph name="check" size={14} /></button>
+            </div>
+          ) : (
+            <div className="row-tight">
+              <button className="quiet" onClick={() => decide('skip')}>{t('merge.dupSkip')}</button>
+              {!isOcc && <button className="quiet" onClick={() => { setEditQ(d.bCard.q); setEditA(d.bCard.a); setEditing(true); }}>{t('add.reviewEdit')}</button>}
+              <button className="primary" onClick={() => decide('keep')}>{t('merge.dupKeepBoth')} <Glyph name="check" size={14} /></button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MergeDoneScreen({ summary, onHome }) {
+  const s = summary || { folders: 0, topics: 0, cards: 0, duplicates: 0 };
+  return (
+    <div className="stage-inner">
+      <div className="done-mark"><Glyph name="merge" size={28} /></div>
+      <div className="lede center">{t('merge.doneTitle')}</div>
+      <p className="copy center">{t('merge.doneSummary', { folders: s.folders, topics: s.topics, cards: s.cards })}</p>
+      {s.duplicates > 0 && <p className="copy center">{t('merge.doneDuplicates', { n: s.duplicates })}</p>}
+      <div className="home-actions">
+        <button className="quiet" onClick={onHome}>{t('common.done.backHome')}</button>
+      </div>
+    </div>
+  );
+}
+
 function SettingsScreen({ language, onLanguageChange, theme, onThemeChange, apiKey, onApiKeyChange, genModel, onGenModelChange, onOpenAbout, onDone }) {
   // In desktop, apiKey is just a presence sentinel ('saved'); the raw key lives in
   // the keychain and never reaches the renderer, so the input starts empty there.
@@ -3719,6 +4073,8 @@ function App() {
   const [currentFile, setCurrentFile] = useState(null);   // { kind:'desktop'|'fsapi'|'upload', name, path?, handle? }
   const [saveState, setSaveState] = useState('saved');    // 'saved' | 'saving' | 'unsaved'
   const saveTimer = useRef(null);
+  const [mergePlan, setMergePlan] = useState(null);       // pending merge awaiting duplicate resolution
+  const [mergeSummary, setMergeSummary] = useState(null); // counts shown on the post-merge summary
 
   function applyLibrary(lib) {
     lib = lib || {};
@@ -3811,6 +4167,59 @@ function App() {
       return;
     }
     applyLibrary(lib); setCurrentFile({ kind: 'upload', name: t('file.untitled') }); setSaveState('unsaved'); setLibraryLoaded(true);
+  }
+
+  // ── Merge another library into the open one ──
+  // Pick a second .runico file and READ it for merging — never touches currentFile
+  // or live state. Returns the parsed library, or null if cancelled/invalid.
+  async function pickLibraryForMerge() {
+    if (IS_DESKTOP) {
+      let r; try { r = await RUNICO.openLibrary(); } catch (e) { return null; }
+      if (!r || r.canceled) return null;
+      const lib = r.ok ? parseLibrary(r.data) : null;
+      if (!lib) { try { alert(t('file.invalid')); } catch (e) {} return null; }
+      return lib;
+    }
+    if (FS_ACCESS) {
+      let handle; try { [handle] = await window.showOpenFilePicker({ types: FILE_PICKER_TYPES, multiple: false }); } catch (e) { return null; }
+      try { const f = await handle.getFile(); const lib = parseLibrary(await f.text()); if (!lib) { try { alert(t('file.invalid')); } catch (e) {} return null; } return lib; }
+      catch (e) { return null; }
+    }
+    return new Promise(res => pickUploadLibrary((file, lib) => res(lib)));   // pickUploadLibrary parses + alerts on invalid
+  }
+
+  // Write a merged library into the open file (the existing setters auto-save it).
+  function commitMerge(library, summary) {
+    setScopes(library.scopes);
+    setSourceCards(library.sourceCards);
+    setScopeLabelOverrides(library.scopeLabels);
+    setFolderSort(library.folderSort);
+    setHistory(library.history);
+    setSources(library.sources);
+    setMergePlan(null);
+    setMergeSummary(summary);
+    setScreen('mergeDone');
+  }
+
+  async function mergeLibraryFile() {
+    const lib = await pickLibraryForMerge();
+    if (!lib) return;
+    const plan = planLibraryMerge(
+      { scopes, sourceCards, scopeLabels: scopeLabelOverrides, folderSort, history, sources },
+      lib, genId, t('browse.copySuffix'));
+    if (!plan.duplicates.length) {
+      const r = applyMergeResolutions(plan, {}, genId);
+      commitMerge(r.library, { folders: plan.summary.folders, topics: plan.summary.topics, cards: plan.summary.cards, duplicates: 0 });
+      return;
+    }
+    setMergePlan(plan);
+    setScreen('mergeResolve');
+  }
+
+  function resolveMerge(resolutions) {
+    if (!mergePlan) { setScreen('folder'); return; }
+    const r = applyMergeResolutions(mergePlan, resolutions, genId);
+    commitMerge(r.library, { folders: mergePlan.summary.folders, topics: mergePlan.summary.topics, cards: mergePlan.summary.cards, duplicates: mergePlan.duplicates.length });
   }
 
   // Debounced auto-save whenever the library changes.
@@ -4426,6 +4835,9 @@ function App() {
               <button className="nav-btn" onClick={openLibraryFile} title={t('file.open')}>
                 <Glyph name="folders" size={14} /> {t('file.open')}
               </button>
+              <button className="nav-btn" onClick={mergeLibraryFile} title={t('file.mergeTitle')}>
+                <Glyph name="merge" size={14} /> {t('file.merge')}
+              </button>
               {currentFile && currentFile.kind === 'upload' && (
                 <button className="nav-btn" onClick={downloadLibrary} title={t('file.save')}>
                   <Glyph name="download" size={14} /> {t('file.save')}
@@ -4442,12 +4854,13 @@ function App() {
         </div>
       </div>
 
-      {(screen === 'add' || screen === 'manualGen' || screen === 'reviewDrafts' || screen === 'settings' || screen === 'study' || screen === 'performance' || screen === 'about' || screen === 'source' || screen === 'trash') && (
+      {(screen === 'add' || screen === 'manualGen' || screen === 'reviewDrafts' || screen === 'mergeResolve' || screen === 'mergeDone' || screen === 'settings' || screen === 'study' || screen === 'performance' || screen === 'about' || screen === 'source' || screen === 'trash') && (
         <div className="back-bar">
           <button className="nav-btn" onClick={() => {
             // Performance returns to where it was opened from; study pauses (saving
             // the spot so it's resumable); a source goes up to its parent folder;
             // everything else goes home.
+            if (screen === 'mergeResolve') { setMergePlan(null); setScreen('folder'); return; }  // backing out cancels the un-committed merge
             if (screen === 'about') { setScreen(aboutReturn || 'folder'); return; }
             if (screen === 'performance') { setScreen(perfReturn || 'folder'); return; }
             if (screen === 'study') { pauseSession(); return; }
@@ -4635,6 +5048,16 @@ function App() {
             }}
             onHome={() => setScreen('folder')}
           />
+        )}
+        {screen === 'mergeResolve' && mergePlan && (
+          <MergeResolveScreen
+            duplicates={mergePlan.duplicates}
+            onResolve={resolveMerge}
+            onCancel={() => { setMergePlan(null); setScreen('folder'); }}
+          />
+        )}
+        {screen === 'mergeDone' && (
+          <MergeDoneScreen summary={mergeSummary} onHome={() => setScreen('folder')} />
         )}
         {screen === 'settings' && (
           <SettingsScreen
