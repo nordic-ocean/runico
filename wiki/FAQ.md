@@ -38,6 +38,11 @@ auto-save, or just keep saving by download. Nothing is lost either way. Details:
 Copy the `.runico` file (e.g. via a cloud-drive folder) and **Open** it on the other device.
 Your theme and AI key are device-specific, so you'll set those again there.
 
+**Can I combine two libraries into one?**
+Yes. Open one, click **🔀 Merge**, and pick the other — its folders, topics, cards, and study
+history fold in, with a step to resolve any duplicate cards. The file you merge *from* is
+left untouched. See **[Merging Libraries](Merging-Libraries)**.
+
 **Is my data private?**
 Yes. Your library stays in your file on your device. Your OpenRouter key is stored locally
 (or encrypted in your OS keychain on desktop) and is only ever sent to OpenRouter when you

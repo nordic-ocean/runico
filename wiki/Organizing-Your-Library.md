@@ -97,6 +97,7 @@ the card-creation flow for that location. See **[Adding Cards](Adding-Cards)**.
 ### Related
 
 - 🗂️ **[Browsing and Practicing](Browsing-and-Practicing)** — getting around the library.
+- 🔀 **[Merging Libraries](Merging-Libraries)** — combine two `.runico` files into one.
 - 🗑️ **[Trash and Recovery](Trash-and-Recovery)** — undo a delete.
 - ✨ **[Adding Cards](Adding-Cards)** — fill a topic with cards.
 

@@ -32,8 +32,11 @@ a worked example. Pick whatever you're curious about:
 | ⏯️ | **[Resuming Your Last Session](Resuming-Your-Last-Session)** | One tap drops you back on the exact card you stopped on. |
 | 🗂️ | **[Browsing and Practicing](Browsing-and-Practicing)** | Navigate subjects → folders → topics, then practice any of them. |
 | 🌱 | **[Organizing Your Library](Organizing-Your-Library)** | Make folders, rename, move, copy, and sort your topics. |
+| 🔀 | **[Merging Libraries](Merging-Libraries)** | Fold another `.runico` file into this one — content and history, with duplicate handling. |
 | 📈 | **[Tracking Your Progress](Tracking-Your-Progress)** | See whether a topic is trending up, session by session. |
 | ✨ | **[Adding Cards](Adding-Cards)** | Drop in material and let AI draft cards — or paste your own. |
+| 🤖 | **[Using OpenRouter](Using-OpenRouter)** | Connect a key so AI drafts cards for you, billed per use. |
+| 💬 | **[Using Your Own AI](Using-Your-Own-AI)** | Draft cards for free with ChatGPT, Claude, or Gemini — no key. |
 | 🖼️ | **[Image-Occlusion Cards](Image-Occlusion-Cards)** | Hide labels on a diagram to study figures, anatomy, and maps. |
 | 🔎 | **[Seeing the Source](Seeing-the-Source)** | Open the original material, with the studied term highlighted. |
 | 🎨 | **[Settings](Settings)** | Choose a canvas theme and the language for your cards and app. |
