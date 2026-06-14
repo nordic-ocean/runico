@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<title>Merging Libraries - Runico</title>
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="description" content="Magical runes for your learning.">
+<meta name="generator" content="mkdocs-1.6.1, mkdocs-gitbook-1.0.7">
+
+<link rel="shortcut icon" href="../images/favicon.ico" type="image/x-icon">
+<meta name="HandheldFriendly" content="true"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta rel="next" href="" />
+<link href="../css/style.min.css" rel="stylesheet"> 
+</head>
+
+<body>
+<div class="book">
+<div class="book-summary">
+<div id="book-search-input" role="search">
+<input type="text" placeholder="Type to search" />
+</div> <!-- end of book-search-input -->
+
+<nav role="navigation">
+<ul class="summary">
+<li>
+<a href=".." target="_blank" class="custom-link">Runico</a>
+</li>
+<li class="divider"></li>
+<li class="chapter" data-path="">
+<a href="..">Home</a>
+<li class="header">Start here</li>
+
+<li>
+<a href="../Getting-Started/" class="">Getting Started</a>
+</li>
+
+<li>
+<a href="../Your-Library-File/" class="">Your Library File</a>
+</li>
+
+<li class="header">Features</li>
+
+<li>
+<a href="../Studying-Cards/" class="">Studying Cards</a>
+</li>
+
+<li>
+<a href="../Resuming-Your-Last-Session/" class="">Resuming Your Last Session</a>
+</li>
+
+<li>
+<a href="../Browsing-and-Practicing/" class="">Browsing & Practicing</a>
+</li>
+
+<li>
+<a href="../Organizing-Your-Library/" class="">Organizing Your Library</a>
+</li>
+
+<li>
+<a href="./" class="active">Merging Libraries</a>
+</li>
+
+<li>
+<a href="../Tracking-Your-Progress/" class="">Tracking Your Progress</a>
+</li>
+
+<li>
+<a href="../Adding-Cards/" class="">Adding Cards</a>
+</li>
+
+<li>
+<a href="../Using-OpenRouter/" class="">Using OpenRouter</a>
+</li>
+
+<li>
+<a href="../Using-Your-Own-AI/" class="">Using Your Own AI</a>
+</li>
+
+<li>
+<a href="../Image-Occlusion-Cards/" class="">Image-Occlusion Cards</a>
+</li>
+
+<li>
+<a href="../Seeing-the-Source/" class="">Seeing the Source</a>
+</li>
+
+<li>
+<a href="../Settings/" class="">Settings</a>
+</li>
+
+<li class="header">Help</li>
+
+<li>
+<a href="../Trash-and-Recovery/" class="">Trash & Recovery</a>
+</li>
+
+<li>
+<a href="../Glossary/" class="">Glossary</a>
+</li>
+
+<li>
+<a href="../FAQ/" class="">FAQ & Troubleshooting</a>
+</li>
+
+<li class="divider"></li>
+
+
+
+<li><a href="http://www.mkdocs.org">
+Published with MkDocs
+</a></li>
+
+<li><a href="https://github.com/GitbookIO/theme-default">
+Theme by GitBook
+</a></li>
+</ul>
+
+</nav>
+
+</div> <!-- end of book-summary -->
+
+<div class="book-body">
+<div class="body-inner">
+<div class="book-header" role="navigation">
+
+<!-- Title -->
+<h1>
+<i class="fa fa-circle-o-notch fa-spin"></i>
+<a href="." ></a>
+</h1>
+
+</div> <!-- end of book-header -->
+
+<div class="page-wrapper" tabindex="-1" role="main">
+<div class="page-inner">
+<div id="book-search-results">
+<div class="search-noresults">
+
+<section class="normal markdown-section">
+
+
+
+<h1 id="-merging-libraries">🔀 Merging Libraries</h1>
+<blockquote>
+<p>Have study material in more than one <code>.runico</code> file? Fold one into the other — folders,
+topics, cards, <strong>and</strong> your study history come along, with a quick step to sort out any
+duplicates.</p>
+</blockquote>
+<p>Each Runico library is a self-contained <strong><a href="../Your-Library-File/"><code>.runico</code> file</a></strong>. That's great
+for keeping things tidy, but sometimes you end up with two: a deck a classmate shared, a
+subject you started on another laptop, an export you want to fold back in. <strong>Merge</strong> brings
+them together.</p>
+<hr />
+<h2 id="the-short-version">The short version</h2>
+<ol>
+<li><strong>Open</strong> the library you want to keep working in (call it <strong>A</strong>).</li>
+<li>Click <strong>🔀 Merge</strong> in the top bar and pick the <strong>second</strong> file (<strong>B</strong>).</li>
+<li>If any cards clash, resolve them (keep both / edit / skip).</li>
+<li>Done — B's content is now part of A, and A is saved automatically.</li>
+</ol>
+<blockquote>
+<p>🔒 <strong>B is never touched.</strong> Merging only adds to the library you have open. The file you
+merged <em>from</em> is left exactly as it was on disk.</p>
+</blockquote>
+<hr />
+<h2 id="how-content-is-placed">How content is placed</h2>
+<p>Runico doesn't just dump B's folders next to A's — it <strong>matches them up by name</strong> so things
+land where you'd expect:</p>
+<ul>
+<li>A folder or topic in B that has the <strong>same name in the same place</strong> as one in A is
+  <strong>merged into</strong> it. Two folders both called <em>Biology</em> become one <em>Biology</em>.</li>
+<li>Anything in B that <strong>doesn't exist</strong> in A is <strong>added</strong> — a new topic appears inside the
+  matching folder; a brand-new top-level folder appears alongside your existing ones.</li>
+<li>Everything that comes across gets fresh internal ids, so nothing collides with what you
+  already had.</li>
+</ul>
+<p><strong>Example.</strong> You merge <em>Study Set B</em> into your library:</p>
+<pre><code>Your library (A)          Merging in (B)            Result
+─────────────────         ───────────────           ──────────────────
+Biology                   Biology          ──▶      Biology         (merged)
+  └ Cell Biology            └ Cell Biology  ──▶        └ Cell Biology  (cards combined)
+History                    └ Microbiology  ──▶        └ Microbiology  (added)
+                          Spanish          ──▶      History
+                            └ Verbs        ──▶      Spanish           (added)
+                                                      └ Verbs
+</code></pre>
+<hr />
+<h2 id="your-study-history-comes-too">Your study history comes too</h2>
+<p>When a topic from B merges into one of yours, its <strong><a href="../Tracking-Your-Progress/">progress</a></strong>
+isn't thrown away:</p>
+<ul>
+<li>Past <strong>sessions</strong> from both files are combined, so the topic's accuracy chart shows your
+  whole history.</li>
+<li>Per-card pass/fail records travel with each card.</li>
+</ul>
+<p>Newly added folders and topics bring their own history with them.</p>
+<hr />
+<h2 id="resolving-duplicate-cards">Resolving duplicate cards</h2>
+<p>A card counts as a <strong>duplicate</strong> only when it lands in the <strong>same place</strong> <em>and</em> has the
+<strong>same content</strong> as a card you already have. (A card with the same wording under a
+different topic is <strong>not</strong> a duplicate — it's legitimately separate.)</p>
+<p>When duplicates turn up, Runico pauses and shows them to you one at a time, <strong>side by side</strong> —
+your copy on the left, the incoming copy on the right — so you can compare and choose:</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Keep both</strong></td>
+<td>The incoming card is added too. You end up with both copies.</td>
+</tr>
+<tr>
+<td><strong>Edit</strong></td>
+<td>Tweak the incoming card before it's added, so it's no longer a duplicate.</td>
+</tr>
+<tr>
+<td><strong>Skip</strong></td>
+<td>Keep only the copy you already had. The incoming card's study history is <strong>merged into</strong> your surviving card, so you don't lose its practice record.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>💡 Nothing is ever discarded silently — if there's a duplicate, you decide what happens to
+it. If a merge finds <strong>no</strong> duplicates, it just completes, no questions asked.</p>
+</blockquote>
+<p>When it's done you'll see a short summary: <em>"Added 1 folder, 2 topics, and 6 cards · 1
+duplicate resolved."</em></p>
+<hr />
+<h2 id="merging-three-or-more-files">Merging three or more files</h2>
+<p>Merge handles two files at a time, but it's <strong>repeatable</strong> — open A, merge B, then merge C,
+and so on. Each merge folds the next file into the growing library.</p>
+<hr />
+<h2 id="good-to-know">Good to know</h2>
+<ul>
+<li><strong>Where the result goes.</strong> The merged result is written into the library you have open
+  (A) and <strong><a href="../Your-Library-File/">auto-saved</a></strong> to its file. There's no separate "save as"
+  step.</li>
+<li><strong>Changed your mind mid-merge?</strong> Use <strong>Cancel merge</strong> on the duplicate screen (or the
+  Back arrow) — nothing is written until you finish resolving.</li>
+<li><strong>No undo for a whole merge,</strong> but since B is untouched and the added content is easy to
+  spot, you can always delete a grafted folder (it goes to the <strong><a href="../Trash-and-Recovery/">Trash</a></strong>)
+  or re-open B.</li>
+<li><strong>What doesn't come across:</strong> B's trash and its unreviewed AI drafts are left behind, and
+  your own "last session" marker is kept — only real library content is merged.</li>
+</ul>
+<hr />
+<h2 id="a-worked-example">A worked example</h2>
+<p>You've been studying <em>biology.runico</em> all semester. A classmate sends you
+<em>shared-deck.runico</em> with extra cell-biology cards and a whole new Spanish set.</p>
+<ol>
+<li>You <strong>Open</strong> <em>biology.runico</em>.</li>
+<li>You click <strong>🔀 Merge</strong> and pick <em>shared-deck.runico</em>.</li>
+<li>Their <em>Cell Biology</em> merges into yours; the new cards appear, and one card you both had
+   ("Powerhouse of the cell?") shows up as a duplicate. You tap <strong>Skip</strong> — your version
+   stays, and your classmate's practice history on it merges into yours.</li>
+<li>Their <em>Spanish</em> folder lands alongside your subjects.</li>
+<li>The summary reads <em>"Added 1 folder, 1 topic, and 9 cards · 1 duplicate resolved,"</em> and
+   <em>biology.runico</em> saves automatically. ✨</li>
+</ol>
+<hr />
+<h3 id="related">Related</h3>
+<ul>
+<li>💾 <strong><a href="../Your-Library-File/">Your Library File</a></strong> — what a <code>.runico</code> file is and how saving works.</li>
+<li>🌱 <strong><a href="../Organizing-Your-Library/">Organizing Your Library</a></strong> — move, copy, and sort after merging.</li>
+<li>🗑️ <strong><a href="../Trash-and-Recovery/">Trash and Recovery</a></strong> — remove something a merge added.</li>
+<li>📈 <strong><a href="../Tracking-Your-Progress/">Tracking Your Progress</a></strong> — the history that merging preserves.</li>
+</ul>
+
+
+</section>
+</div> <!-- end of search-noresults -->
+<div class="search-results">
+<div class="has-results">
+
+<h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+<ul class="search-results-list"></ul>
+
+</div> <!-- end of has-results -->
+<div class="no-results">
+
+<h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+
+</div> <!-- end of no-results -->
+</div> <!-- end of search-results -->
+</div> <!-- end of book-search-results -->
+
+</div> <!-- end of page-inner -->
+</div> <!-- end of page-wrapper -->
+
+</div> <!-- end of body-inner -->
+
+</div> <!-- end of book-body -->
+<script src="../js/main.js"></script>
+<script src="../search/main.js"></script>
+<script src="../js/gitbook.min.js"></script>
+<script src="../js/theme.min.js"></script>
+</body>
+</html>

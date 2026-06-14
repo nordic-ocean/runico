@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<title>Using OpenRouter - Runico</title>
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="description" content="Magical runes for your learning.">
+<meta name="generator" content="mkdocs-1.6.1, mkdocs-gitbook-1.0.7">
+
+<link rel="shortcut icon" href="../images/favicon.ico" type="image/x-icon">
+<meta name="HandheldFriendly" content="true"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta rel="next" href="" />
+<link href="../css/style.min.css" rel="stylesheet"> 
+</head>
+
+<body>
+<div class="book">
+<div class="book-summary">
+<div id="book-search-input" role="search">
+<input type="text" placeholder="Type to search" />
+</div> <!-- end of book-search-input -->
+
+<nav role="navigation">
+<ul class="summary">
+<li>
+<a href=".." target="_blank" class="custom-link">Runico</a>
+</li>
+<li class="divider"></li>
+<li class="chapter" data-path="">
+<a href="..">Home</a>
+<li class="header">Start here</li>
+
+<li>
+<a href="../Getting-Started/" class="">Getting Started</a>
+</li>
+
+<li>
+<a href="../Your-Library-File/" class="">Your Library File</a>
+</li>
+
+<li class="header">Features</li>
+
+<li>
+<a href="../Studying-Cards/" class="">Studying Cards</a>
+</li>
+
+<li>
+<a href="../Resuming-Your-Last-Session/" class="">Resuming Your Last Session</a>
+</li>
+
+<li>
+<a href="../Browsing-and-Practicing/" class="">Browsing & Practicing</a>
+</li>
+
+<li>
+<a href="../Organizing-Your-Library/" class="">Organizing Your Library</a>
+</li>
+
+<li>
+<a href="../Merging-Libraries/" class="">Merging Libraries</a>
+</li>
+
+<li>
+<a href="../Tracking-Your-Progress/" class="">Tracking Your Progress</a>
+</li>
+
+<li>
+<a href="../Adding-Cards/" class="">Adding Cards</a>
+</li>
+
+<li>
+<a href="./" class="active">Using OpenRouter</a>
+</li>
+
+<li>
+<a href="../Using-Your-Own-AI/" class="">Using Your Own AI</a>
+</li>
+
+<li>
+<a href="../Image-Occlusion-Cards/" class="">Image-Occlusion Cards</a>
+</li>
+
+<li>
+<a href="../Seeing-the-Source/" class="">Seeing the Source</a>
+</li>
+
+<li>
+<a href="../Settings/" class="">Settings</a>
+</li>
+
+<li class="header">Help</li>
+
+<li>
+<a href="../Trash-and-Recovery/" class="">Trash & Recovery</a>
+</li>
+
+<li>
+<a href="../Glossary/" class="">Glossary</a>
+</li>
+
+<li>
+<a href="../FAQ/" class="">FAQ & Troubleshooting</a>
+</li>
+
+<li class="divider"></li>
+
+
+
+<li><a href="http://www.mkdocs.org">
+Published with MkDocs
+</a></li>
+
+<li><a href="https://github.com/GitbookIO/theme-default">
+Theme by GitBook
+</a></li>
+</ul>
+
+</nav>
+
+</div> <!-- end of book-summary -->
+
+<div class="book-body">
+<div class="body-inner">
+<div class="book-header" role="navigation">
+
+<!-- Title -->
+<h1>
+<i class="fa fa-circle-o-notch fa-spin"></i>
+<a href="." ></a>
+</h1>
+
+</div> <!-- end of book-header -->
+
+<div class="page-wrapper" tabindex="-1" role="main">
+<div class="page-inner">
+<div id="book-search-results">
+<div class="search-noresults">
+
+<section class="normal markdown-section">
+
+
+
+<h1 id="-using-openrouter">🤖 Using OpenRouter</h1>
+<blockquote>
+<p>Connect Runico to an AI model so it can <strong>draft cards for you</strong> from a page, a screenshot,
+or your notes. Setup takes about a minute, and you only pay for what you use.</p>
+</blockquote>
+<p>This page covers the OpenRouter setup in depth. For the card-drafting flow itself, see
+<strong><a href="../Adding-Cards/">Adding Cards</a></strong>. No key, or don't want one? You can draft cards for free
+with <strong><a href="../Using-Your-Own-AI/">your own AI chat</a></strong> instead.</p>
+<hr />
+<h2 id="what-is-openrouter">What is OpenRouter?</h2>
+<p><strong>OpenRouter</strong> is a service that gives you access to many AI models (from Google, OpenAI,
+Anthropic, DeepSeek, Mistral, and others) through a single account and a single <strong>API key</strong>.
+Runico uses it as the bridge to whichever model you choose — so you're never locked into one
+provider, and you can pick a cheaper or more capable model whenever you like.</p>
+<p>Runico has <strong>no AI server of its own</strong>. When you generate cards, the request goes straight
+from your device to OpenRouter using <em>your</em> key, and you're billed by OpenRouter for that
+usage.</p>
+<hr />
+<h2 id="setting-up-your-key">Setting up your key</h2>
+<ol>
+<li><strong>Create an account</strong> at <strong><a href="https://openrouter.ai/">openrouter.ai</a></strong> (free).</li>
+<li><strong>Create an API key</strong> in your OpenRouter dashboard, and copy it.</li>
+<li>In Runico, open <strong><a href="../Settings/">Settings</a></strong> (the ⚙️ gear) → <strong>AI card generation</strong>.</li>
+<li><strong>Paste</strong> your key and click <strong>Save</strong>.</li>
+<li>Click <strong>Test key</strong> to confirm Runico can reach OpenRouter with it. ✅</li>
+</ol>
+<p>You can <strong>Clear</strong> the key at any time from the same place.</p>
+<blockquote>
+<p>🔑 You'll need a little credit on your OpenRouter account to generate cards — add a small
+amount in their dashboard. Most models cost a fraction of a cent per batch of cards (see
+below).</p>
+</blockquote>
+<hr />
+<h2 id="choosing-a-generation-model">Choosing a generation model</h2>
+<p>Under <strong>AI card generation → Generation model</strong>, Runico offers a <strong>curated list of models,
+ordered cheapest → most capable</strong>. Next to each one it shows a rough estimate:</p>
+<blockquote>
+<p><strong>≈ N cards per $1</strong></p>
+</blockquote>
+<p>…so you can balance <strong>quality against cost</strong> at a glance. A cheaper model drafts more cards
+per dollar; a stronger model may write better cards from messy or complex material. You can
+switch models any time — the choice is saved as one of your app preferences.</p>
+<blockquote>
+<p>💡 <strong>Tip:</strong> start with one of the cheaper models. If the drafts from a tricky source feel
+thin, bump up to a more capable one for that material.</p>
+</blockquote>
+<hr />
+<h2 id="where-your-key-is-stored-and-kept-private">Where your key is stored (and kept private)</h2>
+<p>Your key is <strong>never</strong> sent anywhere except OpenRouter, and it's stored differently depending
+on where you run Runico:</p>
+<table>
+<thead>
+<tr>
+<th>Where you run Runico</th>
+<th>Where the key lives</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Browser</strong> (Chrome, Edge, …)</td>
+<td>On your device only, in local storage. It never leaves your machine except in the request to OpenRouter.</td>
+</tr>
+<tr>
+<td><strong>Desktop app</strong></td>
+<td>Encrypted in your <strong>operating-system keychain</strong> (macOS Keychain, Windows Credential Manager, etc.). It never reaches the page at all.</td>
+</tr>
+</tbody>
+</table>
+<p>Because the key is a <strong>device preference</strong> (like your theme), it's <em>not</em> part of your
+<strong><a href="../Your-Library-File/"><code>.runico</code> library file</a></strong>. If you open your library on another device,
+you'll re-enter the key there once.</p>
+<hr />
+<h2 id="browser-vs-desktop-a-note-on-reliability">Browser vs. desktop: a note on reliability</h2>
+<p>In the <strong>desktop app</strong>, the generation request is made by the app itself, so it works
+without browser cross-origin (CORS) restrictions and tends to "just work."</p>
+<p>In the <strong>browser</strong>, the request goes directly from the page to OpenRouter. This works in
+most modern browsers, but if you ever hit a <strong>network / CORS</strong> error, you have two easy
+fallbacks:</p>
+<ul>
+<li>Use the <strong><a href="../Getting-Started/">desktop app</a></strong>, or</li>
+<li>Switch to <strong><a href="../Using-Your-Own-AI/">Use my own AI</a></strong> — no key or network call from Runico at all.</li>
+</ul>
+<hr />
+<h2 id="what-it-costs">What it costs</h2>
+<ul>
+<li><strong>Runico itself is free.</strong> The only thing that can cost money is AI generation, billed by
+  <strong>OpenRouter</strong> based on the model you pick and how much you generate.</li>
+<li>The <strong>"≈ N cards per $1"</strong> estimate next to each model is your guide. Typical card batches
+  cost cents.</li>
+<li>Prefer zero cost? <strong><a href="../Using-Your-Own-AI/">Use your own AI chat</a></strong> is completely free.</li>
+</ul>
+<hr />
+<h2 id="troubleshooting">Troubleshooting</h2>
+<p><strong>"Add a key in Settings."</strong>
+You haven't saved an OpenRouter key yet, or it was cleared. Follow <em>Setting up your key</em>
+above — or skip the key and <strong><a href="../Using-Your-Own-AI/">use your own AI</a></strong>.</p>
+<p><strong>"Test key" fails / generation says the key is invalid.</strong>
+Double-check you copied the whole key, that it's still active in your OpenRouter dashboard,
+and that your account has a little credit.</p>
+<p><strong>Generation says "network" or "CORS."</strong>
+The browser couldn't reach OpenRouter directly. Try the <strong>desktop app</strong>, or use
+<strong><a href="../Using-Your-Own-AI/">Use my own AI</a></strong>.</p>
+<p><strong>Generation says "rate."</strong>
+OpenRouter is rate-limiting the requests; wait a moment and try again, or pick a different
+model.</p>
+<hr />
+<h3 id="related">Related</h3>
+<ul>
+<li>✨ <strong><a href="../Adding-Cards/">Adding Cards</a></strong> — the full card-drafting flow.</li>
+<li>💬 <strong><a href="../Using-Your-Own-AI/">Using Your Own AI</a></strong> — draft cards for free with ChatGPT, Claude, or Gemini.</li>
+<li>🎨 <strong><a href="../Settings/">Settings</a></strong> — where the key and model live.</li>
+<li>❓ <strong><a href="../FAQ/">FAQ &amp; Troubleshooting</a></strong> — more common fixes.</li>
+</ul>
+
+
+</section>
+</div> <!-- end of search-noresults -->
+<div class="search-results">
+<div class="has-results">
+
+<h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+<ul class="search-results-list"></ul>
+
+</div> <!-- end of has-results -->
+<div class="no-results">
+
+<h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+
+</div> <!-- end of no-results -->
+</div> <!-- end of search-results -->
+</div> <!-- end of book-search-results -->
+
+</div> <!-- end of page-inner -->
+</div> <!-- end of page-wrapper -->
+
+</div> <!-- end of body-inner -->
+
+</div> <!-- end of book-body -->
+<script src="../js/main.js"></script>
+<script src="../search/main.js"></script>
+<script src="../js/gitbook.min.js"></script>
+<script src="../js/theme.min.js"></script>
+</body>
+</html>

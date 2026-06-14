@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<title>Using Your Own AI - Runico</title>
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="description" content="Magical runes for your learning.">
+<meta name="generator" content="mkdocs-1.6.1, mkdocs-gitbook-1.0.7">
+
+<link rel="shortcut icon" href="../images/favicon.ico" type="image/x-icon">
+<meta name="HandheldFriendly" content="true"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta rel="next" href="" />
+<link href="../css/style.min.css" rel="stylesheet"> 
+</head>
+
+<body>
+<div class="book">
+<div class="book-summary">
+<div id="book-search-input" role="search">
+<input type="text" placeholder="Type to search" />
+</div> <!-- end of book-search-input -->
+
+<nav role="navigation">
+<ul class="summary">
+<li>
+<a href=".." target="_blank" class="custom-link">Runico</a>
+</li>
+<li class="divider"></li>
+<li class="chapter" data-path="">
+<a href="..">Home</a>
+<li class="header">Start here</li>
+
+<li>
+<a href="../Getting-Started/" class="">Getting Started</a>
+</li>
+
+<li>
+<a href="../Your-Library-File/" class="">Your Library File</a>
+</li>
+
+<li class="header">Features</li>
+
+<li>
+<a href="../Studying-Cards/" class="">Studying Cards</a>
+</li>
+
+<li>
+<a href="../Resuming-Your-Last-Session/" class="">Resuming Your Last Session</a>
+</li>
+
+<li>
+<a href="../Browsing-and-Practicing/" class="">Browsing & Practicing</a>
+</li>
+
+<li>
+<a href="../Organizing-Your-Library/" class="">Organizing Your Library</a>
+</li>
+
+<li>
+<a href="../Merging-Libraries/" class="">Merging Libraries</a>
+</li>
+
+<li>
+<a href="../Tracking-Your-Progress/" class="">Tracking Your Progress</a>
+</li>
+
+<li>
+<a href="../Adding-Cards/" class="">Adding Cards</a>
+</li>
+
+<li>
+<a href="../Using-OpenRouter/" class="">Using OpenRouter</a>
+</li>
+
+<li>
+<a href="./" class="active">Using Your Own AI</a>
+</li>
+
+<li>
+<a href="../Image-Occlusion-Cards/" class="">Image-Occlusion Cards</a>
+</li>
+
+<li>
+<a href="../Seeing-the-Source/" class="">Seeing the Source</a>
+</li>
+
+<li>
+<a href="../Settings/" class="">Settings</a>
+</li>
+
+<li class="header">Help</li>
+
+<li>
+<a href="../Trash-and-Recovery/" class="">Trash & Recovery</a>
+</li>
+
+<li>
+<a href="../Glossary/" class="">Glossary</a>
+</li>
+
+<li>
+<a href="../FAQ/" class="">FAQ & Troubleshooting</a>
+</li>
+
+<li class="divider"></li>
+
+
+
+<li><a href="http://www.mkdocs.org">
+Published with MkDocs
+</a></li>
+
+<li><a href="https://github.com/GitbookIO/theme-default">
+Theme by GitBook
+</a></li>
+</ul>
+
+</nav>
+
+</div> <!-- end of book-summary -->
+
+<div class="book-body">
+<div class="body-inner">
+<div class="book-header" role="navigation">
+
+<!-- Title -->
+<h1>
+<i class="fa fa-circle-o-notch fa-spin"></i>
+<a href="." ></a>
+</h1>
+
+</div> <!-- end of book-header -->
+
+<div class="page-wrapper" tabindex="-1" role="main">
+<div class="page-inner">
+<div id="book-search-results">
+<div class="search-noresults">
+
+<section class="normal markdown-section">
+
+
+
+<h1 id="-using-your-own-ai">💬 Using Your Own AI</h1>
+<blockquote>
+<p>No OpenRouter key? No problem. Runico can hand you a ready-made prompt to run in <strong>any</strong>
+AI chat you already use — ChatGPT, Claude, Gemini — then turn the reply back into cards.
+It's completely <strong>free</strong> and needs no key and no network access from Runico.</p>
+</blockquote>
+<p>This is the <strong>"Use my own AI"</strong> path on the Add screen. For the automatic alternative, see
+<strong><a href="../Using-OpenRouter/">Using OpenRouter</a></strong>; for the whole card-drafting picture, see
+<strong><a href="../Adding-Cards/">Adding Cards</a></strong>.</p>
+<hr />
+<h2 id="when-to-use-this">When to use this</h2>
+<ul>
+<li>You don't have (or don't want) an <strong><a href="../Using-OpenRouter/">OpenRouter</a></strong> key.</li>
+<li>You'd rather not pay per generation — your existing AI chat subscription already covers it.</li>
+<li>Automatic generation in the browser hit a <strong>network / CORS</strong> error.</li>
+<li>You simply prefer to see and tweak the prompt yourself.</li>
+</ul>
+<hr />
+<h2 id="how-it-works">How it works</h2>
+<p>Runico does the hard part — it writes a precise prompt and knows how to read the reply. You
+just shuttle text between Runico and your chat assistant.</p>
+<ol>
+<li><strong>Start adding cards.</strong> In the <strong><a href="../Browsing-and-Practicing/">browser</a></strong>, open a folder and
+   begin adding cards to a topic (name it when asked, and drop in your source if you have
+   one).</li>
+<li><strong>Choose <em>Use my own AI</em>.</strong> Instead of running generation itself, Runico shows a
+   ready-made <strong>prompt</strong>.</li>
+<li><strong>Copy the prompt.</strong> Click <strong>Copy prompt</strong>.</li>
+<li><strong>Paste it into your AI chat</strong> — ChatGPT, Claude, Gemini, anything. If your source is an
+   <strong>image</strong> (a diagram or screenshot), attach that image in the chat alongside the prompt.</li>
+<li><strong>Copy the reply.</strong> The assistant responds with card data; copy its <strong>whole</strong> response.</li>
+<li><strong>Paste it back into Runico</strong> and click <strong>Use these cards</strong>.</li>
+<li><strong>Review the drafts.</strong> Just like the automatic flow, you get <strong>Keep</strong>, <strong>Edit</strong>, or
+   <strong>Remove</strong> for each card. Keep the good ones. ✨</li>
+</ol>
+<blockquote>
+<p>💡 The prompt is carefully written so the reply is in exactly the format Runico expects —
+so copy the assistant's response <strong>as-is</strong>, without editing it, and let Runico parse it.</p>
+</blockquote>
+<hr />
+<h2 id="image-occlusion-cards-from-your-own-ai">Image-occlusion cards from your own AI</h2>
+<p>If your source is a <strong>labeled diagram</strong>, Runico can also build an
+<strong><a href="../Image-Occlusion-Cards/">image-occlusion card</a></strong> (one that hides the labels for you to
+recall). There's an <strong>optional second prompt</strong> for this:</p>
+<ol>
+<li>Copy the <strong>occlusion prompt</strong> as well.</li>
+<li>Paste it into your chat <strong>with the image attached</strong>.</li>
+<li>Paste that reply back into Runico too.</li>
+</ol>
+<p>Runico crops the figure and places the masks for you, ready to fine-tune in draft review.
+Either prompt alone is enough — whatever you paste back is combined into one set of drafts.</p>
+<hr />
+<h2 id="tips">Tips</h2>
+<ul>
+<li><strong>Any assistant works</strong> — there's nothing OpenRouter-specific here. Use whichever chat you
+  like best.</li>
+<li><strong>Attach the image</strong> when your source is a picture, or the assistant can only work from
+  text.</li>
+<li><strong>Don't reformat the reply.</strong> Paste the assistant's answer exactly as given; Runico is
+  built to read that format.</li>
+<li>If a reply doesn't import, ask the assistant to "return only the requested format," then
+  copy and paste again.</li>
+</ul>
+<hr />
+<h2 id="a-worked-example">A worked example</h2>
+<p>You're on Safari (no auto-generation) and have a ChatGPT tab open.</p>
+<ol>
+<li>In Runico you start adding cards to <em>Cell signaling</em> and choose <strong>Use my own AI</strong>.</li>
+<li>You <strong>Copy prompt</strong>, switch to ChatGPT, paste it, and hit enter.</li>
+<li>ChatGPT replies with a block of card data. You copy the whole thing.</li>
+<li>Back in Runico you paste it and click <strong>Use these cards</strong> — six drafts appear.</li>
+<li>You <strong>Keep</strong> five and <strong>Remove</strong> one. Done, for free. 🎉</li>
+</ol>
+<hr />
+<h3 id="related">Related</h3>
+<ul>
+<li>✨ <strong><a href="../Adding-Cards/">Adding Cards</a></strong> — all three ways to get cards into a topic.</li>
+<li>🤖 <strong><a href="../Using-OpenRouter/">Using OpenRouter</a></strong> — the automatic, in-app alternative.</li>
+<li>🖼️ <strong><a href="../Image-Occlusion-Cards/">Image-Occlusion Cards</a></strong> — masked-figure cards in depth.</li>
+</ul>
+
+
+</section>
+</div> <!-- end of search-noresults -->
+<div class="search-results">
+<div class="has-results">
+
+<h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+<ul class="search-results-list"></ul>
+
+</div> <!-- end of has-results -->
+<div class="no-results">
+
+<h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+
+</div> <!-- end of no-results -->
+</div> <!-- end of search-results -->
+</div> <!-- end of book-search-results -->
+
+</div> <!-- end of page-inner -->
+</div> <!-- end of page-wrapper -->
+
+</div> <!-- end of body-inner -->
+
+</div> <!-- end of book-body -->
+<script src="../js/main.js"></script>
+<script src="../search/main.js"></script>
+<script src="../js/gitbook.min.js"></script>
+<script src="../js/theme.min.js"></script>
+</body>
+</html>

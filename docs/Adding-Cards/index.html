@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<title>Adding Cards - Runico</title>
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="description" content="Magical runes for your learning.">
+<meta name="generator" content="mkdocs-1.6.1, mkdocs-gitbook-1.0.7">
+
+<link rel="shortcut icon" href="../images/favicon.ico" type="image/x-icon">
+<meta name="HandheldFriendly" content="true"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta rel="next" href="" />
+<link href="../css/style.min.css" rel="stylesheet"> 
+</head>
+
+<body>
+<div class="book">
+<div class="book-summary">
+<div id="book-search-input" role="search">
+<input type="text" placeholder="Type to search" />
+</div> <!-- end of book-search-input -->
+
+<nav role="navigation">
+<ul class="summary">
+<li>
+<a href=".." target="_blank" class="custom-link">Runico</a>
+</li>
+<li class="divider"></li>
+<li class="chapter" data-path="">
+<a href="..">Home</a>
+<li class="header">Start here</li>
+
+<li>
+<a href="../Getting-Started/" class="">Getting Started</a>
+</li>
+
+<li>
+<a href="../Your-Library-File/" class="">Your Library File</a>
+</li>
+
+<li class="header">Features</li>
+
+<li>
+<a href="../Studying-Cards/" class="">Studying Cards</a>
+</li>
+
+<li>
+<a href="../Resuming-Your-Last-Session/" class="">Resuming Your Last Session</a>
+</li>
+
+<li>
+<a href="../Browsing-and-Practicing/" class="">Browsing & Practicing</a>
+</li>
+
+<li>
+<a href="../Organizing-Your-Library/" class="">Organizing Your Library</a>
+</li>
+
+<li>
+<a href="../Merging-Libraries/" class="">Merging Libraries</a>
+</li>
+
+<li>
+<a href="../Tracking-Your-Progress/" class="">Tracking Your Progress</a>
+</li>
+
+<li>
+<a href="./" class="active">Adding Cards</a>
+</li>
+
+<li>
+<a href="../Using-OpenRouter/" class="">Using OpenRouter</a>
+</li>
+
+<li>
+<a href="../Using-Your-Own-AI/" class="">Using Your Own AI</a>
+</li>
+
+<li>
+<a href="../Image-Occlusion-Cards/" class="">Image-Occlusion Cards</a>
+</li>
+
+<li>
+<a href="../Seeing-the-Source/" class="">Seeing the Source</a>
+</li>
+
+<li>
+<a href="../Settings/" class="">Settings</a>
+</li>
+
+<li class="header">Help</li>
+
+<li>
+<a href="../Trash-and-Recovery/" class="">Trash & Recovery</a>
+</li>
+
+<li>
+<a href="../Glossary/" class="">Glossary</a>
+</li>
+
+<li>
+<a href="../FAQ/" class="">FAQ & Troubleshooting</a>
+</li>
+
+<li class="divider"></li>
+
+
+
+<li><a href="http://www.mkdocs.org">
+Published with MkDocs
+</a></li>
+
+<li><a href="https://github.com/GitbookIO/theme-default">
+Theme by GitBook
+</a></li>
+</ul>
+
+</nav>
+
+</div> <!-- end of book-summary -->
+
+<div class="book-body">
+<div class="body-inner">
+<div class="book-header" role="navigation">
+
+<!-- Title -->
+<h1>
+<i class="fa fa-circle-o-notch fa-spin"></i>
+<a href="." ></a>
+</h1>
+
+</div> <!-- end of book-header -->
+
+<div class="page-wrapper" tabindex="-1" role="main">
+<div class="page-inner">
+<div id="book-search-results">
+<div class="search-noresults">
+
+<section class="normal markdown-section">
+
+
+
+<h1 id="-adding-cards">✨ Adding Cards</h1>
+<blockquote>
+<p>Drop in material, let Runico draft cards, then keep the ones worth studying.</p>
+</blockquote>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/nordic-ocean/runico/main/tutorial/assets/add.gif" alt="Adding cards from anything — looping demo" width="700">
+  <br><sub>Looping demo · plays automatically</sub>
+</p>
+
+<p>You can turn almost <strong>anything</strong> into flashcards — a textbook page, a screenshot, your
+class notes, a diagram. You drop in the material, Runico reads it and <strong>drafts cards for
+you</strong>, and you review each one and keep only the good ones.</p>
+<p>There are three ways to get cards into a topic. Pick whichever suits you:</p>
+<ol>
+<li><strong><a href="#1--let-ai-draft-cards-for-you">Let AI draft them for you</a></strong> (needs a free OpenRouter key — see below)</li>
+<li><strong><a href="#2--use-your-own-ai-chatgpt-claude-gemini">Use your own AI chat</a></strong> (no key needed)</li>
+<li><strong><a href="#3--write-cards-by-hand">Write them by hand</a></strong></li>
+</ol>
+<hr />
+<h2 id="before-you-start-the-ai-key-optional-but-recommended">Before you start: the AI key (optional but recommended)</h2>
+<p>To have Runico draft cards automatically, it needs to talk to an AI model through a service
+called <strong>OpenRouter</strong>. This takes one minute to set up (full guide:
+<strong><a href="../Using-OpenRouter/">Using OpenRouter</a></strong>):</p>
+<ol>
+<li>Make a free account at <strong><a href="https://openrouter.ai/">openrouter.ai</a></strong> and create an API key.</li>
+<li>In Runico, open <strong><a href="../Settings/">Settings</a></strong> → <strong>AI card generation</strong>.</li>
+<li>Paste your key and click <strong>Save</strong>. (Click <strong>Test key</strong> to confirm it works.)</li>
+<li>Optionally pick a <strong>Generation model</strong> — Runico shows a rough <em>"≈ N cards per $1"</em>
+   estimate so you can balance quality against cost.</li>
+</ol>
+<blockquote>
+<p>🔒 <strong>Your key stays private.</strong> In the browser it's stored only on your device; in the
+desktop app it's encrypted in your operating system's keychain. It's never sent anywhere
+except OpenRouter.</p>
+</blockquote>
+<p><strong>No key, or don't want one?</strong> No problem — skip to
+<strong><a href="#2--use-your-own-ai-chatgpt-claude-gemini">Use your own AI chat</a></strong>.</p>
+<hr />
+<h2 id="1--let-ai-draft-cards-for-you">1 · Let AI draft cards for you</h2>
+<ol>
+<li><strong>Start the flow.</strong> In the <strong><a href="../Browsing-and-Practicing/">browser</a></strong>, open a folder and
+   click <strong>➕ Add AI Cards</strong> (or <strong>Add more AI Cards</strong> on a topic's action card). You'll see
+   a breadcrumb like <em>New AI Cards in Biology › Cell Biology</em> so you know where the cards
+   will land.</li>
+<li><strong>Name the topic.</strong> Answer <em>"What are you learning?"</em> with a name like <em>Cell signaling</em>.</li>
+<li><strong>Drop in your source.</strong> Use the <strong>"Drop, paste, or browse"</strong> zone — an image, a chapter,
+   a screenshot, or a page of notes. Once a file lands you'll see a thumbnail and a
+   <em>"ready to read"</em> check.</li>
+<li><strong>(Optional) Set what matters most.</strong> Drag to reorder priorities like <em>Definitions</em>,
+   <em>Labeled diagrams</em>, <em>Examples</em>, <em>Body prose</em> so the AI focuses on what you care about.</li>
+<li><strong>Click <em>Begin</em>.</strong> Runico works in the background, cycling through <em>Reading →
+   Understanding → Drafting cards → Choosing the best</em>. You can even leave this screen —
+   your cards will be waiting.</li>
+<li><strong>Review each draft.</strong> For every card you get <strong>Remove</strong>, <strong>Edit</strong>, or <strong>Keep</strong>. Keep the
+   good ones, drop the rest.</li>
+<li><strong>Done.</strong> You'll see <em>"5 cards added to Cell signaling,"</em> with <strong>View cards</strong> and <strong>Back
+   home</strong>.</li>
+</ol>
+<blockquote>
+<p>💡 The cards stay as <strong>drafts</strong> until you review them — your topic shows a <em>"N new cards
+ready"</em> badge until you do.</p>
+</blockquote>
+<hr />
+<h2 id="2--use-your-own-ai-chatgpt-claude-gemini">2 · Use your own AI (ChatGPT, Claude, Gemini…)</h2>
+<p>No OpenRouter key? You can still get AI-drafted cards using <em>any</em> chat assistant you already
+use. On the Add screen, choose <strong>Use my own AI</strong>:</p>
+<ol>
+<li>Runico shows a ready-made <strong>prompt</strong>. Click <strong>Copy prompt</strong>.</li>
+<li>Paste it into your AI chat (ChatGPT, Claude, Gemini — anything). If your source is an
+   image, attach the image in the chat too.</li>
+<li>The AI replies with card data. Copy its whole response.</li>
+<li>Back in Runico, <strong>paste the response</strong> into the box and click <strong>Use these cards</strong>.</li>
+<li>Review and keep, exactly like the automatic flow.</li>
+</ol>
+<p>There's even an optional second prompt for building <strong>image-occlusion</strong> cards from a figure
+— see <strong><a href="../Image-Occlusion-Cards/">Image-Occlusion Cards</a></strong>. Full walkthrough:
+<strong><a href="../Using-Your-Own-AI/">Using Your Own AI</a></strong>.</p>
+<hr />
+<h2 id="3--write-cards-by-hand">3 · Write cards by hand</h2>
+<p>You can always author cards yourself. When editing a card you choose its type:</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>What it is</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Q&amp;A</strong></td>
+<td>A question on the front, an answer on the back.</td>
+<td><em>Q: What organelle makes ATP? → A: Mitochondrion</em></td>
+</tr>
+<tr>
+<td><strong>Cloze</strong></td>
+<td>A sentence with a blank you fill in. Wrap the blank in <code>{{ }}</code>.</td>
+<td><em>The {{nucleus}} holds the cell's DNA.</em></td>
+</tr>
+<tr>
+<td><strong>Reversible</strong></td>
+<td>A term ↔ definition pair you can study in both directions.</td>
+<td><em>Front: Mitochondrion · Back: the cell's powerhouse</em></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="a-worked-example">A worked example</h2>
+<p>You snap a photo of a textbook page on cell signaling. You:</p>
+<ol>
+<li>Click <strong>Add AI Cards</strong> inside <em>Cell Biology</em>.</li>
+<li>Name it <em>Cell signaling</em>, drop in the photo, and tap <strong>Begin</strong>.</li>
+<li>After a few seconds, 6 draft cards appear. You <strong>Keep</strong> 5 and <strong>Remove</strong> 1 that's too
+   trivial.</li>
+<li>Tap <strong>View cards</strong> — your new topic is ready to <strong><a href="../Studying-Cards/">study</a></strong>. ✨</li>
+</ol>
+<hr />
+<h3 id="related">Related</h3>
+<ul>
+<li>🤖 <strong><a href="../Using-OpenRouter/">Using OpenRouter</a></strong> — set up the key, choose a model, and what it costs.</li>
+<li>💬 <strong><a href="../Using-Your-Own-AI/">Using Your Own AI</a></strong> — draft cards for free with ChatGPT, Claude, or Gemini.</li>
+<li>🖼️ <strong><a href="../Image-Occlusion-Cards/">Image-Occlusion Cards</a></strong> — make cards that hide labels on a figure.</li>
+<li>🎨 <strong><a href="../Settings/">Settings</a></strong> — where the OpenRouter key and model live.</li>
+<li>🔎 <strong><a href="../Seeing-the-Source/">Seeing the Source</a></strong> — each card links back to the material it came from.</li>
+</ul>
+
+
+</section>
+</div> <!-- end of search-noresults -->
+<div class="search-results">
+<div class="has-results">
+
+<h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+<ul class="search-results-list"></ul>
+
+</div> <!-- end of has-results -->
+<div class="no-results">
+
+<h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+
+</div> <!-- end of no-results -->
+</div> <!-- end of search-results -->
+</div> <!-- end of book-search-results -->
+
+</div> <!-- end of page-inner -->
+</div> <!-- end of page-wrapper -->
+
+</div> <!-- end of body-inner -->
+
+</div> <!-- end of book-body -->
+<script src="../js/main.js"></script>
+<script src="../search/main.js"></script>
+<script src="../js/gitbook.min.js"></script>
+<script src="../js/theme.min.js"></script>
+</body>
+</html>
