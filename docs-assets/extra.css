@@ -1,0 +1,8 @@
+/* mkdocs-gitbook 0.0.1 ships the search-results markup but omits the rules that
+   keep it hidden until a search is active — so the "RESULTS MATCHING" / "NO
+   RESULTS MATCHING" headers leak onto the bottom of every page. Restore the
+   default-hidden behaviour; the theme adds `with-search` to `.book` while a query
+   is active, which reveals the panel and hides the normal page content. */
+#book-search-results .search-results { display: none; }
+.book.with-search #book-search-results .search-results { display: block; }
+.book.with-search #book-search-results .search-noresults { display: none; }
