@@ -15,7 +15,7 @@ const STORE_PREFIX = 'runico:v3:';
 
 // App version shown in the bottom-left build badge. Keep in sync with
 // package.json "version" — electron-builder names the installers from that.
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.1';
 
 // ── Native (desktop) backend ─────────────────────────────
 // In the Electron build, window.runico (preload.js) exposes the OS keychain, the
