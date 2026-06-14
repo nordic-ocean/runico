@@ -54,8 +54,9 @@ This is where you set up automatic card drafting. Under **AI card generation** y
   weigh quality vs. cost.
 
 > 🔒 Your key is private: stored only on your device in the browser, or encrypted in your
-> OS keychain in the desktop app. Full setup steps are on the **[Adding Cards](Adding-Cards)**
-> page.
+> OS keychain in the desktop app. Full setup, model choice, and costs are on
+> **[Using OpenRouter](Using-OpenRouter)** — or skip the key and use
+> **[your own AI](Using-Your-Own-AI)**.
 
 ---
 
@@ -68,7 +69,8 @@ turns near-black instantly. Much better. You tap **Done** and get back to studyi
 
 ### Related
 
-- ✨ **[Adding Cards](Adding-Cards)** — full OpenRouter key setup and the AI flow.
+- 🤖 **[Using OpenRouter](Using-OpenRouter)** — full key setup, model choice, and costs.
+- ✨ **[Adding Cards](Adding-Cards)** — the AI card-drafting flow.
 - ❓ **[FAQ & Troubleshooting](FAQ)** — answers to common questions.
 
 <div align="center"><sub><a href="Home">↑ Home</a></sub></div>

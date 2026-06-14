@@ -22,7 +22,8 @@ There are three ways to get cards into a topic. Pick whichever suits you:
 ## Before you start: the AI key (optional but recommended)
 
 To have Runico draft cards automatically, it needs to talk to an AI model through a service
-called **OpenRouter**. This takes one minute to set up:
+called **OpenRouter**. This takes one minute to set up (full guide:
+**[Using OpenRouter](Using-OpenRouter)**):
 
 1. Make a free account at **[openrouter.ai](https://openrouter.ai/)** and create an API key.
 2. In Runico, open **[Settings](Settings)** → **AI card generation**.
@@ -77,7 +78,8 @@ use. On the Add screen, choose **Use my own AI**:
 5. Review and keep, exactly like the automatic flow.
 
 There's even an optional second prompt for building **image-occlusion** cards from a figure
-— see **[Image-Occlusion Cards](Image-Occlusion-Cards)**.
+— see **[Image-Occlusion Cards](Image-Occlusion-Cards)**. Full walkthrough:
+**[Using Your Own AI](Using-Your-Own-AI)**.
 
 ---
 
@@ -107,6 +109,8 @@ You snap a photo of a textbook page on cell signaling. You:
 
 ### Related
 
+- 🤖 **[Using OpenRouter](Using-OpenRouter)** — set up the key, choose a model, and what it costs.
+- 💬 **[Using Your Own AI](Using-Your-Own-AI)** — draft cards for free with ChatGPT, Claude, or Gemini.
 - 🖼️ **[Image-Occlusion Cards](Image-Occlusion-Cards)** — make cards that hide labels on a figure.
 - 🎨 **[Settings](Settings)** — where the OpenRouter key and model live.
 - 🔎 **[Seeing the Source](Seeing-the-Source)** — each card links back to the material it came from.

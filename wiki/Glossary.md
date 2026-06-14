@@ -30,6 +30,14 @@ it.
 **Library** — your whole collection: all folders, topics, cards, and history. It's saved
 as one **`.runico` file** you own. See **[Your Library File](Your-Library-File)**.
 
+**Merge** — folding one library into another: open one `.runico` file and pull a second
+one's folders, topics, cards, and history into it. Matching folders/topics combine; new ones
+are added. See **[Merging Libraries](Merging-Libraries)**.
+
+**Duplicate (card)** — during a merge, an incoming card that lands in the **same place** and
+has the **same content** as one you already have. Runico asks you to keep both, edit it, or
+skip it.
+
 **Session (or "sitting")** — one round of studying. Runico records each session to chart
 your progress.
 
