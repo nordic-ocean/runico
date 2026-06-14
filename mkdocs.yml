@@ -1,0 +1,41 @@
+site_name: Runico
+site_description: Magical runes for your learning.
+site_url: https://nordic-ocean.github.io/runico/docs/
+repo_url: https://github.com/nordic-ocean/runico
+repo_name: nordic-ocean/runico
+docs_dir: .wiki-build
+site_dir: docs
+theme:
+  name: gitbook
+markdown_extensions:
+  - tables
+  - fenced_code
+  - admonition
+  - attr_list
+  - sane_lists
+  - toc:
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+nav:
+  - Home: index.md
+  - Start here:
+    - Getting Started: Getting-Started.md
+    - Your Library File: Your-Library-File.md
+  - Features:
+    - Studying Cards: Studying-Cards.md
+    - Resuming Your Last Session: Resuming-Your-Last-Session.md
+    - Browsing & Practicing: Browsing-and-Practicing.md
+    - Organizing Your Library: Organizing-Your-Library.md
+    - Merging Libraries: Merging-Libraries.md
+    - Tracking Your Progress: Tracking-Your-Progress.md
+    - Adding Cards: Adding-Cards.md
+    - Using OpenRouter: Using-OpenRouter.md
+    - Using Your Own AI: Using-Your-Own-AI.md
+    - Image-Occlusion Cards: Image-Occlusion-Cards.md
+    - Seeing the Source: Seeing-the-Source.md
+    - Settings: Settings.md
+  - Help:
+    - Trash & Recovery: Trash-and-Recovery.md
+    - Glossary: Glossary.md
+    - FAQ & Troubleshooting: FAQ.md

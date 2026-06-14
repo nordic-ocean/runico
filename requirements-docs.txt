@@ -1,0 +1,5 @@
+# Tooling for the documentation site (see .github/workflows/docs.yml).
+# Builds the GitBook-themed MkDocs site from wiki/. Not needed to run the app.
+mkdocs>=1.6,<2
+mkdocs-gitbook==0.0.1
+pymdown-extensions>=10
