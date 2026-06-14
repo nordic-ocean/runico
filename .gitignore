@@ -9,3 +9,8 @@ dist-electron/
 .env
 .env.*
 .DS_Store
+
+# Docs site build (see .github/workflows/docs.yml). The intermediate MkDocs source
+# tree and any local site output are regenerable; docs/ itself is published by CI.
+.wiki-build/
+site/

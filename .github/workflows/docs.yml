@@ -1,0 +1,73 @@
+name: Publish docs site
+
+# Builds the GitBook-themed MkDocs documentation site from wiki/ and publishes it
+# to docs/ on main. GitHub Pages (which serves the main branch root) then exposes
+# it at https://nordic-ocean.github.io/runico/docs/.
+#
+# wiki/ stays the single source of truth: a small converter (scripts/build-wiki-site.py)
+# turns the GitHub-Wiki Markdown into a MkDocs source tree, then mkdocs builds it
+# straight into docs/. The live app at /runico/app/ and the Pages settings are
+# untouched — only the docs/ folder is written.
+#
+# Two ways in:
+#   • Automatic: any push to main that touches the docs source (wiki/, the config,
+#     the converter, or this workflow).
+#   • Manual:    Actions → "Publish docs site" → Run workflow.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'wiki/**'
+      - 'mkdocs.yml'
+      - 'scripts/build-wiki-site.py'
+      - 'requirements-docs.txt'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+# Needed so the job can commit the rebuilt docs/ back to main.
+permissions:
+  contents: write
+
+# One publish at a time.
+concurrency:
+  group: publish-docs
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install MkDocs + GitBook theme
+        run: pip install -r requirements-docs.txt
+
+      - name: Build the site (wiki/ -> docs/)
+        run: |
+          python scripts/build-wiki-site.py wiki .wiki-build
+          mkdocs build --strict
+          touch docs/.nojekyll
+
+      - name: Commit docs/ back to main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f docs
+          if git diff --cached --quiet; then
+            echo "Docs already up to date — nothing to publish."
+            exit 0
+          fi
+          # [skip ci] + the paths filter (docs/** is not a trigger) keep this from
+          # re-triggering itself.
+          git commit -m "docs: rebuild GitBook site from ${GITHUB_SHA::7} [skip ci]"
+          git push origin HEAD:main
+          echo "Published to https://nordic-ocean.github.io/runico/docs/"
