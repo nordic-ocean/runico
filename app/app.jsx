@@ -3414,44 +3414,44 @@ function MergeResolveScreen({ duplicates, onResolve, onCancel }) {
   const renderCard = (card) => {
     if (card.kind === 'occlusion') {
       return card.image
-        ? <img src={card.image} alt="" style={{ maxWidth: '100%', borderRadius: 8, display: 'block' }} />
-        : <div className="card-answer muted">{t('add.reviewOcclusionTag')}</div>;
+        ? <img className="merge-dup-img" src={card.image} alt="" />
+        : <div className="merge-dup-a">{t('add.reviewOcclusionTag')}</div>;
     }
     return (
       <>
-        <div className="card-question smaller">{card.kind === 'cloze' ? <Cloze text={card.q} revealed={true} /> : card.q}</div>
-        {card.a && <div className="card-answer muted">{card.a}</div>}
+        <div className="merge-dup-q">{card.kind === 'cloze' ? <Cloze text={card.q} revealed={true} /> : card.q}</div>
+        {card.a && <><div className="merge-dup-divider" /><div className="merge-dup-a">{card.a}</div></>}
       </>
     );
   };
 
   return (
-    <div className="stage-inner">
+    <div className="stage-inner wide">
       <div className="eyebrow">{t('merge.dupCounter', { idx: idx + 1, total: duplicates.length })}<span className="dot" />{d.pathLabel}</div>
-      <p className="copy">{t('merge.dupExplain')}</p>
+      <p className="merge-dup-lead">{t('merge.dupExplain')}</p>
 
       <div className="merge-dup-pair">
         <div className="merge-dup-col">
           <div className="merge-dup-tag">{t('merge.dupExisting')}</div>
-          {renderCard(d.aCard)}
+          <div className="merge-dup-card">{renderCard(d.aCard)}</div>
         </div>
-        <div className="merge-dup-col">
+        <div className="merge-dup-col is-incoming">
           <div className="merge-dup-tag">{t('merge.dupIncoming')}</div>
-          {editing ? (
-            <>
-              <input className="card-question smaller" value={editQ} onChange={e => setEditQ(e.target.value)}
-                     style={{ border: '1px solid #EBEEF2', borderRadius: 8, padding: 14, font: 'inherit', width: '100%', outline: 'none' }} />
-              <input className="card-answer" value={editA} onChange={e => setEditA(e.target.value)}
-                     style={{ border: '1px solid #EBEEF2', borderRadius: 8, padding: 14, font: 'inherit', width: '100%', outline: 'none', marginTop: 12 }} />
-            </>
-          ) : renderCard(d.bCard)}
+          <div className="merge-dup-card">
+            {editing ? (
+              <>
+                <input className="merge-dup-edit" value={editQ} onChange={e => setEditQ(e.target.value)} />
+                <input className="merge-dup-edit" value={editA} onChange={e => setEditA(e.target.value)} />
+              </>
+            ) : renderCard(d.bCard)}
+          </div>
         </div>
       </div>
 
       <div className="card-foot">
         <div className="card-foot-row">
           <div className="card-meta">
-            <button onClick={onCancel}>{t('merge.dupCancel')}</button>
+            <button className="merge-dup-cancel" onClick={onCancel}>{t('merge.dupCancel')}</button>
           </div>
           {editing ? (
             <div className="row-tight">
