@@ -57,7 +57,14 @@ def main(src, dst):
         with open(os.path.join(dst, out), 'w', encoding='utf-8') as fh:
             fh.write(s)
         n += 1
-    print('Converted %d pages: %s -> %s' % (n, src, dst))
+    # Copy static assets referenced by mkdocs.yml (e.g. extra.css) into the build.
+    assets = 0
+    if os.path.isdir('docs-assets'):
+        for a in glob.glob('docs-assets/*'):
+            if os.path.isfile(a):
+                shutil.copy(a, os.path.join(dst, os.path.basename(a)))
+                assets += 1
+    print('Converted %d pages (+%d assets): %s -> %s' % (n, assets, src, dst))
 
 
 if __name__ == '__main__':
